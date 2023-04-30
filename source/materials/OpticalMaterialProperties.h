@@ -67,6 +67,8 @@ namespace opticalprops {
 
   G4MaterialPropertiesTable* PolishedAl();
 
+  G4MaterialPropertiesTable* Polystyrene();
+
   G4MaterialPropertiesTable* EJ280();
 
   G4MaterialPropertiesTable* EJ286();
