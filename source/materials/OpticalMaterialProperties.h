@@ -85,6 +85,8 @@ namespace opticalprops {
 
   G4MaterialPropertiesTable* XXX();
 
+  G4MaterialPropertiesTable* Si();
+
 
   constexpr G4double optPhotMinE_ =  0.2  * eV;
   constexpr G4double optPhotMaxE_ = 11.5  * eV;

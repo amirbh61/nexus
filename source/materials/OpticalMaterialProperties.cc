@@ -700,6 +700,64 @@ namespace opticalprops {
 
 
 
+  /// Si ///
+  G4MaterialPropertiesTable* Si()
+  {
+    // properties taken from  https://www.pveducation.org/pvcdrom/materials/optical-properties-of-silicon
+
+    G4MaterialPropertiesTable* mpt = new G4MaterialPropertiesTable();
+
+    //REFLECTIVITY
+    std::vector<G4double> ENERGIES = {
+      1.5498 * eV,  1.937 * eV,   2.479 * eV, 
+      3.099 * eV,   3.874 * eV,   4.959 * eV   
+    };
+
+
+    std::vector<G4double> REFLECTIVITY = {
+      0.328,   0.346,   0.387,
+      0.486,   0.574,   0.672
+    };
+
+    // std::vector<G4double> REFLECTIVITY = {
+    //   0.,  0.,  0.,
+    //   0.,  0.,  0.
+    // };
+    // std::vector<G4double> REFLECTIVITY = {
+    //   1.,  1.,  1.,  1.,
+    //   1.,  1.,  1.
+    // };
+
+    mpt->AddProperty("REFLECTIVITY", ENERGIES, REFLECTIVITY);
+
+
+    // REFRACTIVE INDEX
+    std::vector<G4double> rIndex = {
+      3.68,   3.861,  4.293,
+      5.587,  5.102,  1.694
+    };
+    mpt->AddProperty("RINDEX", ENERGIES, rIndex);
+
+
+    //ABSORPTION LENGTH
+    std::vector<G4double> abs_length = {
+      1176 * um,   328.9 * um,   90 * um,
+      10.5 * um,     0.78 * um,     0.54 * um
+    };
+
+    // std::vector<G4double> abs_length = {
+    //   0.2 * cm,   0.2 * cm,   0.2 * cm,
+    //   0.2 * cm,     0.2 * cm,     0.2 * cm
+    // };
+
+    mpt->AddProperty("ABSLENGTH", ENERGIES, abs_length);
+    return mpt;
+
+  }
+
+
+
+
 
   /// PTFE (== TEFLON) ///
   G4MaterialPropertiesTable* PTFE()

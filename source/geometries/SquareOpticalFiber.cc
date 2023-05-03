@@ -12,13 +12,21 @@
 #include "G4VSensitiveDetector.hh"
 #include <iomanip>
 #include "CLHEP/Random/Random.h"
+#include <optional>
+#include "SquareFiberSD.h"
+#include "G4SDManager.hh"
 
 // 21.4.23 rnd generator still NOT GOOD !!
 // need to tell paula about the TPB not having energy conservation
 // with walls, with caldding = 3.48% photons hit
-// with walls, no lcadding = 7.989% photons hit
+// with walls, no lcadding = 7.989% photons hit ""
 // DOESN'T MAKE SENSE !!
 // maybe try that the fiber's part inside the holder will have no cladding.
+
+// 30.4.23 remember to change geant seeds between workers in multiprocess
+// tried to add writing of xyz hits to text, didn't work 
+// test sipm photons hit for w/wo cladding combined with w/wo walls
+// SquareFiberSD.cc needs working
 
 namespace nexus{
 
@@ -26,7 +34,7 @@ REGISTER_CLASS(SquareOpticalFiber, GeometryBase)
 
 
 
-SquareOpticalFiber::SquareOpticalFiber() : gen_(), GeometryBase(), msg_(), z_dist_()
+SquareOpticalFiber::SquareOpticalFiber() : gen_(), GeometryBase(), msg_(), z_dist_() 
 {  
 msg_ = new G4GenericMessenger(this, "/Geometry/SquareOpticalFiber/", "Control commands of geometry SquareOpticalFiber."); 
 msg_-> DeclarePropertyWithUnit("specific_vertex", "mm",  specific_vertex_, "Set generation vertex.");
@@ -36,11 +44,15 @@ msg_-> DeclarePropertyWithUnit("distanceFiberHolder", "mm",  distanceFiberHolder
 msg_-> DeclarePropertyWithUnit("distanceAnodeHolder", "mm",  distanceAnodeHolder_, "Set distance between anode and holder.");
 msg_-> DeclarePropertyWithUnit("holderThickness", "mm",  holderThickness_, "Teflon holder thickness.");
 msg_-> DeclarePropertyWithUnit("TPBThickness", "um",  TPBThickness_, "TPB thickness.");
+
+// msgSD_ = new G4GenericMessenger(this, "/Geometry/SquareOpticalFiber/Output/", "Commands for setting output file paths.");
+// msgSD_ = DeclareMethod("sipmPath", &SquareOpticalFiber::SetSiPMOutputPath, this).SetGuidance("Set the output file path for SiPM hits.");
+// msgSD_ = DeclareMethod("tpbPath", &SquareOpticalFiber::SetTPBOutputPath, this).SetGuidance("Set the output file path for TPB hits.");
 }
 
 
-SquareOpticalFiber::~SquareOpticalFiber()
-{}
+SquareOpticalFiber::~SquareOpticalFiber(){
+}
 
 
 void SquareOpticalFiber::Construct(){
@@ -71,10 +83,11 @@ void SquareOpticalFiber::Construct(){
     PMMA->SetMaterialPropertiesTable(opticalprops::PMMA());
     FPethylene->SetMaterialPropertiesTable(opticalprops::FPethylene());
     TPB->SetMaterialPropertiesTable(opticalprops::TPB());
+    Si->SetMaterialPropertiesTable(opticalprops::Si());
 
 
     // Add reflective surface to Teflon material
-    G4OpticalSurface* teflonSurface = new G4OpticalSurface("Teflon_coating",
+    G4OpticalSurface* teflonSurface = new G4OpticalSurface("Teflon_Surface",
                                                             // glisur,
                                                             unified,
                                                             // polished,
@@ -87,16 +100,30 @@ void SquareOpticalFiber::Construct(){
     teflonSurface->SetMaterialPropertiesTable(opticalprops::PTFE());
 
     // Add reflective surface to TPB material
-    G4OpticalSurface* TPBSurface = new G4OpticalSurface("TPB",
+    G4OpticalSurface* TPBSurface = new G4OpticalSurface("TPB_surface",
                                                             // glisur,
                                                             unified,
                                                             ground,
-                                                            // polished,
+                                                            // polished
                                                             dielectric_dielectric,
-                                                            1 // surface normal variance, Radians                                                      
+                                                            0.2 // surface normal variance, Radians                                                      
                                                             );
 
     TPBSurface->SetMaterialPropertiesTable(opticalprops::TPB());
+
+
+    // // Add reflective surface to Si material
+    // G4OpticalSurface* SiSurface = new G4OpticalSurface("Si_Surface",
+    //                                                         // glisur,
+    //                                                         unified,
+    //                                                         ground,
+    //                                                         // polished
+    //                                                         dielectric_metal,
+    //                                                         0.01 // surface normal variance, Radians                                                      
+    //                                                         );
+
+    // SiSurface->SetMaterialPropertiesTable(opticalprops::Si());
+
 
 
 
@@ -157,8 +184,8 @@ void SquareOpticalFiber::Construct(){
     //                 true);          // checking overlaps
 
 
-    // //make barrel surface reflective
-    // new G4LogicalSkinSurface( "Teflon_coating", barrelLogicalVolume, teflonSurface);
+    //make barrel surface reflective
+    new G4LogicalSkinSurface( "Teflon_coating", barrelLogicalVolume, teflonSurface);
 
 
 
@@ -188,8 +215,8 @@ void SquareOpticalFiber::Construct(){
                     0,                // copy number
                     true);          // checking overlaps
 
-    //add reflective surface to cap
-    new G4LogicalSkinSurface( "Teflon_coating", capLogicalVolume, teflonSurface);
+    // //add reflective surface to cap
+    // new G4LogicalSkinSurface( "Teflon_coating", capLogicalVolume, teflonSurface);
 
 
     ///// SIPM ARRAY /////
@@ -200,7 +227,7 @@ void SquareOpticalFiber::Construct(){
                               sideSiPM, //side b
                               thicknessSiPM); //side c
 
-    G4LogicalVolume* SiPMLogicalVolume = new G4LogicalVolume(SiPMSolidVolume, //the cylinder object
+    G4LogicalVolume* SiPMLogicalVolume = new G4LogicalVolume(SiPMSolidVolume, 
                                             Si, //material of cylinder
                                             "SiPM"); //name
 
@@ -212,52 +239,11 @@ void SquareOpticalFiber::Construct(){
     G4int numberOfSiPMs = n; //in a row/column , needs to be an ODD number!
 
     if (numberOfSiPMs%2 == 0) G4cout << "SiPM Number must be an ODD number !!" << G4endl;
-    // G4float pitch_ = 10*mm;
     G4double maxCoord = (numberOfSiPMs-1) * pitch_ / 2.0;
-    G4float delta = 0.001*mm;
+    // G4float delta = 0.001*mm; // SiPM is just a bit outside Cap1
+    G4float delta = 1*mm; 
     G4float zSiPM = cylLength + thicknessSiPM - delta;
     G4String name;
-
-    for (G4double x=-maxCoord; x<=maxCoord; x+=pitch_){
-        for (G4double y=-maxCoord; y<=maxCoord; y+=pitch_){
-
-            //Handle x,y values to be stored and printed in format %f.2
-            std::stringstream stream;
-            stream << std::fixed << std::setprecision(2) << x;
-            std::string x_str = stream.str();
-            stream.str("");
-            stream << std::fixed << std::setprecision(2) << y;
-            std::string y_str = stream.str();
-
-            name = "SiPM_(x,y)=(" + std::to_string(x) + "," + std::to_string(y) + ")"; 
-
-            new G4PVPlacement(
-                        0,                // no rotation
-                        G4ThreeVector(x,y,zSiPM),  // at (0,0,0)
-                        SiPMLogicalVolume, // its logical volume
-                        name,               //its name
-                        worldLogicalVolume,   //its mother volume
-                        // capLogicalVolume,
-                        false,            // no boolean operation
-                        0,// copy number, this time each SiPM has a unique copy number
-                        false);          // checking overlaps
-
-
-            // SiPM = SiPMSD::
-            // G4SDManager* SDmanager = G4SDManager::GetSDMpointer();
-            // G4String detectorSDname = name;
-            // if(!aDetectorSD){
-            //     SiPM = new DetectorSD(detectorSDname);
-            //     SDmanager->AddNewDetector(aDetectorSD);   
-            //     }
-            // SiPM::SiPMSD(name) : G4VSensitiveDetector
-            // SiPM = new SiPMSD::SiPMSD(name);
-            // // SiPM = new SiPMSD(name);
-            // SiPMLogicalVolume->SetSensitiveDetector(SiPM);
-                   
-        }
-    }
-
 
 
 
@@ -268,8 +254,6 @@ void SquareOpticalFiber::Construct(){
     // G4double holderWidth = 5*mm; //half width
     // G4double fiberLength = 0.5*cylLength - thicknessSiPM - delta/2; // when sipm is outside cap
     G4double fiberLength = 0.5*cylLength - delta/2; // when sipm is inside cap
-    G4double teflonWallLength = 0.5*(cylLength - distanceFiberHolder_ - holderWidth);
-    // G4double teflonWallLength = 0.5*(cylLength - distanceFiberHolder_); //for a single fiber heatmap simulation
 
     G4Box *fiberCore = new G4Box("Fiber_Core", //name
                            fiberSize, //side a
@@ -308,12 +292,15 @@ void SquareOpticalFiber::Construct(){
     G4Color brown = G4Color::Brown();
     G4VisAttributes* claddingColor = new G4VisAttributes(brown);
     fiberCladdingLogicalVolume->SetVisAttributes(claddingColor);
+    std::optional<bool> claddingExists = false; // a flag -> needed for specific geometry change for cladding
 
 
     ///// TEFLON WALL SURROUNDING FIBER CORE /////
     G4double WallThickness = 0.5*mm;
     G4double outerTeflonWallSide = 0.5*pitch_;
     G4double innerTeflonWallSide = outerTeflonWallSide - WallThickness;
+    G4double teflonWallLength = 0.5*(cylLength - distanceFiberHolder_ - holderWidth);
+    // G4double teflonWallLength = 0.5*(cylLength - distanceFiberHolder_); //for a single fiber heatmap simulation
 
 
     G4Box *teflonWallOuter = new G4Box("Teflon_Wall_Outer", //name
@@ -338,10 +325,11 @@ void SquareOpticalFiber::Construct(){
     teflonWallLogicalVolume->SetVisAttributes(teflonWallColor);
 
 
+
     ///// TPB COATING ON FIBER END /////
     G4double TPBFiberSize = fiberSize;
     G4double TPBFiberWidth = 0.5*TPBThickness_;
-    G4Box *fiberTPB = new G4Box("Fiber_TPB", //name
+    G4Box *fiberTPB = new G4Box("TPB", //name
                            TPBFiberSize, //side a
                            TPBFiberSize, //side b
                            TPBFiberWidth); //length
@@ -369,10 +357,12 @@ void SquareOpticalFiber::Construct(){
     G4VPhysicalVolume *fiberTPBPhysicalVolume;
     G4VPhysicalVolume *fiberCorePhysicalVolume;
     G4VPhysicalVolume *fiberCladdingPhysicalVolume;
+    G4VPhysicalVolume *SiPMPhysicalVolume;
 
     //for square lattice
     for (G4double x=-maxCoord; x<=maxCoord; x+=pitch_){
         for (G4double y=-maxCoord; y<=maxCoord; y+=pitch_){
+
 
             std::vector<double> point;
             point.push_back(x);
@@ -387,6 +377,22 @@ void SquareOpticalFiber::Construct(){
             stream << std::fixed << std::setprecision(2) << y;
             std::string y_str = stream.str();
 
+
+            // name = "SiPM_(x,y)=(" + x_str + "," + y_str + ")"; 
+            name = "SiPM";
+            SiPMPhysicalVolume = new G4PVPlacement(
+                        0,                // no rotation
+                        G4ThreeVector(x,y,zSiPM),  // at (0,0,0)
+                        SiPMLogicalVolume, // its logical volume
+                        name,               //its name
+                        worldLogicalVolume,   //its mother volume
+                        // capLogicalVolume,
+                        false,            // no boolean operation
+                        0,// copy number, this time each SiPM has a unique copy number
+                        false);          // checking overlaps
+
+
+
             name = "fiber_(x,y)=(" + x_str + "," + y_str + ")";;
             fiberCorePhysicalVolume = new G4PVPlacement(
                                                     0,                // no rotation
@@ -399,16 +405,16 @@ void SquareOpticalFiber::Construct(){
                                                     true);          // checking overlaps
 
 
-            name = "fiber_cladding_(x,y)=(" + std::to_string(x) + "," + std::to_string(y) + ")"; 
-            fiberCladdingPhysicalVolume = new G4PVPlacement(
-                                                    0,                // no rotation
-                                                    G4ThreeVector(x,y,zFiber),  // at (0,0,0)
-                                                    fiberCladdingLogicalVolume, // its logical volume
-                                                    name,               //its name
-                                                    worldLogicalVolume,   //its mother volume
-                                                    false,            // no boolean operation
-                                                    0,                // copy number
-                                                    true);          // checking overlaps
+            // name = "fiber_cladding_(x,y)=(" + std::to_string(x) + "," + std::to_string(y) + ")"; 
+            // fiberCladdingPhysicalVolume = new G4PVPlacement(
+            //                                         0,                // no rotation
+            //                                         G4ThreeVector(x,y,zFiber),  // at (0,0,0)
+            //                                         fiberCladdingLogicalVolume, // its logical volume
+            //                                         name,               //its name
+            //                                         worldLogicalVolume,   //its mother volume
+            //                                         false,            // no boolean operation
+            //                                         0,                // copy number
+            //                                         true);          // checking overlaps
 
 
             name = "wall_(x,y)=(" + x_str + "," + y_str + ")";
@@ -425,7 +431,7 @@ void SquareOpticalFiber::Construct(){
 
 
             // name = "fiber_TPB_(x,y)=(" + std::to_string(x) + "," + std::to_string(y) + ")"; 
-            name = "TPB_(x,y)=(" + x_str + "," + y_str + ")";;
+            name = "TPB_(x,y)=(" + x_str + "," + y_str + ")";
             fiberTPBPhysicalVolume = new G4PVPlacement(
                                                     0,                // no rotation
                                                     G4ThreeVector(x,y,zFiberTPB),  // at (0,0,0)
@@ -438,10 +444,16 @@ void SquareOpticalFiber::Construct(){
 
 
             //  TPB - Fiber core interface
-            new G4LogicalBorderSurface("TPB",
+            new G4LogicalBorderSurface("TPB-Fiber",
                                         fiberTPBPhysicalVolume,
                                          fiberCorePhysicalVolume,
                                          TPBSurface);
+
+            // // Fiber - SiPM core interface
+            // new G4LogicalBorderSurface("Fiber-SiPM",
+            //                             fiberCorePhysicalVolume,
+            //                              SiPMPhysicalVolume,
+            //                              SiSurface);
 
         }
     }
@@ -452,8 +464,10 @@ void SquareOpticalFiber::Construct(){
     G4double holderInnerRadius = 0;
     G4double holderOuterRadius = barrelInnerRadius;
 
-    // G4double holderHoleSize = fiberSize; // WITHOUT CLADDING
-    G4double holderHoleSize = claddingSizeOuter; // WITH CLADDING
+
+    G4double holderHoleSize;
+    if (claddingExists){holderHoleSize = claddingSizeOuter;} // WITH CLADDING 
+    else {holderHoleSize = fiberSize;} // WITHOUT CLADDING
 
     G4double holeSpacing = pitch_;
     G4int nHoles = numOfFibers;
@@ -568,10 +582,13 @@ void SquareOpticalFiber::Construct(){
     G4cout << "Physical holder TPB OK !!" << G4endl << G4endl;
 
 
-
-
-
-
+    // Set the sensitive detector for these volumes
+    SquareFiberSD* squareFiberSD = new SquareFiberSD("SquareFiberSD");
+    G4SDManager* sdManager = G4SDManager::GetSDMpointer();
+    sdManager->AddNewDetector(squareFiberSD);
+    SiPMLogicalVolume->SetSensitiveDetector(squareFiberSD);
+    fiberTPBLogicalVolume->SetSensitiveDetector(squareFiberSD);
+    holePatternTPBLogical->SetSensitiveDetector(squareFiberSD);
 
 
 
