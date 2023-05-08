@@ -4,7 +4,6 @@
 ###  in the active volume.
 ### --------------------------------------------------------
 
-/nexus/random_seed 42
 
 /run/verbose 0
 /event/verbose 0
@@ -28,6 +27,7 @@
 
 
 # SETUP PARAMETERS
+/nexus/random_seed 45
 /Geometry/SquareOpticalFiber/specific_vertex 0 0 0.0012 mm # no importance for z-value here
 /Geometry/SquareOpticalFiber/ELGap 10 mm
 /Geometry/SquareOpticalFiber/pitch 10 mm

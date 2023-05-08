@@ -719,21 +719,12 @@ namespace opticalprops {
       0.486,   0.574,   0.672
     };
 
-    // std::vector<G4double> REFLECTIVITY = {
-    //   0.,  0.,  0.,
-    //   0.,  0.,  0.
-    // };
-    // std::vector<G4double> REFLECTIVITY = {
-    //   1.,  1.,  1.,  1.,
-    //   1.,  1.,  1.
-    // };
-
     mpt->AddProperty("REFLECTIVITY", ENERGIES, REFLECTIVITY);
 
 
     // REFRACTIVE INDEX
     std::vector<G4double> rIndex = {
-      3.68,   3.861,  4.293,
+      3.681,   3.861,  4.293,
       5.587,  5.102,  1.694
     };
     mpt->AddProperty("RINDEX", ENERGIES, rIndex);
@@ -745,10 +736,6 @@ namespace opticalprops {
       10.5 * um,     0.78 * um,     0.54 * um
     };
 
-    // std::vector<G4double> abs_length = {
-    //   0.2 * cm,   0.2 * cm,   0.2 * cm,
-    //   0.2 * cm,     0.2 * cm,     0.2 * cm
-    // };
 
     mpt->AddProperty("ABSLENGTH", ENERGIES, abs_length);
     return mpt;

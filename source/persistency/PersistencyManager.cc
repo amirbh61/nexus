@@ -83,6 +83,10 @@ void PersistencyManager::OpenFile()
     G4Exception("[PersistencyManager]", "OpenFile()",
 		JustWarning, "An output file was previously opened.");
   }
+
+  // // Add a warning message to indicate that no file will be created
+  // G4Exception("[PersistencyManager]", "OpenFile()",
+  //             JustWarning, "No output file will be created.");
 }
 
 
@@ -90,7 +94,6 @@ void PersistencyManager::OpenFile()
 void PersistencyManager::CloseFile()
 {
   if (!h5writer_) return;
-
   h5writer_->Close();
 }
 

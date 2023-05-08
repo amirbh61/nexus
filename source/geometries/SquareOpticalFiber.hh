@@ -19,7 +19,6 @@
 #include "G4TouchableHistory.hh"
 #include "G4Step.hh"
 #include "G4VSensitiveDetector.hh"
-//#include "SquareFiberSD.h"
 
 
 namespace nexus {
@@ -30,6 +29,7 @@ namespace nexus {
     mutable std::uniform_real_distribution<double> z_dist_; // make the distribution mutable as well
 
     public:
+        G4int seed_ = 42;
         SquareOpticalFiber();
         ~SquareOpticalFiber();
         // void UpdateELGapLimits();
@@ -60,30 +60,6 @@ namespace nexus {
         G4double distanceAnodeHolder_;
 
     };
-
-
-    // class SquareFiberSD : public G4VSensitiveDetector {
-    //   public:
-    //     SquareFiberSD(const G4String& name);
-    //     virtual ~SquareFiberSD();
-
-    //     virtual G4bool ProcessHits(G4Step* step, G4TouchableHistory* history);
-    //     // static void SetOutputFilePaths(const std::string& sipmFilePath, const std::string& tpbFilePath);
-
-    //     // void SetSiPMOutputFilePath(const std::ofstream& filePath);
-    //     // void SetTPBOutputFilePath(const std::ofstream& filePath);
-
-    //     void WritePositionToTextFile(std::ofstream& file, G4ThreeVector& position);
-
-    //     // Setters for output file paths
-    //     void SetSiPMOutputFilePath(const G4String& filePath);
-    //     void SetTPBOutputFilePath(const G4String& filePath);
-    //     G4GenericMessenger *msgSD_;
-
-    //   private:
-    //     std::ofstream sipmOutputFile_;
-    //     std::ofstream tpbOutputFile_;
-    // };
-
 }
+
 #endif
