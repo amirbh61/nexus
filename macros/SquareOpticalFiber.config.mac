@@ -28,7 +28,7 @@
 
 # SETUP PARAMETERS
 /nexus/random_seed 45
-/Geometry/SquareOpticalFiber/specific_vertex 0 0 0.0012 mm # no importance for z-value here
+/Geometry/SquareOpticalFiber/specific_vertex 0 0 -0.0011 mm # no importance for z-value here
 /Geometry/SquareOpticalFiber/ELGap 10 mm
 /Geometry/SquareOpticalFiber/pitch 10 mm
 /Geometry/SquareOpticalFiber/distanceFiberHolder 2 mm

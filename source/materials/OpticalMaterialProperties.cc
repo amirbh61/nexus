@@ -730,11 +730,31 @@ namespace opticalprops {
     mpt->AddProperty("RINDEX", ENERGIES, rIndex);
 
 
+    // REFLEXION BEHAVIOR
+    std::vector<G4double> ENERGIES_2    = {optPhotMinE_, optPhotMaxE_};
+    // Specular reflection about the normal to a microfacet.
+    // Such a vector is chosen according to a gaussian distribution with
+    // sigma = SigmaAlhpa (in rad) and centered in the average normal.
+    std::vector<G4double> specularlobe  = {0., 0.};
+    // specular reflection about the average normal
+    std::vector<G4double> specularspike = {1., 1.}; // the default is for this to be {0.,0.}, which is fully diffuse
+    // 180 degrees reflection.
+    std::vector<G4double> backscatter   = {0., 0.};
+    // 1 - the sum of these three last parameters is the percentage of Lambertian reflection
+
+
+    mpt->AddProperty("SPECULARLOBECONSTANT", ENERGIES_2, specularlobe);
+    mpt->AddProperty("SPECULARSPIKECONSTANT",ENERGIES_2, specularspike);
+    mpt->AddProperty("BACKSCATTERCONSTANT",  ENERGIES_2, backscatter);
+
+
     //ABSORPTION LENGTH
     std::vector<G4double> abs_length = {
-      1176 * um,   328.9 * um,   90 * um,
-      10.5 * um,     0.78 * um,     0.54 * um
+      11.764* um,   3.289 * um,   0.9 * um,
+      0.105 * um,     0.0078125 * um,     0.00543 * um
     };
+
+
 
 
     mpt->AddProperty("ABSLENGTH", ENERGIES, abs_length);
@@ -1693,6 +1713,37 @@ namespace opticalprops {
     return mpt;
   }
 
+
+  /// Mirror coating for Square fiber ///
+  G4MaterialPropertiesTable* Vikuiti()
+  {
+    G4MaterialPropertiesTable* mpt = new G4MaterialPropertiesTable();
+    std::vector<G4double> ENERGIES = {optPhotMinE_ , optPhotMaxE_};
+    std::vector<G4double> REFLECTIVITY = {0.96, 0.96};
+    mpt->AddProperty("REFLECTIVITY", ENERGIES, REFLECTIVITY);
+
+
+    std::vector<G4double> efficiency = {1.0, 1.0};
+    mpt->AddProperty("EFFICIENCY", ENERGIES, efficiency);
+
+
+        // REFLEXION BEHAVIOR
+    // Specular reflection about the normal to a microfacet.
+    // Such a vector is chosen according to a gaussian distribution with
+    // sigma = SigmaAlhpa (in rad) and centered in the average normal.
+    std::vector<G4double> specularlobe  = {0., 0.};
+    // specular reflection about the average normal
+    std::vector<G4double> specularspike = {1., 1.}; // the default is for this to be {0.,0.}, which is fully diffuse
+    // 180 degrees reflection.
+    std::vector<G4double> backscatter   = {0., 0.};
+    // 1 - the sum of these three last parameters is the percentage of Lambertian reflection
+
+    mpt->AddProperty("SPECULARLOBECONSTANT", ENERGIES, specularlobe);
+    mpt->AddProperty("SPECULARSPIKECONSTANT",ENERGIES, specularspike);
+    mpt->AddProperty("BACKSCATTERCONSTANT",  ENERGIES, backscatter);
+
+    return mpt;
+  }
 
 
   /// Pethylene ///

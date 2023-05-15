@@ -46,8 +46,13 @@ SquareOpticalFiber::~SquareOpticalFiber(){
 
 void SquareOpticalFiber::Construct(){
     G4int n = 25;
-    bool claddingExists = true; // a flag -> needed for specific geometry change for cladding
-    bool wallsExists = true; // a flag -> needed for specific geometry change for walls
+    bool claddingExists = false; // a flag -> needed for specific geometry change for cladding
+    bool wallsExists = false; // a flag -> needed for specific geometry change for walls
+    bool holderExists = true; // a flag -> needed for specific geometry change for holder
+    bool holderTPBExist = true; // a flag -> needed for specific geometry change for holder TPB
+
+  
+    ///// Materials /////
 
     G4NistManager *nist = G4NistManager::Instance();
     G4double temperature = 298.*kelvin;
@@ -55,65 +60,45 @@ void SquareOpticalFiber::Construct(){
     G4int sc_yield = 1; //value irrelevant for my usecase
     G4double e_lifetime = 1; //value irrelevant for my usecase
 
-    /// Materials ///
     G4Material *Xe = nist->FindOrBuildMaterial("G4_Xe", temperature, pressure);
     G4Material *Teflon = nist->FindOrBuildMaterial("G4_TEFLON", temperature, pressure); //detector barrel
     G4Material *Si = nist->FindOrBuildMaterial("G4_Si", temperature, pressure); //SiPM 
-    // G4Material *Polystyrene = nist->FindOrBuildMaterial("G4_POLYSTYRENE", temperature, pressure); //fiber core
-    // G4Material *Polyethylene = nist->FindOrBuildMaterial("G4_POLYETHYLENE", temperature, pressure); //fiber claddding
     G4Material *PMMA = materials::PMMA();
-    G4Material *FPethylene = materials::FPethylene(); // cladding
     G4Material *TPB = materials::TPB();
-    
+    G4Material *FPethylene = materials::FPethylene();
 
-    //Optical propoerties 
+    // Optical Materials 
     Xe->SetMaterialPropertiesTable(opticalprops::GXe(pressure, temperature, sc_yield, e_lifetime ));
     Teflon->SetMaterialPropertiesTable(opticalprops::PTFE());
-    // Polystyrene->SetMaterialPropertiesTable(opticalprops::Polystyrene());
-    // Polyethylene->SetMaterialPropertiesTable(opticalprops::Pethylene());
     PMMA->SetMaterialPropertiesTable(opticalprops::PMMA());
-    FPethylene->SetMaterialPropertiesTable(opticalprops::FPethylene());
     TPB->SetMaterialPropertiesTable(opticalprops::TPB());
     Si->SetMaterialPropertiesTable(opticalprops::Si());
+    FPethylene->SetMaterialPropertiesTable(opticalprops::FPethylene());
 
-
-    // Add reflective surface to Teflon material
-    G4OpticalSurface* teflonSurface = new G4OpticalSurface("Teflon_Surface",
-                                                            // glisur,
-                                                            unified,
-                                                            // polished,
-                                                            ground,
-                                                            dielectric_metal,
-                                                            0.1 // surface normal variance, Radians
-                                                            // dielectric_dielectric                                                            
-                                                            );
-
+    // Optical surfaces
+    G4OpticalSurface* teflonSurface = new G4OpticalSurface("Teflon_Surface", glisur,
+                                                            ground, dielectric_metal, 0.05);
     teflonSurface->SetMaterialPropertiesTable(opticalprops::PTFE());
 
-    // Add reflective surface to TPB material
-    G4OpticalSurface* TPBSurface = new G4OpticalSurface("TPB_surface",
-                                                            // glisur,
-                                                            unified,
-                                                            ground,
-                                                            // polished
-                                                            dielectric_dielectric,
-                                                            0.2 // surface normal variance, Radians                                                      
-                                                            );
-
+    G4OpticalSurface* TPBSurface = new G4OpticalSurface("TPB_surface", glisur,
+                                                        ground, dielectric_dielectric, 0.1);
     TPBSurface->SetMaterialPropertiesTable(opticalprops::TPB());
 
+    G4OpticalSurface* VikuitiCoatingTeflon = new G4OpticalSurface("Vikuiti_Teflon_Surface", unified,
+                                                                     polished, dielectric_metal);
+    VikuitiCoatingTeflon->SetMaterialPropertiesTable(opticalprops::Vikuiti());
 
-    // // Add reflective surface to Si material
-    // G4OpticalSurface* SiSurface = new G4OpticalSurface("Si_Surface",
-    //                                                         // glisur,
-    //                                                         unified,
-    //                                                         ground,
-    //                                                         // polished
-    //                                                         dielectric_metal,
-    //                                                         0.01 // surface normal variance, Radians                                                      
-    //                                                         );
+    G4OpticalSurface* VikuitiCoatingXe = new G4OpticalSurface("Vikuiti_Xe_Surface", unified,
+                                                                 polished, dielectric_metal);
+    VikuitiCoatingXe->SetMaterialPropertiesTable(opticalprops::Vikuiti());
 
-    // SiSurface->SetMaterialPropertiesTable(opticalprops::Si());
+    G4OpticalSurface* claddingSurface = new G4OpticalSurface("Cladding_Surface", unified,
+                                                                ground, dielectric_dielectric, 0.02);
+    claddingSurface->SetMaterialPropertiesTable(opticalprops::FPethylene());
+
+    G4OpticalSurface* SiSurface = new G4OpticalSurface("Si_Surface", unified,
+                                                        ground, dielectric_metal);
+    SiSurface->SetMaterialPropertiesTable(opticalprops::Si());
 
 
 
@@ -127,8 +112,7 @@ void SquareOpticalFiber::Construct(){
                               edge, //side b
                               edge); //side c
 
-    G4LogicalVolume *worldLogicalVolume = new G4LogicalVolume(
-                                                                solidWorld, //the cylinder object
+    G4LogicalVolume *worldLogicalVolume = new G4LogicalVolume(solidWorld, //the cylinder object
                                                                 Xe, //material of cylinder
                                                                 "World"); //name
     this->SetLogicalVolume(worldLogicalVolume);
@@ -175,8 +159,8 @@ void SquareOpticalFiber::Construct(){
     //                 true);          // checking overlaps
 
 
-    //make barrel surface reflective
-    new G4LogicalSkinSurface( "Teflon_coating", barrelLogicalVolume, teflonSurface);
+    // //make barrel surface reflective
+    // new G4LogicalSkinSurface( "Teflon_coating", barrelLogicalVolume, teflonSurface);
 
 
 
@@ -211,9 +195,7 @@ void SquareOpticalFiber::Construct(){
 
 
     ///// SIPM ARRAY /////
-    G4double sideSiPM;
-    if (claddingExists){sideSiPM = 1.65*mm;}
-    else {sideSiPM = 1.5*mm;}
+    G4double sideSiPM = 1.5*mm;
 
     G4double thicknessSiPM = sideSiPM/2;
     G4Box *SiPMSolidVolume = new G4Box("SiPM", //name
@@ -245,8 +227,6 @@ void SquareOpticalFiber::Construct(){
     ///// SQUARE FIBER CORE /////
     G4double fiberSize = 1.5*mm;
     G4double holderWidth = 0.5*holderThickness_;
-    // G4double holderWidth = 5*mm; //half width
-    // G4double fiberLength = 0.5*cylLength - thicknessSiPM - delta/2; // when sipm is outside cap
     G4double fiberLength = 0.5*cylLength - delta/2; // when sipm is inside cap
 
     G4Box *fiberCore = new G4Box("Fiber_Core", //name
@@ -259,14 +239,16 @@ void SquareOpticalFiber::Construct(){
                                                         // Polyethylene, //material of fiber
                                                         PMMA,
                                                         "Fiber_Core"); //name
-
+    // new G4LogicalSkinSurface("fiberSurface", fiberCoreLogicalVolume, VikuitiCoatingTeflon);
     G4Color white(1,1,1);
     G4VisAttributes* fiberCoreColor = new G4VisAttributes(white);
     fiberCoreLogicalVolume->SetVisAttributes(fiberCoreColor);
 
 
+
+
     ///// SQUARE FIBER CLADDING ///// 
-    G4double claddingSizeOuter = fiberSize + 0.1*fiberSize;
+    G4double claddingSizeOuter = fiberSize + 0.01*fiberSize;
     G4double claddingSizeInner = fiberSize;
     G4double claddingLength = fiberLength;
 
@@ -282,10 +264,44 @@ void SquareOpticalFiber::Construct(){
 
     G4SubtractionSolid *fiberCladding = new G4SubtractionSolid("Fiber_Cladding", fiberCladdingOuter, fiberCladdingInner);
     G4LogicalVolume *fiberCladdingLogicalVolume = new G4LogicalVolume(fiberCladding, FPethylene, "Fiber_Cladding");
+    new G4LogicalSkinSurface( "Fiber_Cladding", fiberCladdingLogicalVolume, VikuitiCoatingTeflon);
+
 
     G4Color brown = G4Color::Brown();
     G4VisAttributes* claddingColor = new G4VisAttributes(brown);
     fiberCladdingLogicalVolume->SetVisAttributes(claddingColor);
+
+
+
+    // ///// ROUND OPTICAL FIBER /////
+
+
+    // // Tube core
+
+    // // G4double coreSide = 0.075*cm;
+    // // G4double coreSide = 1.4*mm;
+    // // G4double fiberSize = 1.5*mm;
+    // // G4double fiberLength = 0.5*cylLength - delta/2;
+
+    // G4Tubs *fiberCore = new G4Tubs("Fiber_Core", //name
+    //                        0, //side a
+    //                        fiberSize, //side b
+    //                        fiberLength,
+    //                        0,
+    //                        2*M_PI); //length
+
+    // G4LogicalVolume *fiberCoreLogicalVolume = new G4LogicalVolume(
+    //                                                     fiberCore, //the fiber object
+    //                                                     //Polyethylene, //material of fiber
+    //                                                     PMMA,
+    //                                                     "Fiber_Core"); //name
+
+    // G4Color white(1,1,1);
+    // G4VisAttributes* roundFiberCoreColor = new G4VisAttributes(white);
+    // fiberCoreLogicalVolume->SetVisAttributes(roundFiberCoreColor);
+    // // new G4LogicalSkinSurface( "Fiber_Cladding", fiberCoreLogicalVolume, fiberOpticalSurface);
+
+
 
 
 
@@ -339,7 +355,7 @@ void SquareOpticalFiber::Construct(){
     fiberTPBLogicalVolume->SetVisAttributes(colorTPB);
 
 
-    ///// SQUARE LATTICE : FIBER CORE, TEFLON WALL, SIPM, CLADDING  /////
+    ///// SQUARE LATTICE : CREATE PHYICAL VOLUMES FOR FIBER CORE, TEFLON WALL, SIPM, CLADDING  /////
 
     G4int numOfFibers = numberOfSiPMs;
     G4double zFiber = fiberLength;
@@ -353,7 +369,7 @@ void SquareOpticalFiber::Construct(){
     G4VPhysicalVolume *fiberCladdingPhysicalVolume;
     G4VPhysicalVolume *SiPMPhysicalVolume;
     G4String name;
-
+    std::vector<G4VPhysicalVolume*> fiberCorePhysicalVolumeArray;
 
     //for square lattice
     for (G4double x=-maxCoord; x<=maxCoord; x+=pitch_){
@@ -381,7 +397,6 @@ void SquareOpticalFiber::Construct(){
                         SiPMLogicalVolume, // its logical volume
                         name,               //its name
                         worldLogicalVolume,   //its mother volume
-                        // capLogicalVolume,
                         false,            // no boolean operation
                         0,// copy number, this time each SiPM has a unique copy number
                         true);          // checking overlaps
@@ -397,7 +412,11 @@ void SquareOpticalFiber::Construct(){
                                                     worldLogicalVolume,   //its mother volume
                                                     false,            // no boolean operation
                                                     0,                // copy number
-                                                    false);          // checking overlaps
+                                                    false         // checking overlaps
+                                                    );
+            fiberCorePhysicalVolumeArray.push_back(fiberCorePhysicalVolume);
+
+
 
             if (claddingExists){
                 name = "fiber_cladding_(x,y)=(" + x_str + "," + y_str + ")";
@@ -442,12 +461,6 @@ void SquareOpticalFiber::Construct(){
                                         fiberTPBPhysicalVolume,
                                          fiberCorePhysicalVolume,
                                          TPBSurface);
-
-            // // Fiber - SiPM core interface
-            // new G4LogicalBorderSurface("Fiber-SiPM",
-            //                             fiberCorePhysicalVolume,
-            //                              SiPMPhysicalVolume,
-            //                              SiSurface);
 
         }
     }
@@ -506,22 +519,24 @@ void SquareOpticalFiber::Construct(){
     G4SubtractionSolid* holePatternHolder = new G4SubtractionSolid("Hole_Pattern_Placement", holder, multiUnionHolder);
 
     G4LogicalVolume *holePatternHolderLogical = new G4LogicalVolume(holePatternHolder, Teflon, "Hole_Pattern_Placement");
+    new G4LogicalSkinSurface( "Teflon_Holder", holePatternHolderLogical, teflonSurface); // makes reflections in holes
     G4Color yellow = G4Color::Yellow();
     G4VisAttributes* holderColor = new G4VisAttributes(yellow);
     holePatternHolderLogical->SetVisAttributes(holderColor);
 
-    G4VPhysicalVolume *holePatternHolderPhysical = new G4PVPlacement(0,
-                                                                G4ThreeVector(0,0,zHolder),
-                                                                holePatternHolderLogical,
-                                                                "Hole_Pattern_Placement",
-                                                                worldLogicalVolume,
-                                                                false,
-                                                                0,
-                                                                false);
-    new G4LogicalSkinSurface( "Teflon_Holder", holePatternHolderLogical, teflonSurface); // makes reflections in holes
+    G4VPhysicalVolume *holePatternHolderPhysical;
+    if (holderExists){
+        holePatternHolderPhysical = new G4PVPlacement(0,
+                                                        G4ThreeVector(0,0,zHolder),
+                                                        holePatternHolderLogical,
+                                                        "Hole_Pattern_Placement",
+                                                        worldLogicalVolume,
+                                                        false,
+                                                        0,
+                                                        false);
 
-    G4cout << "Physical holder OK !!" << G4endl << G4endl;
-
+        G4cout << "Physical holder OK !!" << G4endl << G4endl;
+    }
 
 
     // ///// TPB LAYER FOR TEFLON HOLDER /////
@@ -565,16 +580,36 @@ void SquareOpticalFiber::Construct(){
 
     holePatternTPBLogical->SetVisAttributes(colorTPB);
 
-    G4VPhysicalVolume *holePatternTPBPhysical = new G4PVPlacement(0,
-                                                        G4ThreeVector(0,0,holderTPBCoatingLocationZ),
-                                                        holePatternTPBLogical,
-                                                        "TPB",
-                                                        worldLogicalVolume,
-                                                        false,
-                                                        0,
-                                                        false);
+    G4VPhysicalVolume *holePatternTPBPhysical;
+    if (holderTPBExist){
+        holePatternTPBPhysical = new G4PVPlacement(0,
+                                                    G4ThreeVector(0,0,holderTPBCoatingLocationZ),
+                                                    holePatternTPBLogical,
+                                                    "TPB",
+                                                    worldLogicalVolume,
+                                                    false,
+                                                    0,
+                                                    false);
 
-    G4cout << "Physical holder TPB OK !!" << G4endl << G4endl;
+        G4cout << "Physical holder TPB OK !!" << G4endl << G4endl;
+    }
+
+
+    // Add optical borders for fiber with teflon holder and Xe -> eliminates diffuse reflection angles
+    for (G4int i=0; i<fiberCorePhysicalVolumeArray.size(); i++){
+
+        new G4LogicalBorderSurface("Fiber-Holder",
+                                    fiberCorePhysicalVolumeArray[i],
+                                     holePatternHolderPhysical,
+                                     VikuitiCoatingTeflon);
+
+        new G4LogicalBorderSurface("Fiber-Xe",
+                            fiberCorePhysicalVolumeArray[i],
+                             world,
+                             VikuitiCoatingTeflon);
+    }
+
+
 
 
 
