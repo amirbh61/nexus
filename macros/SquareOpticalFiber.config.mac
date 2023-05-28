@@ -19,41 +19,45 @@
 /Generator/SingleParticle/max_energy 7.21 eV
 
 
-/Generator/SingleParticle/region LINE_SOURCE_EL
+#/Generator/SingleParticle/region LINE_SOURCE_EL
+/Generator/SingleParticle/region AD_HOC
+#/Generator/SingleParticle/region SingleParticle
+
 #/Generator/SingleParticle/region ACTIVE
 #/Generator/SingleParticle/min_costheta 0.6711
 /Generator/SingleParticle/min_costheta 0
 /Generator/SingleParticle/max_costheta 1
 
 
-# SETUP PARAMETERS
+####  SETUP PARAMETERS ####
 /nexus/random_seed 45
-/Geometry/SquareOpticalFiber/specific_vertex 0 0 -0.0011 mm # no importance for z-value here
+/Geometry/SquareOpticalFiber/specific_vertex 5 5 -5.0023 mm # z-value not relevant here in "LINE_SOURCE_EL" mode
 /Geometry/SquareOpticalFiber/ELGap 10 mm
 /Geometry/SquareOpticalFiber/pitch 10 mm
-/Geometry/SquareOpticalFiber/distanceFiberHolder 2 mm
+/Geometry/SquareOpticalFiber/distanceFiberHolder 0 mm
 /Geometry/SquareOpticalFiber/distanceAnodeHolder 2.5 mm
 /Geometry/SquareOpticalFiber/holderThickness 10 mm
 /Geometry/SquareOpticalFiber/TPBThickness 2.2 #microns
 
+# When using the SaveAllSteppingAction
+/nexus/persistency/outputFile /media/amir/9C33-6BBD/NEXT_work/Geant4/nexus/SquareFiber.next
+
+# When NOT using the SaveAllSteppingAction
+#/nexus/persistency/outputFile /dev/null
+
+/SquareOpticalFiber/SquareFiberSD/Output/sipmPath /media/amir/9C33-6BBD/NEXT_work/Geant4/nexus/SiPM_hits.txt
+/SquareOpticalFiber/SquareFiberSD/Output/tpbPath /media/amir/9C33-6BBD/NEXT_work/Geant4/nexus/TPB_hits.txt
 
 
-# point vertex
-#/Generator/SingleParticle/region SingleParticle
-#/Generator/SingleParticle/region AD_HOC
 
-/Actions/SaveAllSteppingAction/select_volume SiPM
-/Actions/SaveAllSteppingAction/select_volume TPB
 
+
+
+#/Actions/SaveAllSteppingAction/select_volume SiPM
+#/Actions/SaveAllSteppingAction/select_volume TPB
 #/Actions/SaveAllSteppingAction/select_volume WORLD
 #/Actions/SaveAllSteppingAction/select_volume Cap1
-
 #/Actions/SaveAllSteppingAction/select_volume Barrel
 
-
-#/nexus/persistency/outputFile /media/amir/9C33-6BBD/NEXT_work/Geant4/nexus/SquareFiberCladding.next
-/nexus/persistency/outputFile /media/amir/9C33-6BBD/NEXT_work/Geant4/nexus/SquareFiber.next
-#/Geometry/SquareOpticalFiber/Output/sipmPath /media/amir/9C33-6BBD/NEXT_work/Geant4/nexus/SiPM_hits.txt
-#/Geometry/SquareOpticalFiber/Output/tpbPath /media/amir/9C33-6BBD/NEXT_work/Geant4/nexus/TPB_hits.txt
 
 

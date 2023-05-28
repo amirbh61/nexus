@@ -6,33 +6,37 @@
 #include "G4TouchableHistory.hh"
 #include "G4VPhysicalVolume.hh"
 #include "G4LogicalVolume.hh"
+#include "SquareFiberSD.h"
+#include "G4VProcess.hh"
 #include "G4Material.hh"
 #include <fstream>
 #include <sstream>
-#include "SquareFiberSD.h"
-#include "G4VProcess.hh"
+#include <cstdio>
+
 
 
 namespace nexus{
 
 
-SquareFiberSD::SquareFiberSD(const G4String& name): G4VSensitiveDetector(name), msgSD_(nullptr),
-sipmOutputFile_("/media/amir/9C33-6BBD/NEXT_work/Geant4/nexus/SiPM_hits.txt"),
-tpbOutputFile_("/media/amir/9C33-6BBD/NEXT_work/Geant4/nexus/TPB_hits.txt")
+SquareFiberSD::SquareFiberSD(G4String const& SD_name, G4String const& sipmOutputFileName,
+ G4String const& tpbOutputFileName): G4VSensitiveDetector(SD_name)
 {
-  // msgSD_ = new G4GenericMessenger(this, "/Geometry/SquareFiberSD/Output/", "Commands for setting output file paths.");
-  // msgSD_->DeclareMethod("sipmPath", &SquareFiberSD::SetSiPMOutputFilePath, "Set the output file path for SiPM hits.");
-  // msgSD_->DeclareMethod("tpbPath", &SquareFiberSD::SetTPBOutputFilePath, "Set the output file path for TPB hits.");
+  SetSipmPath(sipmOutputFileName);
+  SetTpbPath(tpbOutputFileName);
 }
+
 
 
 
 SquareFiberSD::~SquareFiberSD() {
   if (sipmOutputFile_.is_open()) {
     sipmOutputFile_.close();
-  }
+    std::cout << "SiPM output file closed." << std::endl;
+    }
+
   if (tpbOutputFile_.is_open()) {
     tpbOutputFile_.close();
+    std::cout << "TPB output file closed." << std::endl;
   }
 }
 
@@ -50,11 +54,10 @@ G4bool SquareFiberSD::ProcessHits(G4Step* step, G4TouchableHistory*) {
   // std::cout << "track->GetParentID() = " << track->GetParentID() << std::endl;
   // std::cout << "track->GetCurrentStepNumber() = " << track->GetCurrentStepNumber() << std::endl;
 
-  if (materialName == "TPB" &&
-      track->GetParentID() == 0) {
-
-    // std::cout << "TPB hit! #" << std::endl;
-    G4ThreeVector position = step->GetPreStepPoint()->GetPosition();
+  if (materialName == "TPB" && track->GetParentID() == 0 &&
+      track->GetStep()->GetPostStepPoint()->GetProcessDefinedStep()->GetProcessName() == "OpWLS" ) {
+    std::cout << "OpWLS" << std::endl;
+    G4ThreeVector position = step->GetPostStepPoint()->GetPosition();
     WritePositionToTextFile(tpbOutputFile_, position);
 
   }
@@ -70,24 +73,26 @@ G4bool SquareFiberSD::ProcessHits(G4Step* step, G4TouchableHistory*) {
   return true;
 }
 
-void SquareFiberSD::WritePositionToTextFile(std::ofstream& file, const G4ThreeVector& position) {
+
+void SquareFiberSD::WritePositionToTextFile(std::ofstream& file, G4ThreeVector position) {
   if (file.is_open()) {
     file << position.x() << " " << position.y() << " " << position.z() << std::endl;
   } else {
-    std::cerr << "Error: Unable to open output file" << std::endl;
+    throw std::runtime_error("Error: Unable to write position to output file!");
   }
 }
 
 
-
-// Implementation of setter functions
-void SquareFiberSD::SetSiPMOutputFilePath(const G4String& filePath) {
-  sipmOutputFile_.open(filePath.c_str(), std::ios_base::app);
+void SquareFiberSD::SetSipmPath(const G4String& path) {
+  std::cout << "SIPM_PATH=" << path << std::endl;
+  sipmOutputFile_.open(path, std::ios::out | std::ios::app);
+  if (!sipmOutputFile_){throw std::runtime_error("Error: Unable to open SiPM output file for writing!");}
 }
 
-
-void SquareFiberSD::SetTPBOutputFilePath(const G4String& filePath) {
-  tpbOutputFile_.open(filePath.c_str(), std::ios_base::app);
+void SquareFiberSD::SetTpbPath(const G4String& path) {
+  std::cout << "TPB_PATH=" << path << std::endl;
+  tpbOutputFile_.open(path, std::ios::out | std::ios::app);
+  if (!tpbOutputFile_){throw std::runtime_error("Error: Unable to open TPB output file for writing!");}
 }
 
 

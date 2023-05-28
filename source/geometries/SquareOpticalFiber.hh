@@ -32,25 +32,12 @@ namespace nexus {
         G4int seed_ = 42;
         SquareOpticalFiber();
         ~SquareOpticalFiber();
-        // void UpdateELGapLimits();
         std::pair<G4double, G4double> UpdateELGapLimits();
         void Construct();
         G4GenericMessenger *msg_;
+        G4GenericMessenger *msgSD_;
         /// Return vertex within region <region> of the chamber
         G4ThreeVector GenerateVertex(const G4String& region) const;
-
-        // // my addition - trying something 30.4.23
-        // void SetSiPMOutputPath(const G4String& path);
-        // void SetTPBOutputPath(const G4String& path);
-        // void SetNewValue(G4UIcommand* command, G4String newValue);
-        // SquareFiberSD* squareFiberSD_;
-        // G4GenericMessenger *msgSD_;
-        // G4UIcmdWithAString* sipmPathCmd_;
-        // G4UIcmdWithAString* tpbPathCmd_;
-
-
-        G4double holderThickness_;
-        G4double TPBThickness_;
 
         // Controlled from macro
         G4ThreeVector specific_vertex_;
@@ -58,6 +45,10 @@ namespace nexus {
         G4double pitch_;
         G4double distanceFiberHolder_;
         G4double distanceAnodeHolder_;
+        G4double holderThickness_;
+        G4double TPBThickness_;
+        G4String sipmOutputFile_;
+        G4String tpbOutputFile_;
 
     };
 }

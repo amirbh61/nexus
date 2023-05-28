@@ -1059,7 +1059,6 @@ namespace opticalprops {
     // As Geant4 doesn't allow this possibility, it is set to the value corresponding
     // to Xe scintillation spectrum peak.
     mpt->AddConstProperty("WLSMEANNUMBERPHOTONS", 0.65);
-
     return mpt;
   }
 
@@ -1720,6 +1719,7 @@ namespace opticalprops {
     G4MaterialPropertiesTable* mpt = new G4MaterialPropertiesTable();
     std::vector<G4double> ENERGIES = {optPhotMinE_ , optPhotMaxE_};
     std::vector<G4double> REFLECTIVITY = {0.96, 0.96};
+    // std::vector<G4double> REFLECTIVITY = {0.99, 0.99};
     mpt->AddProperty("REFLECTIVITY", ENERGIES, REFLECTIVITY);
 
 
@@ -1727,7 +1727,7 @@ namespace opticalprops {
     mpt->AddProperty("EFFICIENCY", ENERGIES, efficiency);
 
 
-        // REFLEXION BEHAVIOR
+    // REFLEXION BEHAVIOR
     // Specular reflection about the normal to a microfacet.
     // Such a vector is chosen according to a gaussian distribution with
     // sigma = SigmaAlhpa (in rad) and centered in the average normal.
@@ -1786,10 +1786,10 @@ namespace opticalprops {
     mpt->AddProperty("ABSLENGTH", abs_energy, absLength);
 
 
-    //REFLECTIVITY - **** MY ADDITION - NOT EXIST IN THE ORIGINAL *****
-    std::vector<G4double> ENERGIES = {optPhotMinE_ , optPhotMaxE_};
-    std::vector<G4double> REFLECTIVITY = {0.96, 0.96};
-    mpt->AddProperty("REFLECTIVITY", ENERGIES, REFLECTIVITY);
+    // //REFLECTIVITY - **** MY ADDITION - NOT EXIST IN THE ORIGINAL *****
+    // std::vector<G4double> ENERGIES = {optPhotMinE_ , optPhotMaxE_};
+    // std::vector<G4double> REFLECTIVITY = {0.96, 0.96};
+    // mpt->AddProperty("REFLECTIVITY", ENERGIES, REFLECTIVITY);
 
     return mpt;
   }

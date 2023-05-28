@@ -10,16 +10,18 @@ namespace nexus {
 
   class SquareFiberSD : public G4VSensitiveDetector {
   public:
-    SquareFiberSD(const G4String& name);
-    virtual ~SquareFiberSD();
+    SquareFiberSD(G4String const& SD_name, G4String const& sipmOutputFileName,
+                   G4String const& tpbOutputFileName);
+    ~SquareFiberSD();
 
-    virtual G4bool ProcessHits(G4Step* step, G4TouchableHistory* history);
 
-    void WritePositionToTextFile(std::ofstream& file, const G4ThreeVector& position);
+    G4bool ProcessHits(G4Step* step, G4TouchableHistory* history);
 
-    // Setters for output file paths
-    void SetSiPMOutputFilePath(const G4String& filePath);
-    void SetTPBOutputFilePath(const G4String& filePath);
+    void WritePositionToTextFile(std::ofstream&, G4ThreeVector);
+
+    // // Setters for output file paths
+    void SetSipmPath(const G4String& path);
+    void SetTpbPath(const G4String& path);
 
     G4GenericMessenger *msgSD_;
     std::ofstream sipmOutputFile_;
