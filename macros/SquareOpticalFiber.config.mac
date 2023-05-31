@@ -15,12 +15,12 @@
 /Generator/SingleParticle/particle opticalphoton
 #/Generator/SingleParticle/min_energy 2.883 eV
 #/Generator/SingleParticle/max_energy 2.883 eV
-/Generator/SingleParticle/min_energy 7.21 eV
+/Generator/SingleParticle/min_energy  7.21 eV
 /Generator/SingleParticle/max_energy 7.21 eV
 
 
-#/Generator/SingleParticle/region LINE_SOURCE_EL
-/Generator/SingleParticle/region AD_HOC
+/Generator/SingleParticle/region LINE_SOURCE_EL
+#/Generator/SingleParticle/region AD_HOC
 #/Generator/SingleParticle/region SingleParticle
 
 #/Generator/SingleParticle/region ACTIVE
@@ -30,14 +30,31 @@
 
 
 ####  SETUP PARAMETERS ####
-/nexus/random_seed 45
-/Geometry/SquareOpticalFiber/specific_vertex 5 5 -5.0023 mm # z-value not relevant here in "LINE_SOURCE_EL" mode
-/Geometry/SquareOpticalFiber/ELGap 10 mm
-/Geometry/SquareOpticalFiber/pitch 10 mm
-/Geometry/SquareOpticalFiber/distanceFiberHolder 0 mm
-/Geometry/SquareOpticalFiber/distanceAnodeHolder 2.5 mm
-/Geometry/SquareOpticalFiber/holderThickness 10 mm
-/Geometry/SquareOpticalFiber/TPBThickness 2.2 #microns
+#/nexus/random_seed 10000
+#/Geometry/SquareOpticalFiber/specific_vertex 5 5 -5.0023 mm # z-value not relevant here in "LINE_SOURCE_EL" mode
+#/Geometry/SquareOpticalFiber/specific_vertex 0 0 -5.0023 mm # z-value not relevant here in "LINE_SOURCE_EL" mode
+#/Geometry/SquareOpticalFiber/ELGap 10 mm
+#/Geometry/SquareOpticalFiber/pitch 10 mm
+#/Geometry/SquareOpticalFiber/distanceFiberHolder 0 mm
+#/Geometry/SquareOpticalFiber/distanceAnodeHolder 2.5 mm
+#/Geometry/SquareOpticalFiber/holderThickness 10 mm
+#/Geometry/SquareOpticalFiber/TPBThickness 2.2 #microns
+
+
+#### SETUP PARAMETERS, Big run #### 
+/nexus/random_seed ${seed}
+/Geometry/SquareOpticalFiber/specific_vertex ${x} ${y} -5.0023 # z-value not relevant here in "LINE_SOURCE_EL" mode
+/Geometry/SquareOpticalFiber/ELGap ${ELGap}
+/Geometry/SquareOpticalFiber/pitch ${pitch}
+/Geometry/SquareOpticalFiber/distanceFiberHolder ${distanceFiberHolder}
+/Geometry/SquareOpticalFiber/distanceAnodeHolder ${distanceAnodeHolder}
+/Geometry/SquareOpticalFiber/holderThickness ${holderThickness}
+/Geometry/SquareOpticalFiber/TPBThickness ${TPBThickness}
+
+
+
+
+
 
 # When using the SaveAllSteppingAction
 /nexus/persistency/outputFile /media/amir/9C33-6BBD/NEXT_work/Geant4/nexus/SquareFiber.next
