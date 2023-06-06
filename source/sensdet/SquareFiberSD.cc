@@ -56,7 +56,7 @@ G4bool SquareFiberSD::ProcessHits(G4Step* step, G4TouchableHistory*) {
 
   if (materialName == "TPB" && track->GetParentID() == 0 &&
       track->GetStep()->GetPostStepPoint()->GetProcessDefinedStep()->GetProcessName() == "OpWLS" ) {
-    std::cout << "OpWLS" << std::endl;
+    //std::cout << "OpWLS" << std::endl;
     G4ThreeVector position = step->GetPostStepPoint()->GetPosition();
     WritePositionToTextFile(tpbOutputFile_, position);
 

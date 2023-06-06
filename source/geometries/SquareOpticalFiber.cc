@@ -143,7 +143,7 @@ void SquareOpticalFiber::Construct(){
     G4double barrelOuterRadius = 50.*cm;
     G4double barrelInnerRadius = barrelOuterRadius - BarrelThickness;
     // G4double cylLength = 25.*cm;
-    G4double cylLength = 5*cm;
+    G4double cylLength = 7*cm;
 
     G4Tubs *barrel = new G4Tubs("Barrel", //name
                               barrelInnerRadius, //inner radius
@@ -236,7 +236,7 @@ void SquareOpticalFiber::Construct(){
     ///// SQUARE FIBER CORE /////
     G4double fiberSize = 1.5*mm;
     G4double holderWidth = 0.5*holderThickness_;
-    G4double fiberLength = 0.5*cylLength - delta/2; // when sipm is inside cap
+    G4double fiberLength = 0.5*cylLength;
 
     G4Box *fiberCore = new G4Box("Fiber_Core", //name
                            fiberSize, //side a
@@ -365,7 +365,7 @@ void SquareOpticalFiber::Construct(){
     ///// SQUARE LATTICE : CREATE PHYICAL VOLUMES FOR FIBER CORE, TEFLON WALL, SIPM, CLADDING  /////
 
     G4int numOfFibers = numberOfSiPMs;
-    G4double zFiber = fiberLength;
+    G4double zFiber = fiberLength - delta;
     G4double zTeflonWall = teflonWallLength + holderWidth + distanceFiberHolder_;
     // G4double zTeflonWall = teflonWallLength + distanceFiberHolder_; //for a single fiber heatmap simulation
     G4double zFiberTPB = zFiber-fiberLength-TPBFiberWidth;
