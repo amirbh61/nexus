@@ -61,7 +61,7 @@ SquareOpticalFiber::~SquareOpticalFiber(){
 
 
 void SquareOpticalFiber::Construct(){
-    G4int n = 25;
+    G4int n = 35;
     bool claddingExists = true; // a flag -> needed for specific geometry change for cladding
     bool wallsExists = false; // a flag -> needed for specific geometry change for walls
     bool holderExists = true; // a flag -> needed for specific geometry change for holder
@@ -225,8 +225,8 @@ void SquareOpticalFiber::Construct(){
 
     if (numberOfSiPMs%2 == 0) G4cout << "SiPM Number must be an ODD number !!" << G4endl;
     G4double maxCoord = (numberOfSiPMs-1) * pitch_ / 2.0;
-    // G4float delta = 0.001*mm; // SiPM is just a bit outside Cap1
-    G4float delta = 1*mm; // SiPM is X*mm outside Cap1
+    G4float delta = 0.000001*um; // SiPM is just a bit outside Cap1
+    // G4float delta = 1*mm; // SiPM is X*mm outside Cap1
     G4float zSiPM = cylLength + thicknessSiPM - delta;
 
 

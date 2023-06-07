@@ -20,69 +20,69 @@ pd.set_option('display.max_rows', 500)
 # In[0]
 # Generate shell session to get to sim folder
 
-import subprocess
-import pexpect
+# import subprocess
+# import pexpect
   
-commands = [
-    "cd Products/geant4/geant4-v11.0.1/",
-    "echo 'Current directory:'",
-    "pwd",
-    "source set_source.sh",
-    "cd MySims/nexus/",
-    "echo 'Current directory:'",
-    "pwd"
-]
+# commands = [
+#     "cd Products/geant4/geant4-v11.0.1/",
+#     "echo 'Current directory:'",
+#     "pwd",
+#     "source set_source.sh",
+#     "cd MySims/nexus/",
+#     "echo 'Current directory:'",
+#     "pwd"
+# ]
 
-# Start a shell session
-shell = pexpect.spawn("/bin/bash", timeout=None, encoding='utf-8')
+# # Start a shell session
+# shell = pexpect.spawn("/bin/bash", timeout=None, encoding='utf-8')
 
-# Execute the commands one by one in the same shell session
-for command in commands:
-    shell.sendline(command)
-    shell.expect_exact("$")
+# # Execute the commands one by one in the same shell session
+# for command in commands:
+#     shell.sendline(command)
+#     shell.expect_exact("$")
 
-# Collect the output
-output = shell.before
+# # Collect the output
+# output = shell.before
 
-# Close the shell session
-# shell.close()
+# # Close the shell session
+# # shell.close()
 
-print("Output:")
-print(output)
+# print("Output:")
+# print(output)
 
 # In[1]
 
-n_photons = 100000
-geant4_command = f"./build/nexus -b -n {n_photons}" # commant to run sim
+# n_photons = 100000
+# geant4_command = f"./build/nexus -b -n {n_photons}" # commant to run sim
 
-# Define the range of values for the two coordinates
-coordinate_values = range(-5, 6, 1) 
+# # Define the range of values for the two coordinates
+# coordinate_values = range(-5, 6, 1) 
 
-input_macro_path = "/home/amir/Products/geant4/geant4-v11.0.1/MySims/nexus/macros/SquareOpticalFiber.init.mac"
-# Loop through all combinations of coordinate values
-for x in coordinate_values:
-    for y in coordinate_values:
-        # Read the original macro file
-        with open(input_macro_path, "r") as input_macro_file:
-            input_macro = input_macro_file.read()
+# input_macro_path = "/home/amir/Products/geant4/geant4-v11.0.1/MySims/nexus/macros/SquareOpticalFiber.init.mac"
+# # Loop through all combinations of coordinate values
+# for x in coordinate_values:
+#     for y in coordinate_values:
+#         # Read the original macro file
+#         with open(input_macro_path, "r") as input_macro_file:
+#             input_macro = input_macro_file.read()
 
-        # Modify the specific line with the new x and y values
-        modified_macro = input_macro.replace(
-            "/Geometry/SquareOpticalFiber/specific_vertex 0 0",
-            f"/Geometry/SquareOpticalFiber/specific_vertex {x} {y}",
-        )
+#         # Modify the specific line with the new x and y values
+#         modified_macro = input_macro.replace(
+#             "/Geometry/SquareOpticalFiber/specific_vertex 0 0",
+#             f"/Geometry/SquareOpticalFiber/specific_vertex {x} {y}",
+#         )
 
-        # Save the modified macro to a temporary file
-        modified_macro_path = f"modified_macro_({x},{y}).txt"
-        with open(modified_macro_path, "w") as modified_macro_file:
-            modified_macro_file.write(modified_macro)
+#         # Save the modified macro to a temporary file
+#         modified_macro_path = f"modified_macro_({x},{y}).txt"
+#         with open(modified_macro_path, "w") as modified_macro_file:
+#             modified_macro_file.write(modified_macro)
 
-        # Run the Geant4 simulation with the modified macro file
-        run_command = f'{geant4_command} "{modified_macro_path}"'
-        subprocess.run(run_command, shell=True)
+#         # Run the Geant4 simulation with the modified macro file
+#         run_command = f'{geant4_command} "{modified_macro_path}"'
+#         subprocess.run(run_command, shell=True)
 
-        # Optionally, remove the temporary modified macro file
-        os.remove(modified_macro_path)
+#         # Optionally, remove the temporary modified macro file
+#         os.remove(modified_macro_path)
 
 
 
@@ -124,11 +124,9 @@ def shrink_replace_data_file(filename_in,filename_out):
     return filename_out
 
 
-# path = '/media/amir/9C33-6BBD/NEXT_work/Geant4/nexus/SquareFiberCladding.next.h5'
-
 # Set the input and output file paths
-filename_in  = '/media/amir/9C33-6BBD/NEXT_work/Geant4/nexus/SquareFiber.next.h5'
-filename_out = "/media/amir/9C33-6BBD/NEXT_work/Geant4/nexus/results_gonzalo_code.csv"
+filename_in  = '/media/amir/9C33-6BBD/NEXT_work/Geant4/nexus/SquareFiber_big_run.next.h5'
+filename_out = "/media/amir/9C33-6BBD/NEXT_work/Geant4/nexus/results_gonzalo_code_big_run.csv"
 
 filename_out = shrink_replace_data_file(filename_in,filename_out)
 df = pd.read_csv(filename_out)
@@ -143,7 +141,39 @@ print(f'Unique primary photons in dataframe = {unique_primary_photons}/{len(df)}
 
 max_daughters = df.groupby('event_id')['particle_id'].nunique().max()
 print(f'max daughters found = {max_daughters-1}')
-daughters_df = df[df['particle_id'] > 2]
+
+
+
+### Figure for Paula about TPB ###
+# make plot of number of primaries vs max number of secondaries
+import matplotlib.pyplot as plt
+n_daugters = np.arange(2,max_daughters,1)
+
+daughters_df = []
+for i in range(2,max_daughters):
+    daughters_df.append(df[df['particle_id'] == i])
+
+counts = [daughters_df[i]["event_id"].nunique() for i in range(len(daughters_df))]
+                                  
+plt.plot(n_daugters-np.ones(len(n_daugters)),np.divide(counts,unique_primary_photons),'-*k')
+plt.xticks(n_daugters-np.ones(len(n_daugters)))
+plt.xlabel("Max number of secondary photons")
+plt.ylabel("Fraction of primary photons")
+plt.title("Breakdown of primary vs max secondary photons")
+
+grouped = df.groupby('event_id')["particle_id"].max()
+did_WLS_number = sum(grouped > 1)
+did_not_WLS_number = sum(grouped == 1)
+
+
+did_not_WLS_Fraction = did_not_WLS_number/unique_primary_photons
+legend = f'Fraction that did not produce secondaries={round(did_not_WLS_Fraction,3)}'
+plt.text(2.5, 0.42, legend, bbox=dict(facecolor='blue', alpha=0.5))
+plt.grid()
+plt.show()
+
+print(f'recorded WLS efficiency = {round(did_WLS_number/unique_primary_photons,3)}')
+
 
 
 # In[1]

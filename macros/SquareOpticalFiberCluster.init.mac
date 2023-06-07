@@ -1,5 +1,5 @@
 ### --------------------------------------------------------
-###  Initialization macro for the square optical fiber detector setup.
+###  Cluster initialization macro for the square optical fiber detector setup.
 ###  This macro simulates individual particles
 ###  in the active volume. It simulates only the inner
 ###  part of the detector.
@@ -20,7 +20,7 @@
 /nexus/RegisterPersistencyManager PersistencyManager
 
 /nexus/RegisterTrackingAction OpticalTrackingAction
-/nexus/RegisterSteppingAction SaveAllSteppingAction
+#/nexus/RegisterSteppingAction SaveAllSteppingAction
 /nexus/RegisterEventAction DefaultEventAction
 /nexus/RegisterRunAction DefaultRunAction
 

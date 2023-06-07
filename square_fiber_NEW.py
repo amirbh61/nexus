@@ -44,7 +44,7 @@ z = 0 # junk number, value has no meaning but must exist as input for geant
 seed = 10000
 
 original_macro_path = r'/home/amir/Products/geant4/geant4-v11.0.1/MySims/nexus/macros/SquareOpticalFiberCluster.config.mac'
-output_macro_Mfolder = r'/home/amir/Products/geant4/geant4-v11.0.1/MySims/nexus/SquareFiberMacros/'
+output_macro_Mfolder = r'/home/amir/Products/geant4/geant4-v11.0.1/MySims/nexus/SquareFiberMacrosAndOutputs/'
 
 if not os.path.isdir(output_macro_Mfolder):
     os.mkdir(output_macro_Mfolder)
