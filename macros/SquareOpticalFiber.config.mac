@@ -19,8 +19,8 @@
 /Generator/SingleParticle/max_energy 7.21 eV
 
 
-#/Generator/SingleParticle/region LINE_SOURCE_EL
-/Generator/SingleParticle/region AD_HOC
+/Generator/SingleParticle/region LINE_SOURCE_EL
+#/Generator/SingleParticle/region AD_HOC
 #/Generator/SingleParticle/region SingleParticle
 
 #/Generator/SingleParticle/region ACTIVE
@@ -33,9 +33,10 @@
 /nexus/random_seed 10000
 #/Geometry/SquareOpticalFiber/specific_vertex 0 0 -0.0023 mm # when simulating particles at the face of fiber TPB, "AD_HOC"
 /Geometry/SquareOpticalFiber/specific_vertex 0 0 -0.0023 mm # z-value not relevant here in "LINE_SOURCE_EL" mode
+
 /Geometry/SquareOpticalFiber/ELGap 10 mm
-/Geometry/SquareOpticalFiber/pitch 10 mm
-/Geometry/SquareOpticalFiber/distanceFiberHolder 0 mm
+/Geometry/SquareOpticalFiber/pitch 15.6 mm
+/Geometry/SquareOpticalFiber/distanceFiberHolder 2 mm
 /Geometry/SquareOpticalFiber/distanceAnodeHolder 10 mm
 /Geometry/SquareOpticalFiber/holderThickness 10 mm
 /Geometry/SquareOpticalFiber/TPBThickness 2.2 um 

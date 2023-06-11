@@ -25,11 +25,11 @@ namespace nexus {
 
     class SquareOpticalFiber : public GeometryBase {
 
-    mutable std::mt19937 gen_; // move the generator to the class scope and make it mutable
-    mutable std::uniform_real_distribution<double> z_dist_; // make the distribution mutable as well
+    mutable std::mt19937 gen_; // number generator for z value of photon
+    mutable std::uniform_real_distribution<double> z_dist_; // distribution for z value of photon
 
     public:
-        G4int seed_ = 42;
+        G4int z_dist_seed_ = 42;
         SquareOpticalFiber();
         ~SquareOpticalFiber();
         std::pair<G4double, G4double> UpdateELGapLimits();

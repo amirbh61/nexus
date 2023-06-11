@@ -125,10 +125,13 @@ def shrink_replace_data_file(filename_in,filename_out):
 
 
 # Set the input and output file paths
-filename_in  = '/media/amir/9C33-6BBD/NEXT_work/Geant4/nexus/SquareFiber_big_run.next.h5'
+# filename_in  = '/media/amir/9C33-6BBD/NEXT_work/Geant4/nexus/SquareFiber_big_run.next.h5'
 filename_out = "/media/amir/9C33-6BBD/NEXT_work/Geant4/nexus/results_gonzalo_code_big_run.csv"
 
-filename_out = shrink_replace_data_file(filename_in,filename_out)
+
+
+
+# filename_out = shrink_replace_data_file(filename_in,filename_out)
 df = pd.read_csv(filename_out)
 
 
@@ -178,11 +181,18 @@ print(f'recorded WLS efficiency = {round(did_WLS_number/unique_primary_photons,3
 
 # In[1]
 
-n_particles = 462000
-print('\n' + f'percent SiPM hits = {(len(df)/(n_particles)) * 100}')
-edge = 100 #Create a 2*edge by 2*edge matrix
-x_hitpoints = df["final_x"]
-y_hitpoints = df["final_y"]
+n_particles = 462500
+edge = 75 #Create a 2*edge by 2*edge matrix
+# x_hitpoints = df["final_x"]
+# y_hitpoints = df["final_y"]
+
+SiPM_hit_path = r'/media/amir/9C33-6BBD/NEXT_work/Geant4/nexus/SiPM_hits.txt'
+hit_points = np.genfromtxt(SiPM_hit_path)
+x_hitpoints = hit_points[:,0]
+y_hitpoints = hit_points[:,1]
+print('\n' + f'percent SiPM hits = {(len(hit_points)/(n_particles)) * 100}')
+
+
 
 bins = 2*edge
 SR = np.zeros((bins,bins))

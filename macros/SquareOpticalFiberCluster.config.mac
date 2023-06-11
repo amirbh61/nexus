@@ -33,6 +33,7 @@
 /Geometry/SquareOpticalFiber/distanceAnodeHolder ${distanceAnodeHolder} mm
 /Geometry/SquareOpticalFiber/holderThickness ${holderThickness} mm
 /Geometry/SquareOpticalFiber/TPBThickness ${TPBThickness} um 
+
 /SquareOpticalFiber/SquareFiberSD/Output/sipmPath ${sipmOutputFile_}
 
 /SquareOpticalFiber/SquareFiberSD/Output/tpbPath ${tpbOutputFile_}

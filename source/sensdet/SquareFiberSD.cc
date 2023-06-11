@@ -21,6 +21,21 @@ namespace nexus{
 SquareFiberSD::SquareFiberSD(G4String const& SD_name, G4String const& sipmOutputFileName,
  G4String const& tpbOutputFileName): G4VSensitiveDetector(SD_name)
 {
+
+  // Remove SiPM and TPB files, if exist from previous run 
+  if (std::remove(sipmOutputFileName.c_str()) != 0) {
+    std::cout << "Failed to delete SiPM output file." << std::endl;
+  } else {
+    std::cout << "SiPM output file deleted." << std::endl;
+  }
+
+  if (std::remove(tpbOutputFileName.c_str()) != 0) {
+    std::cout << "Failed to delete SiPM output file." << std::endl;
+  } else {
+    std::cout << "SiPM output file deleted." << std::endl;
+  }
+
+
   SetSipmPath(sipmOutputFileName);
   SetTpbPath(tpbOutputFileName);
 }
