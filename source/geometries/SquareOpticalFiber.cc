@@ -29,6 +29,12 @@
 // is only for the absorption of UV photon and has nothing to do with the emissions. larger 
 // values of WLSMEANNUMBERPHOTONS cause more WLS photons -> DONE
 
+// To DO, 19.5.23:
+// writing output file to /dev/null doesn't work now - stream of warning messages
+// for 462K photons .h5 file size of ~500mb without SaveAllSteppingAction
+
+
+
 
 namespace nexus{
 
@@ -93,9 +99,14 @@ void SquareOpticalFiber::Construct(){
                                                             ground, dielectric_metal);
     teflonSurface->SetMaterialPropertiesTable(opticalprops::PTFE());
 
-    G4OpticalSurface* TPBSurface = new G4OpticalSurface("TPB_surface", glisur,
+    G4OpticalSurface* TPBFiberSurface = new G4OpticalSurface("TPB_surface", glisur,
                                                         ground, dielectric_dielectric, 0.01);
-    TPBSurface->SetMaterialPropertiesTable(opticalprops::TPB());
+    TPBFiberSurface->SetMaterialPropertiesTable(opticalprops::TPB());
+
+    // G4OpticalSurface* TPBXeSurface = new G4OpticalSurface("TPB_surface", glisur,
+    //                                                     groundfrontpainted, dielectric_dielectric);
+    // TPBXeSurface->SetMaterialPropertiesTable(opticalprops::TPB());
+
 
     G4OpticalSurface* VikuitiCoating = new G4OpticalSurface("Vikuiti_Surface", unified,
                                                                      polished, dielectric_metal);
@@ -432,7 +443,13 @@ void SquareOpticalFiber::Construct(){
             new G4LogicalBorderSurface("TPB-Fiber",
                                         fiberTPBPhysicalVolume,
                                          fiberCorePhysicalVolume,
-                                         TPBSurface);
+                                         TPBFiberSurface);
+
+
+            // new G4LogicalBorderSurface("TPB-WORLD",
+            //                         fiberTPBPhysicalVolume,
+            //                         world,
+            //                         TPBXeSurface);
 
 
             new G4LogicalBorderSurface("Fiber-Cladding",
@@ -456,7 +473,6 @@ void SquareOpticalFiber::Construct(){
 
     G4double holeSpacing = pitch_;
     G4int nHoles = numOfFibers;
-
 
 
     G4Tubs *holder = new G4Tubs("Teflon_Holder", //name
@@ -731,6 +747,15 @@ G4ThreeVector SquareOpticalFiber::GenerateVertex(const G4String& region) const {
     }
     else if (region == "AD_HOC") {
         return specific_vertex_;
+    }
+    else if (region == "FACE_RANDOM_DIST"){
+        x_dist_ = std::uniform_real_distribution<double>(-1.5*mm, 1.5*mm);
+        y_dist_ = std::uniform_real_distribution<double>(-1.5*mm, 1.5*mm);
+        G4double xGen = x_dist_(gen_);
+        G4double yGen = y_dist_(gen_);
+        G4double zGen = specific_vertex_.z();
+        G4ThreeVector random_vertex = G4ThreeVector(xGen, yGen, zGen);
+        return random_vertex;
     }
     else if (region == "LINE_SOURCE_EL"){
         G4double xGen = specific_vertex_.x();

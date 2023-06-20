@@ -105,6 +105,9 @@ G4bool PersistencyManager::Store(const G4Event* event)
     interacting_evts_++;
   }
 
+  // // My addition for not storing data
+  // return true;
+
   if (!store_evt_) {
     TrajectoryMap::Clear();
     if (store_steps_) {
@@ -359,6 +362,7 @@ void PersistencyManager::StoreSteps()
 
 G4bool PersistencyManager::Store(const G4Run*)
 {
+  // return true;
   // Store the event type
   G4String key = "event_type";
   h5writer_->WriteRunInfo(key, event_type_.c_str());

@@ -146,7 +146,7 @@ max_daughters = df.groupby('event_id')['particle_id'].nunique().max()
 print(f'max daughters found = {max_daughters-1}')
 
 
-
+# In[3.1]
 ### Figure for Paula about TPB ###
 # make plot of number of primaries vs max number of secondaries
 import matplotlib.pyplot as plt
@@ -178,8 +178,60 @@ plt.show()
 print(f'recorded WLS efficiency = {round(did_WLS_number/unique_primary_photons,3)}')
 
 
+# In[3.2]
+### Figure for Lior , with TPB###
+# TPB, plot of the absorbed WLS blue photons in sipm vs fiber coating reflectivity
 
-# In[1]
+n_UV = 100000
+# Note: in reality only 1K photons for 100% reflectivity
+vikuiti_ref = [96, 97, 98, 99, 100]
+# SiPM_hits = [5699, 7841, 11488, 19013, 56640] # results from point source (0,0,-1.1um)
+SiPM_hits = [6006, 8092, 11806, 19365, 55300] # Randomly on face
+SiPM_hits = [x / n_UV for x in SiPM_hits]
+plt.plot(vikuiti_ref, SiPM_hits, '-^', color='rebeccapurple')
+text = "100K UV photons at 7.21[eV] per sample\n" + \
+       "Randomly generated in TPB center, facing forward\n" + \
+       "1K UV photons for 100% reflectivity due to runtime"
+plt.text(96, 0.52, text, bbox=dict(facecolor='red', alpha=0.5))
+plt.xlabel("Fiber Coating Reflectivity [%]")
+plt.ylabel("Fraction of photons absorbed in SiPM")
+plt.title("WLS blue photons absorbed in SiPM vs fiber coating reflectivity")
+plt.grid()
+plt.xlim(min(vikuiti_ref) - 0.1, max(vikuiti_ref) + 0.1)
+plt.gca().ticklabel_format(style='plain', useOffset=False)
+save_path = r'/home/amir/Desktop/Sipm_hits_vs_coating_reflectivity_TPB.jpg'
+plt.savefig(save_path, dpi=600)
+plt.show()
+# In[3.3]
+### Figure for Lior , with TPB###
+# No TPB, plot of the absorbed WLS blue photons in sipm vs fiber coating reflectivity
+
+n_UV = 100000
+# Note: in reality only 1K photons for 100% reflectivity
+vikuiti_ref = [96, 97, 98, 99, 100]
+
+SiPM_hits = [ 15294, 20062, 27828, 42391, 95800]
+SiPM_hits = [x / n_UV for x in SiPM_hits]
+plt.plot(vikuiti_ref, SiPM_hits, '-^b')
+text = "100K blue photons at 2.883[eV] per sample\n" + \
+       "Randomly generated on face of fiber, facing forward, no TPB\n" + \
+       "1K blue photons for 100% reflectivity due to runtime"
+plt.text(96, 0.88, text, bbox=dict(facecolor='blue', alpha=0.5))
+plt.xlabel("Fiber Coating Reflectivity [%]")
+plt.ylabel("Fraction of photons absorbed in SiPM")
+plt.title("WLS blue photons absorbed in SiPM vs fiber coating reflectivity")
+plt.grid()
+plt.xlim(min(vikuiti_ref) - 0.1, max(vikuiti_ref) + 0.1)
+plt.gca().ticklabel_format(style='plain', useOffset=False)
+save_path = r'/home/amir/Desktop/Sipm_hits_vs_coating_reflectivity_no_TPB.jpg'
+plt.savefig(save_path, dpi=600)
+plt.show()
+
+
+
+
+
+# In[4]
 
 n_particles = 462500
 edge = 75 #Create a 2*edge by 2*edge matrix
@@ -204,7 +256,7 @@ plt.ylabel('y [mm]')
 plt.colorbar()
 plt.show()
 
-# In[1]
+# In[5]
 # import os
 # import pandas as pd
 # import tables as tb
@@ -242,7 +294,7 @@ plt.show()
     
 # out_data = pd.read_csv(filename_out)
 
-# In[1]
+# In[6]
 # checks if photons hit SiPMs
 SiPM_hits = 0
 back_fired = 0

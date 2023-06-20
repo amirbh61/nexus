@@ -19,9 +19,12 @@
 /Generator/SingleParticle/max_energy 7.21 eV
 
 
+## Choose region
 /Generator/SingleParticle/region LINE_SOURCE_EL
 #/Generator/SingleParticle/region AD_HOC
 #/Generator/SingleParticle/region SingleParticle
+#/Generator/SingleParticle/region FACE_RANDOM_DIST
+
 
 #/Generator/SingleParticle/region ACTIVE
 #/Generator/SingleParticle/min_costheta 0.6711
@@ -29,10 +32,12 @@
 /Generator/SingleParticle/max_costheta 1
 
 
-####  SETUP PARAMETERS ####
+####  SETUP PARAMETERS  ####
 /nexus/random_seed 10000
-#/Geometry/SquareOpticalFiber/specific_vertex 0 0 -0.0023 mm # when simulating particles at the face of fiber TPB, "AD_HOC"
+#/Geometry/SquareOpticalFiber/specific_vertex 0 0 -0.0011 mm # face of fiber TPB, "AD_HOC"
 /Geometry/SquareOpticalFiber/specific_vertex 0 0 -0.0023 mm # z-value not relevant here in "LINE_SOURCE_EL" mode
+#/Geometry/SquareOpticalFiber/specific_vertex 0 0 -0.0011 mm # face of fiber, "FACE_RANDOM_DIST"
+
 
 /Geometry/SquareOpticalFiber/ELGap 10 mm
 /Geometry/SquareOpticalFiber/pitch 15.6 mm
@@ -41,17 +46,17 @@
 /Geometry/SquareOpticalFiber/holderThickness 10 mm
 /Geometry/SquareOpticalFiber/TPBThickness 2.2 um 
 
-
-# When using the SaveAllSteppingAction
-/nexus/persistency/outputFile /media/amir/9C33-6BBD/NEXT_work/Geant4/nexus/SquareFiber.next
-
-# When NOT using the SaveAllSteppingAction
-#/nexus/persistency/outputFile /dev/null
-
+## Write output hitpoint text files ##
 /SquareOpticalFiber/SquareFiberSD/Output/sipmPath /media/amir/9C33-6BBD/NEXT_work/Geant4/nexus/SiPM_hits.txt
 /SquareOpticalFiber/SquareFiberSD/Output/tpbPath /media/amir/9C33-6BBD/NEXT_work/Geant4/nexus/TPB_hits.txt
 
 
+## Write hdf file ##
+#When using the SaveAllSteppingAction
+#/nexus/persistency/outputFile /media/amir/9C33-6BBD/NEXT_work/Geant4/nexus/SquareFiber.next
+
+# When NOT using the SaveAllSteppingAction
+/nexus/persistency/outputFile /dev/null
 
 
 

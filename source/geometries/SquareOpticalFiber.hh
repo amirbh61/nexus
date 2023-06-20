@@ -26,6 +26,8 @@ namespace nexus {
     class SquareOpticalFiber : public GeometryBase {
 
     mutable std::mt19937 gen_; // number generator for z value of photon
+    mutable std::uniform_real_distribution<double> x_dist_; // distribution for x value of photon
+    mutable std::uniform_real_distribution<double> y_dist_; // distribution for y value of photon
     mutable std::uniform_real_distribution<double> z_dist_; // distribution for z value of photon
 
     public:

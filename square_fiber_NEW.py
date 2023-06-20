@@ -28,7 +28,7 @@ geometry_params = {
     'pitch': ['5', '10', '15.6'],
     'distanceFiberHolder': ['-1', '2', '5'],
     'distanceAnodeHolder': ['2.5', '5', '10'],
-    'holderThickness': ['10'],
+    'holderThickness': ['5','10'],
     'TPBThickness': ['2.2'] # microns
 }
 
@@ -36,7 +36,7 @@ geometry_params = {
 run_params = {
     'x': ['0'],
     'y': ['0'],
-    'z': ['-5.0023'],
+    'z': ['0'],
 }
 
 unit_cell_source_spacing = 0.5 # mm, spacing between sources in different runs
