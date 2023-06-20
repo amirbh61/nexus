@@ -192,7 +192,7 @@ plt.plot(vikuiti_ref, SiPM_hits, '-^', color='rebeccapurple')
 text = "100K UV photons at 7.21[eV] per sample\n" + \
        "Randomly generated in TPB center, facing forward\n" + \
        "1K UV photons for 100% reflectivity due to runtime"
-plt.text(96, 0.52, text, bbox=dict(facecolor='red', alpha=0.5))
+plt.text(96, 0.52, text, bbox=dict(facecolor='rebeccapurple', alpha=0.5))
 plt.xlabel("Fiber Coating Reflectivity [%]")
 plt.ylabel("Fraction of photons absorbed in SiPM")
 plt.title("WLS blue photons absorbed in SiPM vs fiber coating reflectivity")
