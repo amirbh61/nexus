@@ -12,7 +12,7 @@ import numpy as np
 from matplotlib import pyplot as plt
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 plt.style.use('classic')
-from tqdm import tqdm
+#from tqdm import tqdm
 pd.set_option('display.max_columns', None)
 pd.set_option('display.max_rows', 500)
 import re
@@ -56,7 +56,8 @@ with open(original_macro_path, "r") as f:
 # Get the Cartesian product of all parameter values
 geometry_combinations = list(itertools.product(*geometry_params.values()))
 
-for i, combination in tqdm(enumerate(geometry_combinations)):
+#for i, combination in tqdm(enumerate(geometry_combinations)):
+for i, combination in enumerate(geometry_combinations):
     
     output_macro_geom_folder = output_macro_Mfolder + \
                                 f'ELGap={combination[0].replace(" ","")}mm_' + \

@@ -53,10 +53,10 @@
 
 ## Write hdf file ##
 #When using the SaveAllSteppingAction
-#/nexus/persistency/outputFile /media/amir/9C33-6BBD/NEXT_work/Geant4/nexus/SquareFiber.next
+/nexus/persistency/outputFile /media/amir/9C33-6BBD/NEXT_work/Geant4/nexus/SquareFiber.next
 
 # When NOT using the SaveAllSteppingAction
-/nexus/persistency/outputFile /dev/null
+#/nexus/persistency/outputFile /dev/null
 
 
 
