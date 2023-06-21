@@ -39,16 +39,24 @@
 #/Geometry/SquareOpticalFiber/specific_vertex 0 0 -0.0011 mm # face of fiber, "FACE_RANDOM_DIST"
 
 
-/Geometry/SquareOpticalFiber/ELGap 10 mm
-/Geometry/SquareOpticalFiber/pitch 15.6 mm
+/Geometry/SquareOpticalFiber/ELGap 1 mm
+/Geometry/SquareOpticalFiber/pitch 5 mm
 /Geometry/SquareOpticalFiber/distanceFiberHolder 2 mm
-/Geometry/SquareOpticalFiber/distanceAnodeHolder 10 mm
+/Geometry/SquareOpticalFiber/distanceAnodeHolder 2.5 mm
 /Geometry/SquareOpticalFiber/holderThickness 10 mm
 /Geometry/SquareOpticalFiber/TPBThickness 2.2 um 
 
 ## Write output hitpoint text files ##
-/SquareOpticalFiber/SquareFiberSD/Output/sipmPath /media/amir/9C33-6BBD/NEXT_work/Geant4/nexus/SiPM_hits.txt
-/SquareOpticalFiber/SquareFiberSD/Output/tpbPath /media/amir/9C33-6BBD/NEXT_work/Geant4/nexus/TPB_hits.txt
+#/SquareOpticalFiber/SquareFiberSD/Output/sipmPath /media/amir/9C33-6BBD/NEXT_work/Geant4/nexus/SiPM_hits.txt
+#/SquareOpticalFiber/SquareFiberSD/Output/tpbPath /media/amir/9C33-6BBD/NEXT_work/Geant4/nexus/TPB_hits.txt
+
+
+## CLUSTER ONLY, Write output hitpoint text files ##
+/SquareOpticalFiber/SquareFiberSD/Output/sipmPath /gpfs0/arazi/users/amirbenh/Resolving_Power/nexus/test_outputs/SiPM_hits.txt
+/SquareOpticalFiber/SquareFiberSD/Output/tpbPath /gpfs0/arazi/users/amirbenh/Resolving_Power/nexus/test_outputs/TPB_hits.txt
+
+
+
 
 
 ## Write hdf file ##
@@ -57,6 +65,14 @@
 
 # When NOT using the SaveAllSteppingAction
 #/nexus/persistency/outputFile /dev/null
+
+
+
+
+
+
+
+
 
 
 
