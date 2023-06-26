@@ -1,0 +1,43 @@
+### --------------------------------------------------------
+###  CLUSTER configuration macro for the square optical fiber geometry.
+###  This macro simulates a 172 nm (7.21 eV) optical photon.
+###  in the active volume.
+### --------------------------------------------------------
+
+
+/run/verbose 0
+/event/verbose 0
+/tracking/verbose 0
+/process/em/verbose 0
+
+
+### Generation
+/Generator/SingleParticle/particle opticalphoton
+/Generator/SingleParticle/min_energy  7.21 eV
+/Generator/SingleParticle/max_energy 7.21 eV
+
+
+/Generator/SingleParticle/region LINE_SOURCE_EL
+
+/Generator/SingleParticle/min_costheta 0
+/Generator/SingleParticle/max_costheta 1
+
+
+
+#### SETUP PARAMETERS, Big run #### 
+/nexus/random_seed 12878
+/Geometry/SquareOpticalFiber/specific_vertex -2.0 5.0 -0.0023 mm # z-value not relevant here in "LINE_SOURCE_EL" mode
+/Geometry/SquareOpticalFiber/ELGap 10 mm
+/Geometry/SquareOpticalFiber/pitch 10 mm
+/Geometry/SquareOpticalFiber/distanceFiberHolder 2 mm
+/Geometry/SquareOpticalFiber/distanceAnodeHolder 2.5 mm
+/Geometry/SquareOpticalFiber/holderThickness 10 mm
+/Geometry/SquareOpticalFiber/TPBThickness 2.2 um 
+
+/SquareOpticalFiber/SquareFiberSD/Output/sipmPath /home/amir/Products/geant4/geant4-v11.0.1/MySims/nexus/SquareFiberMacrosAndOutputs/ELGap=10mm_pitch=10mm_distanceFiberHolder=2mm_distanceAnodeHolder=2.5mm_holderThickness=10mm/SiPM_hits_x=-2.0mm_y=5.0mm.txt
+
+/SquareOpticalFiber/SquareFiberSD/Output/tpbPath /home/amir/Products/geant4/geant4-v11.0.1/MySims/nexus/SquareFiberMacrosAndOutputs/ELGap=10mm_pitch=10mm_distanceFiberHolder=2mm_distanceAnodeHolder=2.5mm_holderThickness=10mm/TPB_hits_x=-2.0mm_y=5.0mm.txt
+
+
+# When NOT using the SaveAllSteppingAction
+/nexus/persistency/outputFile NULL
