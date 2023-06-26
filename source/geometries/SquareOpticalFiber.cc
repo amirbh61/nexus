@@ -103,18 +103,9 @@ void SquareOpticalFiber::Construct(){
                                                         ground, dielectric_dielectric, 0.01);
     TPBFiberSurface->SetMaterialPropertiesTable(opticalprops::TPB());
 
-    // G4OpticalSurface* TPBXeSurface = new G4OpticalSurface("TPB_surface", glisur,
-    //                                                     groundfrontpainted, dielectric_dielectric);
-    // TPBXeSurface->SetMaterialPropertiesTable(opticalprops::TPB());
-
-
     G4OpticalSurface* VikuitiCoating = new G4OpticalSurface("Vikuiti_Surface", unified,
                                                                      polished, dielectric_metal);
     VikuitiCoating->SetMaterialPropertiesTable(opticalprops::Vikuiti());
-
-    // G4OpticalSurface* SiSurface = new G4OpticalSurface("Si_Surface", unified,
-    //                                                     polished, dielectric_metal);
-    // SiSurface->SetMaterialPropertiesTable(opticalprops::Si());
 
 
 
@@ -277,7 +268,6 @@ void SquareOpticalFiber::Construct(){
 
     G4SubtractionSolid *fiberCladding = new G4SubtractionSolid("Fiber_Cladding", fiberCladdingOuter, fiberCladdingInner);
     G4LogicalVolume *fiberCladdingLogicalVolume = new G4LogicalVolume(fiberCladding, FPethylene, "Fiber_Cladding");
-    // new G4LogicalSkinSurface( "Fiber_Cladding", fiberCladdingLogicalVolume, VikuitiCoatingTeflon);
 
 
     G4Color brown = G4Color::Brown();
@@ -444,12 +434,6 @@ void SquareOpticalFiber::Construct(){
                                         fiberTPBPhysicalVolume,
                                          fiberCorePhysicalVolume,
                                          TPBFiberSurface);
-
-
-            // new G4LogicalBorderSurface("TPB-WORLD",
-            //                         fiberTPBPhysicalVolume,
-            //                         world,
-            //                         TPBXeSurface);
 
 
             new G4LogicalBorderSurface("Fiber-Cladding",
@@ -741,7 +725,6 @@ void SquareOpticalFiber::Construct(){
 
 G4ThreeVector SquareOpticalFiber::GenerateVertex(const G4String& region) const {
 
-    // WORLD
     if (region == "CENTER") {
         return G4ThreeVector(0,0,0);
     }

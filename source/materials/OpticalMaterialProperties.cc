@@ -789,9 +789,9 @@ namespace opticalprops {
     //   1.,  1.,  1.
     // };
 
-
     // std::vector<G4double> ENERGIES = {7.2 * eV , 7.2 * eV};
     // std::vector<G4double> REFLECTIVITY = {0.98 , 0.98};
+
     mpt->AddProperty("REFLECTIVITY", ENERGIES, REFLECTIVITY);
 
     // REFLEXION BEHAVIOR
@@ -1783,13 +1783,7 @@ namespace opticalprops {
     std::vector<G4double> abs_energy = {optPhotMinE_, optPhotMaxE_};
     std::vector<G4double> absLength  = {noAbsLength_, noAbsLength_};
     mpt->AddProperty("ABSLENGTH", abs_energy, absLength);
-
-
-    // //REFLECTIVITY - **** MY ADDITION - NOT EXIST IN THE ORIGINAL *****
-    // std::vector<G4double> ENERGIES = {optPhotMinE_ , optPhotMaxE_};
-    // std::vector<G4double> REFLECTIVITY = {0.96, 0.96};
-    // mpt->AddProperty("REFLECTIVITY", ENERGIES, REFLECTIVITY);
-
+    
     return mpt;
   }
 
