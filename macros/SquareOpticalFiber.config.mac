@@ -51,29 +51,18 @@
 /SquareOpticalFiber/SquareFiberSD/Output/tpbPath /media/amir/9C33-6BBD/NEXT_work/Geant4/nexus/TPB_hits.txt
 
 
-## CLUSTER ONLY, Write output hitpoint text files ##
+## CLUSTER ONLY, Write output hitpoint text and hdf5 files ##
 #/SquareOpticalFiber/SquareFiberSD/Output/sipmPath /gpfs0/arazi/users/amirbenh/Resolving_Power/nexus/test_outputs/SiPM_hits.txt
 #/SquareOpticalFiber/SquareFiberSD/Output/tpbPath /gpfs0/arazi/users/amirbenh/Resolving_Power/nexus/test_outputs/TPB_hits.txt
-
-
-
+#/nexus/persistency/outputFile /gpfs0/arazi/users/amirbenh/Resolving_Power/nexus/test_outputs/SquareFiber.next
 
 
 ## Write hdf file ##
 #When using the SaveAllSteppingAction
-/nexus/persistency/outputFile /media/amir/9C33-6BBD/NEXT_work/Geant4/nexus/SquareFiber.next
+#/nexus/persistency/outputFile /media/amir/9C33-6BBD/NEXT_work/Geant4/nexus/SquareFiber.next
 
 # When NOT using the SaveAllSteppingAction
-#/nexus/persistency/outputFile NULL
-
-
-
-
-
-
-
-
-
+/nexus/persistency/outputFile NULL
 
 
 
@@ -82,6 +71,5 @@
 #/Actions/SaveAllSteppingAction/select_volume WORLD
 #/Actions/SaveAllSteppingAction/select_volume Cap1
 #/Actions/SaveAllSteppingAction/select_volume Barrel
-
 
 

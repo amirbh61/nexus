@@ -17,76 +17,8 @@ from scipy.interpolate import interp2d as interp2d
 pd.set_option('display.max_columns', None)
 pd.set_option('display.max_rows', 500)
 
+
 # In[0]
-# Generate shell session to get to sim folder
-
-# import subprocess
-# import pexpect
-  
-# commands = [
-#     "cd Products/geant4/geant4-v11.0.1/",
-#     "echo 'Current directory:'",
-#     "pwd",
-#     "source set_source.sh",
-#     "cd MySims/nexus/",
-#     "echo 'Current directory:'",
-#     "pwd"
-# ]
-
-# # Start a shell session
-# shell = pexpect.spawn("/bin/bash", timeout=None, encoding='utf-8')
-
-# # Execute the commands one by one in the same shell session
-# for command in commands:
-#     shell.sendline(command)
-#     shell.expect_exact("$")
-
-# # Collect the output
-# output = shell.before
-
-# # Close the shell session
-# # shell.close()
-
-# print("Output:")
-# print(output)
-
-# In[1]
-
-# n_photons = 100000
-# geant4_command = f"./build/nexus -b -n {n_photons}" # commant to run sim
-
-# # Define the range of values for the two coordinates
-# coordinate_values = range(-5, 6, 1) 
-
-# input_macro_path = "/home/amir/Products/geant4/geant4-v11.0.1/MySims/nexus/macros/SquareOpticalFiber.init.mac"
-# # Loop through all combinations of coordinate values
-# for x in coordinate_values:
-#     for y in coordinate_values:
-#         # Read the original macro file
-#         with open(input_macro_path, "r") as input_macro_file:
-#             input_macro = input_macro_file.read()
-
-#         # Modify the specific line with the new x and y values
-#         modified_macro = input_macro.replace(
-#             "/Geometry/SquareOpticalFiber/specific_vertex 0 0",
-#             f"/Geometry/SquareOpticalFiber/specific_vertex {x} {y}",
-#         )
-
-#         # Save the modified macro to a temporary file
-#         modified_macro_path = f"modified_macro_({x},{y}).txt"
-#         with open(modified_macro_path, "w") as modified_macro_file:
-#             modified_macro_file.write(modified_macro)
-
-#         # Run the Geant4 simulation with the modified macro file
-#         run_command = f'{geant4_command} "{modified_macro_path}"'
-#         subprocess.run(run_command, shell=True)
-
-#         # Optionally, remove the temporary modified macro file
-#         os.remove(modified_macro_path)
-
-
-
-# In[2]
 # load square fiber
 import tables as tb
 from invisible_cities.io.dst_io import df_writer
@@ -146,7 +78,7 @@ max_daughters = df.groupby('event_id')['particle_id'].nunique().max()
 print(f'max daughters found = {max_daughters-1}')
 
 
-# In[3.1]
+# In[0.1]
 ### Figure for Paula about TPB ###
 # make plot of number of primaries vs max number of secondaries
 import matplotlib.pyplot as plt
@@ -178,8 +110,8 @@ plt.show()
 print(f'recorded WLS efficiency = {round(did_WLS_number/unique_primary_photons,3)}')
 
 
-# In[3.2]
-### Figure for Lior , with TPB###
+# In[0.2]
+### Figure for Lior , with TPB ###
 # TPB, plot of the absorbed WLS blue photons in sipm vs fiber coating reflectivity
 
 n_UV = 100000
@@ -202,8 +134,8 @@ plt.gca().ticklabel_format(style='plain', useOffset=False)
 save_path = r'/home/amir/Desktop/Sipm_hits_vs_coating_reflectivity_TPB.jpg'
 plt.savefig(save_path, dpi=600)
 plt.show()
-# In[3.3]
-### Figure for Lior , with TPB###
+# In[0.3]
+### Figure for Lior , without TPB ###
 # No TPB, plot of the absorbed WLS blue photons in sipm vs fiber coating reflectivity
 
 n_UV = 100000
@@ -231,7 +163,7 @@ plt.show()
 
 
 
-# In[4]
+# In[1]
 
 n_particles = 462500
 edge = 75 #Create a 2*edge by 2*edge matrix
@@ -256,7 +188,7 @@ plt.ylabel('y [mm]')
 plt.colorbar()
 plt.show()
 
-# In[5]
+# In[2]
 # import os
 # import pandas as pd
 # import tables as tb
@@ -294,7 +226,7 @@ plt.show()
     
 # out_data = pd.read_csv(filename_out)
 
-# In[6]
+# In[3]
 # checks if photons hit SiPMs
 SiPM_hits = 0
 back_fired = 0
@@ -345,7 +277,7 @@ print(f'Back fired = {back_fired}')
 
 
 
-# In[2]
+# In[4]
 # Sensor response
 bins = 2*edge
 SR = np.zeros((bins,bins))
@@ -393,7 +325,7 @@ plt.show()
 
 
 
-# In[3]
+# In[7]
 #plot results for lior 8.3.2023
 d2 = [-5, 0, 2.5, 4, 5] - 5*np.ones(5)
 photons_hit_SiPM = [0.4394, 0.5984, 0.8173, 1.0218, 1.4175]
