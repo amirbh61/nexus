@@ -37,7 +37,3 @@
 /SquareOpticalFiber/SquareFiberSD/Output/sipmPath ${sipmOutputFile_}
 
 /SquareOpticalFiber/SquareFiberSD/Output/tpbPath ${tpbOutputFile_}
-
-
-# When NOT using the SaveAllSteppingAction
-/nexus/persistency/outputFile NULL
