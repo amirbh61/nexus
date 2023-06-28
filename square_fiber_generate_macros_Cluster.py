@@ -27,7 +27,7 @@ import itertools
 #     'pitch': ['5', '10', '15.6'],
 #     'distanceFiberHolder': ['-1', '2', '5'],
 #     'distanceAnodeHolder': ['2.5', '5', '10'],
-#     'holderThickness': ['5','10'],
+#     'holderThickness': [10'],
 #     'TPBThickness': ['2.2'] # microns
 # }
 
@@ -48,7 +48,7 @@ run_params = {
     'z': ['0'],
 }
 
-unit_cell_source_spacing = 0.5  # mm, spacing between sources in different runs
+unit_cell_source_spacing = 1  # mm, spacing between sources in different runs
 seed = 10000
 
 original_macro_path = r'/gpfs0/arazi/users/amirbenh/Resolving_Power/nexus/macros/SquareOpticalFiberCluster.config.mac'
