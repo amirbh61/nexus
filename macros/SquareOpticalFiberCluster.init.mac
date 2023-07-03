@@ -25,4 +25,4 @@
 /nexus/RegisterRunAction DefaultRunAction
 
 
-/nexus/RegisterMacro macros/SquareOpticalFiberCluster.config.mac
+/nexus/RegisterMacro ${config_macro}

@@ -54,116 +54,27 @@ unit_cell_source_spacing = 0.5 # mm, spacing between sources in different runs
 z = 0 # junk number, value has no meaning but must exist as input for geant
 seed = 10000
 
-original_macro_path = r'/home/amir/Products/geant4/geant4-v11.0.1/MySims/nexus/macros/SquareOpticalFiberCluster.config.mac'
+original_config_macro_path = r'/home/amir/Products/geant4/geant4-v11.0.1/MySims/nexus/macros/SquareOpticalFiberCluster.config.mac'
+original_init_macro_path = r'/home/amir/Products/geant4/geant4-v11.0.1/MySims/nexus/macros/SquareOpticalFiberCluster.init.mac'
 output_macro_Mfolder = r'/home/amir/Products/geant4/geant4-v11.0.1/MySims/nexus/SquareFiberMacrosAndOutputs/'
 
 if not os.path.isdir(output_macro_Mfolder):
     os.mkdir(output_macro_Mfolder)
+
+# Open config macro file and read in the data
+with open(original_config_macro_path, "r") as f:
+    config_template = f.read()
     
-# Open your macro file and read in the data
-with open(original_macro_path, "r") as f:
-    template = f.read()
-
-# Get the Cartesian product of all parameter values
-geometry_combinations = list(itertools.product(*geometry_params.values()))
-
-for i, combination in tqdm(enumerate(geometry_combinations)):
+# Open init macro file and read in the data
+with open(original_init_macro_path, "r") as f:
+    init_template = f.read()
     
-    output_macro_geom_folder = output_macro_Mfolder + \
-                                f'ELGap={combination[0].replace(" ","")}mm_' + \
-                                f'pitch={combination[1].replace(" ","")}mm_' + \
-                                f'distanceFiberHolder={combination[2].replace(" ","")}mm_' + \
-                                f'distanceAnodeHolder={combination[3].replace(" ","")}mm_' + \
-                                f'holderThickness={combination[4].replace(" ","")}mm'
-                                
-    if not os.path.isdir(output_macro_geom_folder):
-        os.mkdir(output_macro_geom_folder)
-        
-    # Fill x,y,seed values in macros for each geometry setup
-    for x_val in run_params['x']:
-        for y_val in run_params['y']:
-            x_val = str(round(float(x_val),3))
-            y_val = str(round(float(y_val),3))
-            
-            macro = template # Define a fresh copy of the macro template
-            for key, value in zip(geometry_params.keys(), combination):
-                if key == 'pitch':
-                    pitch_value = float(value.split(' ')[0])
-                    x = np.arange(-pitch_value/2, pitch_value/2 + unit_cell_source_spacing,
-                                  unit_cell_source_spacing )
-                    y = np.arange(-pitch_value/2, pitch_value/2 + unit_cell_source_spacing,
-                                  unit_cell_source_spacing )
-                    
-                    # Update the run parameters
-                    run_params = {
-                        'x': [str(val) for val in x],
-                        'y': [str(val) for val in y],
-                    }
-                macro = macro.replace('${' + key + '}', value)
-                
-            macro = macro.replace('${x}', x_val)
-            macro = macro.replace('${y}', y_val)
-            macro = macro.replace('${seed}', str(seed))
-            seed += 1
-            
-            output_SiPM_path = output_macro_geom_folder + \
-                f'/SiPM_hits_x={x_val}mm_y={y_val}mm.txt'                     
-            macro = macro.replace('${sipmOutputFile_}', output_SiPM_path)
-            
-            output_TPB_path = output_macro_geom_folder + \
-                f'/TPB_hits_x={x_val}mm_y={y_val}mm.txt'
-            macro = macro.replace('${tpbOutputFile_}', output_TPB_path)
-            
-            output_macro_path = output_macro_geom_folder + \
-            f'/x={x_val}mm_y={y_val}mm.config.mac'
-                                  
-            # Write the new macro to a new file
-            with open(output_macro_path, "w") as f:
-                f.write(macro)
-
-
-    
-
-
-
-
-# In[1]
-
-# Geometry parameters
-geometry_params = {
-    'ELGap': ['1','10'],
-    'pitch': ['5', '10'],
-    'distanceFiberHolder': ['2', '5'],
-    'distanceAnodeHolder': ['2.5', '10'],
-    'holderThickness': ['10'],
-    'TPBThickness': ['2.2']  # microns
-}
-
-# Run parameters
-run_params = {
-    'x': ['0'],
-    'y': ['0'],
-    'z': ['0'],
-}
-
-unit_cell_source_spacing = 0.5  # mm, spacing between sources in different runs
-seed = 10000
-
-original_macro_path = '/home/amir/Products/geant4/geant4-v11.0.1/MySims/nexus/macros/SquareOpticalFiberCluster.config.mac'
-output_macro_Mfolder = '/home/amir/Products/geant4/geant4-v11.0.1/MySims/nexus/SquareFiberMacrosAndOutputs/'
-
-if not os.path.isdir(output_macro_Mfolder):
-    os.mkdir(output_macro_Mfolder)
-
-# Open your macro file and read in the data
-with open(original_macro_path, "r") as f:
-    template = f.read()
 
 # Get the Cartesian product of all parameter values
 geometry_combinations = list(itertools.product(*geometry_params.values()))
 
 # Iterate through each geometry combination
-for i, combination in tqdm(enumerate(geometry_combinations)):
+for i, combination in enumerate(geometry_combinations):
 
     # Generate output directory based on geometry
     output_macro_geom_folder = os.path.join(output_macro_Mfolder,
@@ -195,36 +106,42 @@ for i, combination in tqdm(enumerate(geometry_combinations)):
     for x_val in run_params['x']:
         for y_val in run_params['y']:
             
-            # Start with a fresh copy of the macro template
-            macro = template
+            # fresh copy of the macro config template
+            config_macro = config_template
             
-            # Replace geometry parameters in the macro
+            # Replace geometry parameters in the config macro
             for key, value in zip(geometry_params.keys(), combination):
-                macro = macro.replace('${' + key + '}', value)
+                config_macro = config_macro.replace('${' + key + '}', value)
                 
             # Replace x, y and seed in the macro
-            macro = macro.replace('${x}', x_val)
-            macro = macro.replace('${y}', y_val)
-            macro = macro.replace('${seed}', str(seed))
+            config_macro = config_macro.replace('${x}', x_val)
+            config_macro = config_macro.replace('${y}', y_val)
+            config_macro = config_macro.replace('${seed}', str(seed))
             seed += 1
 
             # Output paths
             output_SiPM_path = os.path.join(output_macro_geom_folder, f'SiPM_hits_x={x_val}mm_y={y_val}mm.txt')
-            macro = macro.replace('${sipmOutputFile_}', output_SiPM_path)
+            config_macro = config_macro.replace('${sipmOutputFile_}', output_SiPM_path)
             
             output_TPB_path = os.path.join(output_macro_geom_folder, f'TPB_hits_x={x_val}mm_y={y_val}mm.txt')
-            macro = macro.replace('${tpbOutputFile_}', output_TPB_path)
+            config_macro = config_macro.replace('${tpbOutputFile_}', output_TPB_path)
             
-            output_macro_path = os.path.join(output_macro_geom_folder, f'x={x_val}mm_y={y_val}mm.config.mac')
+            output_config_macro_path = os.path.join(output_macro_geom_folder, f'x={x_val}mm_y={y_val}mm.config.mac')
             
-            # Write the new macro to a new file
-            with open(output_macro_path, "w") as f:
-                f.write(macro)
+            # fresh copy of init macro template
+            init_macro = init_template
+            init_macro = init_macro.replace('${config_macro}', output_config_macro_path)
+             
+            output_init_macro_path = os.path.join(output_macro_geom_folder, f'x={x_val}mm_y={y_val}mm.init.mac')
+            
+            
+            # Write the new config macro to a new file
+            with open(output_config_macro_path, "w") as f:
+                f.write(config_macro)
+                
+            # Write the new init macro to a new file
+            with open(output_init_macro_path, "w") as f:
+                f.write(init_macro)
 
-
-
-
-
-
-
+    
 

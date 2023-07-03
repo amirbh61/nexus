@@ -47,23 +47,19 @@
 /Geometry/SquareOpticalFiber/TPBThickness 2.2 um 
 
 ## Write output hitpoint text files ##
-/SquareOpticalFiber/SquareFiberSD/Output/sipmPath /media/amir/9C33-6BBD/NEXT_work/Geant4/nexus/SiPM_hits.txt
-/SquareOpticalFiber/SquareFiberSD/Output/tpbPath /media/amir/9C33-6BBD/NEXT_work/Geant4/nexus/TPB_hits.txt
+#/SquareOpticalFiber/SquareFiberSD/Output/sipmPath /media/amir/9C33-6BBD/NEXT_work/Geant4/nexus/SiPM_hits.txt
+#/SquareOpticalFiber/SquareFiberSD/Output/tpbPath /media/amir/9C33-6BBD/NEXT_work/Geant4/nexus/TPB_hits.txt
 
 
 ## CLUSTER ONLY, Write output hitpoint text and hdf5 files ##
-#/SquareOpticalFiber/SquareFiberSD/Output/sipmPath /gpfs0/arazi/users/amirbenh/Resolving_Power/nexus/test_outputs/SiPM_hits.txt
-#/SquareOpticalFiber/SquareFiberSD/Output/tpbPath /gpfs0/arazi/users/amirbenh/Resolving_Power/nexus/test_outputs/TPB_hits.txt
+/SquareOpticalFiber/SquareFiberSD/Output/sipmPath /gpfs0/arazi/users/amirbenh/Resolving_Power/nexus/test_outputs/SiPM_hits.txt
+/SquareOpticalFiber/SquareFiberSD/Output/tpbPath /gpfs0/arazi/users/amirbenh/Resolving_Power/nexus/test_outputs/TPB_hits.txt
 #/nexus/persistency/outputFile /gpfs0/arazi/users/amirbenh/Resolving_Power/nexus/test_outputs/SquareFiber.next
 
 
 ## Write hdf file ##
 #When using the SaveAllSteppingAction
 #/nexus/persistency/outputFile /media/amir/9C33-6BBD/NEXT_work/Geant4/nexus/SquareFiber.next
-
-# When NOT using the SaveAllSteppingAction
-#/nexus/persistency/outputFile NULL
-
 
 
 #/Actions/SaveAllSteppingAction/select_volume SiPM
