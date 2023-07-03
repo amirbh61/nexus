@@ -19,7 +19,9 @@ namespace nexus{
 
 
 SquareFiberSD::SquareFiberSD(G4String const& SD_name, G4String const& sipmOutputFileName,
- G4String const& tpbOutputFileName): G4VSensitiveDetector(SD_name)
+ G4String const& tpbOutputFileName): G4VSensitiveDetector(SD_name),
+ sipmOutputFileName_(sipmOutputFileName),
+ tpbOutputFileName_(tpbOutputFileName)
 {
 
   // Remove SiPM and TPB files, if exist from previous run 
@@ -46,12 +48,16 @@ SquareFiberSD::SquareFiberSD(G4String const& SD_name, G4String const& sipmOutput
 SquareFiberSD::~SquareFiberSD() {
   if (sipmOutputFile_.is_open()) {
     sipmOutputFile_.close();
-    std::cout << "SiPM output file closed." << std::endl;
+    std::cout << std::endl;
+    std::cout << "SiPM output file :" << std::endl << sipmOutputFileName_ << std::endl << "Closed successfully." << std::endl;
+    std::cout << std::endl;
     }
 
   if (tpbOutputFile_.is_open()) {
     tpbOutputFile_.close();
-    std::cout << "TPB output file closed." << std::endl;
+    std::cout << std::endl;
+    std::cout << "TPB output file :" << std::endl << tpbOutputFileName_ << std::endl << "Closed successfully." << std::endl;
+    std::cout << std::endl;
   }
 }
 
@@ -99,13 +105,13 @@ void SquareFiberSD::WritePositionToTextFile(std::ofstream& file, G4ThreeVector p
 
 
 void SquareFiberSD::SetSipmPath(const G4String& path) {
-  std::cout << "SIPM_PATH=" << path << std::endl;
+  //std::cout << "SIPM_PATH=" << path << std::endl;
   sipmOutputFile_.open(path, std::ios::out | std::ios::app);
   if (!sipmOutputFile_){throw std::runtime_error("Error: Unable to open SiPM output file for writing!");}
 }
 
 void SquareFiberSD::SetTpbPath(const G4String& path) {
-  std::cout << "TPB_PATH=" << path << std::endl;
+  //std::cout << "TPB_PATH=" << path << std::endl;
   tpbOutputFile_.open(path, std::ios::out | std::ios::app);
   if (!tpbOutputFile_){throw std::runtime_error("Error: Unable to open TPB output file for writing!");}
 }

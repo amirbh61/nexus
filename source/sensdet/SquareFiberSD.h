@@ -26,6 +26,8 @@ namespace nexus {
     G4GenericMessenger *msgSD_;
     std::ofstream sipmOutputFile_;
     std::ofstream tpbOutputFile_;
+    G4String sipmOutputFileName_;
+    G4String tpbOutputFileName_;
   };
 
 }
