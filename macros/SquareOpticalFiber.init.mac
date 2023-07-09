@@ -17,11 +17,11 @@
 
 /nexus/RegisterGenerator SingleParticleGenerator
 
-/nexus/RegisterPersistencyManager PersistencyManager
+#/nexus/RegisterPersistencyManager PersistencyManager
 
-/nexus/RegisterTrackingAction OpticalTrackingAction
+#/nexus/RegisterTrackingAction OpticalTrackingAction
 #/nexus/RegisterSteppingAction SaveAllSteppingAction
-/nexus/RegisterEventAction DefaultEventAction
+#/nexus/RegisterEventAction DefaultEventAction
 /nexus/RegisterRunAction DefaultRunAction
 
 
