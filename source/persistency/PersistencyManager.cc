@@ -42,7 +42,7 @@ REGISTER_CLASS(PersistencyManager, PersistencyManagerBase)
 
 
 PersistencyManager::PersistencyManager():
-PersistencyManagerBase(), msg_(0), output_file_("nexus_out"), ready_(false),
+PersistencyManagerBase(), msg_(0), output_file_(""), ready_(false),
   store_evt_(true), store_steps_(false),
   interacting_evt_(false), save_ie_numb_(false), event_type_("other"),
   saved_evts_(0), interacting_evts_(0), pmt_bin_size_(-1), sipm_bin_size_(-1),
@@ -74,7 +74,7 @@ PersistencyManager::~PersistencyManager()
 void PersistencyManager::OpenFile()
 {
   // If the output file was not set yet, do so
-  if (!h5writer_) {
+  if (!h5writer_ && !output_file_.empty()) {
     h5writer_ = new HDF5Writer();
     G4String hdf5file = output_file_ + ".h5";
     h5writer_->Open(hdf5file, store_steps_);

@@ -165,182 +165,23 @@ plt.show()
 
 # In[1]
 
-n_particles = 462500
-edge = 75 #Create a 2*edge by 2*edge matrix
-# x_hitpoints = df["final_x"]
-# y_hitpoints = df["final_y"]
-
-SiPM_hit_path = r'/media/amir/9C33-6BBD/NEXT_work/Geant4/nexus/SiPM_hits.txt'
-hit_points = np.genfromtxt(SiPM_hit_path)
-x_hitpoints = hit_points[:,0]
-y_hitpoints = hit_points[:,1]
-print('\n' + f'percent SiPM hits = {(len(hit_points)/(n_particles)) * 100}')
-
-
-
-bins = 2*edge
-SR = np.zeros((bins,bins))
-SR, x_hist, y_hist = np.histogram2d(x_hitpoints, y_hitpoints,
-                     range=[[-edge, edge], [-edge, edge]],bins=bins)
-plt.imshow(SR)
-plt.xlabel('x [mm]')
-plt.ylabel('y [mm]')
-plt.colorbar()
-plt.show()
-
-# In[2]
-# import os
-# import pandas as pd
-# import tables as tb
-# from invisible_cities.io  .dst_io        import df_writer
-# from invisible_cities.reco.tbl_functions import filters
-
-
-# import pandas as pd
-# import tables as tb
-# from invisible_cities.io.dst_io import df_writer
-# from invisible_cities.reco.tbl_functions import filters
-
-# # Set the input and output file paths
-# filename_in  = path
-# filename_out = "/media/amir/9C33-6BBD/NEXT_work/Geant4/nexus/results_gonzalo_code.csv"
-
-# # Ensure that the directory containing the output file exists
-# os.makedirs(os.path.dirname(filename_out), exist_ok=True)
-
-# # Read the DataFrame from the HDF5 file
-# with pd.HDFStore(filename_in, mode="r") as store:
-#     df = store.select("/DEBUG/steps")
-
-# # Write the DataFrame to a CSV file
-# df.to_csv(filename_out, index=False)
-
-# # Optional: Write the DataFrame to a new HDF5 file with compression
-# with tb.open_file("output_file.h5", mode="w", filters=filters("ZLIB4")) as file:
-#     df_writer(file, df, "DEBUG", "steps")
-#     file.root.DEBUG.steps.colinstances["event_id"].create_index()
-
-# # if os.path.exists(filename_in):
-# #     os.remove(filename_in)
-# #     print(f"File {filename_in} deleted successfully.")
+def psf_creator():
+    # '''
+    # Gives a picture of the SiPM (sensor wall) response to an event involving 
+    # the emission of light in the EL gap.
+    # Depends on the EL and tracking plane gaps.
+    # Returns the Point Spread Function (PSF) of smooth PSF.
+    # '''
+    # x,y = el_light() #MC light on wall
     
-# out_data = pd.read_csv(filename_out)
-
-# In[3]
-# checks if photons hit SiPMs
-SiPM_hits = 0
-back_fired = 0
-n_particles = df['event_id'].max()
-edge = 100 #Create a 2*edge by 2*edge matrix
-x_final = []
-y_final = []
-z_final = []
-for row in tqdm(range(len(df)-1)):
-    cell = df.iloc[row,5]
-    if df.iloc[row,0] != df.iloc[row+1,0]:
-        x = df.iloc[row,-3]
-        y = df.iloc[row,-2]
-        if cell.startswith(("SiPM_")):
-            x_final.append(df.iloc[row,-3])
-            y_final.append(df.iloc[row,-2])
-            SiPM_hits += 1
-        if cell.startswith(("WORLD")):
-            back_fired+=1
-
-print('\n' + f'percent SiPM hits = {(SiPM_hits/(n_particles+1)) * 100}')
-print(f'Back fired = {back_fired}')
-
-
-
-# # Filter for SiPM and World cells only
-# df_filtered = df[df['cell_name'].str.startswith(('SiPM_', 'World_'))]
-
-# # Group by event ID and cell name
-# grouped = df_filtered.groupby(['event_id', 'cell_name'])
-
-# # Get the last coordinates of each cell for each event
-# last_coords = grouped.tail(1)[['x', 'y', 'z']].reset_index(drop=True)
-
-# # Filter for SiPM hits
-# SiPM_hits = last_coords[last_coords['cell_name'].str.startswith('SiPM_')]
-
-# # Filter for back-fired photons
-# back_fired = last_coords[last_coords['cell_name'].str.startswith('World_')]
-
-# # Count the number of events and calculate the percentage of SiPM hits
-# n_particles = df['event_id'].nunique()
-# percent_SiPM_hits = len(SiPM_hits) / n_particles * 100
-
-# # Print the results
-# print(f"Percent SiPM hits = {percent_SiPM_hits:.2f}")
-# print(f"Back fired = {len(back_fired)}")
-
-
-
-# In[4]
-# Sensor response
-bins = 2*edge
-SR = np.zeros((bins,bins))
-SR, x_hist, y_hist = np.histogram2d(x_final, y_final,
-                     range=[[-edge, edge], [-edge, edge]],bins=bins)
-plt.imshow(SR)
-plt.xlabel('x [mm]')
-plt.ylabel('y [mm]')
-plt.colorbar()
-plt.show()
-
-
-
-
-
-# path_to_save ='/home/amir/Desktop/hit_map_right_off_center.npy'
-# np.save(path_to_save,SR)
-# # interpolate
-
-# interp = interp2d(x_hist[:-1], y_hist[:-1], SR, 'cubic')
-# z = interp(x_final, y_final)
-# plt.imshow(z)
-# plt.show()
-
-
-# here we will save the PSF
-
-# In[5]
-# left = np.load('/home/amir/Desktop/hit_map_left_off_center.npy')
-# right = np.load('/home/amir/Desktop/hit_map_right_off_center.npy')
-# combined = left+right
-# plt.imshow(combined)
-# plt.xlabel('x [mm]')
-# plt.ylabel('y [mm]')
-# plt.colorbar()
-# plt.show()
-
-# path_to_save ='/home/amir/Desktop/hit_map_combined.npy'
-# np.save(path_to_save,combined)
-
-# In[6]
-
-
-
-
-
-
-# In[7]
-#plot results for lior 8.3.2023
-d2 = [-5, 0, 2.5, 4, 5] - 5*np.ones(5)
-photons_hit_SiPM = [0.4394, 0.5984, 0.8173, 1.0218, 1.4175]
-title = "5 mm distance between EL gap and holder, line source, 100K ph, 2pi, TPB roughness = 0.01"
-
-
-plt.plot(d2,photons_hit_SiPM,"*-b")
-plt.title(title,fontdict={'fontsize': 10})
-plt.xticks(np.arange(d2.min(), d2.max()+1, 1))
-plt.xlabel("Distance from fiber entrance to hole entrance [mm]")
-plt.ylabel("photons hitting the SiPMs [%]")
-plt.grid()
-plt.figure(dpi=600)
-plt.show()
-
+    # PSF = np.zeros((500,500))
+    # PSF, x_hist, y_hist = np.histogram2d(x, y, range=[[-500, 500], [-500, 500]],bins=500)
+    
+    # #Smooth the PSF
+    # smoothed_PSF = smooth_PSF(PSF)
+    # np.save(evt_PSF_output,smoothed_PSF)
+    # # np.save(evt_PSF_output,PSF) #unsmoothed
+    return 
 
 
 
