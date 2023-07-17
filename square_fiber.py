@@ -16,6 +16,12 @@ from tqdm import tqdm
 from scipy.interpolate import interp2d as interp2d
 pd.set_option('display.max_columns', None)
 pd.set_option('display.max_rows', 500)
+import glob
+import re
+from mpl_toolkits.axes_grid1 import make_axes_locatable
+
+
+
 
 
 # In[0]
@@ -164,6 +170,7 @@ plt.show()
 
 
 # In[1]
+# Create PSFs
 
 def psf_creator():
     # '''
@@ -183,15 +190,90 @@ def psf_creator():
     # # np.save(evt_PSF_output,PSF) #unsmoothed
     return 
 
+# estimates entire dataset size on disk
+def estimate_dataset_size_on_disk(factor):
+    '''
+    Estimates entire dataset size on disk
+
+    Parameters
+    ----------
+    factor : float, dataset factor - 1 for 100K photons per sim, 4.62 for 
+    462K per sim, etc.
+
+    Returns
+    -------
+    None.
+
+    '''
+    datset_size_factor_per_100K = 1 # 1 is for 100K photons per sim
+    single_sipm_file_size = datset_size_factor_per_100K*0.008 # mb
+    single_tpb_file_size = datset_size_factor_per_100K*2 # mb
+    geometry_group = [18,18,18]
+    sims_per_geom = [100,400,961]
+    total_files_files = 2*np.sum(np.multiply(geometry_group, sims_per_geom))
+    total_sipm_txt_files_size = 0.5*total_files_files * single_sipm_file_size     
+    total_tpb_txt_files_size = 0.5*total_files_files * single_tpb_file_size   
+    print(f'Total estimated Sipm text files size on disk = {int(total_sipm_txt_files_size)} MB')
+    print(f'Total estimated TPB text files size on disk = {int(total_tpb_txt_files_size)} MB')
 
 
+estimate_dataset_size_on_disk(factor=1)
 
+# In[2]
+# plot SiPM and TPB hits
+path_to_dataset = r'/media/amir/9C33-6BBD/NEXT_work/Geant4/nexus/' + \
+                  r'small_cluster_hitpoints_dataset/SquareFiberMacrosAndOutputs'
 
+n_sipms = 25
+n_sipms_per_side = (n_sipms-1)/2
 
-
-
-
-
+geometry_dirs = os.listdir(path_to_dataset)
+for geometry in geometry_dirs:
+    os.chdir(path_to_dataset + "/" + geometry)
+    print(os.getcwd())
+    
+    # get the pitch value
+    match = re.search('pitch=(.*?)_', geometry)
+    if match:
+        pitch = match.group(1)
+        pitch = float(pitch.split('mm')[0]) # stored value in mm
+        
+    SiPM_files = glob.glob(r'SiPM*')
+    TPB_files = glob.glob(r'TPB*')
+    for i in range(10,12):
+        SR_response = np.genfromtxt(SiPM_files[i])[:,0:2]
+        sipm_x_coords = SR_response[:,0]
+        sipm_y_coords = SR_response[:,1]
+        
+        TPB_response = np.genfromtxt(TPB_files[i])[:,0:2]
+        tpb_x_coords = TPB_response[:,0]
+        tpb_y_coords = TPB_response[:,1]
+        
+        fig, (ax0,ax1) = plt.subplots(1,2,figsize=(20,10))
+        
+        # Save the mappable object for the colorbar
+        hist_sipm = ax0.hist2d(sipm_x_coords,sipm_y_coords, bins=(300, 300), cmap=plt.cm.jet)
+        ax0.set_title("SiPM hits")
+        
+        divider0 = make_axes_locatable(ax0)
+        cax0 = divider0.append_axes("right", size="5%", pad=0.05)
+        
+        # Pass the mappable object (hist0[3]) to colorbar
+        fig.colorbar(hist_sipm[3], cax=cax0)
+        
+        hist_tpb = ax1.hist2d(tpb_x_coords,tpb_y_coords, bins=(300, 300), cmap=plt.cm.jet)
+        ax1.set_xlim([-n_sipms_per_side*pitch,n_sipms_per_side*pitch])
+        ax1.set_ylim([-n_sipms_per_side*pitch,n_sipms_per_side*pitch])
+        ax1.set_title("TPB hits")
+        
+        divider1 = make_axes_locatable(ax1)
+        cax1 = divider1.append_axes("right", size="5%", pad=0.05)
+        
+        # Pass the mappable object (hist1[3]) to colorbar
+        fig.colorbar(hist_tpb[3], cax=cax1)
+        
+        fig.suptitle(geometry + r'/' + SiPM_files[i])
+        plt.show()
 
 
 
