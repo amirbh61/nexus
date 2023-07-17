@@ -34,7 +34,7 @@ import itertools
 # Geometry parameters - CLUSTER TEST DELETE LATER
 geometry_params = {
     'ELGap': ['10'],
-    'pitch': ['5'],
+    'pitch': ['5', '10'],
     'distanceFiberHolder': ['2'],
     'distanceAnodeHolder': ['2.5', '10'],
     'holderThickness': ['10'],

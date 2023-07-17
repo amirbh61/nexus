@@ -17,11 +17,11 @@
 
 /nexus/RegisterGenerator SingleParticleGenerator
 
-#/nexus/RegisterPersistencyManager PersistencyManager
+#/nexus/RegisterPersistencyManager PersistencyManager # When uncommented, creates problem on cluster big run
 
-#/nexus/RegisterTrackingAction OpticalTrackingAction
-#/nexus/RegisterSteppingAction SaveAllSteppingAction
-#/nexus/RegisterEventAction DefaultEventAction
+#/nexus/RegisterTrackingAction OpticalTrackingAction # When uncommented, creates problem on cluster big run
+#/nexus/RegisterSteppingAction SaveAllSteppingAction # When uncommented, creates problem on cluster big run
+#/nexus/RegisterEventAction DefaultEventAction # When uncommented, creates problem on cluster big run
 /nexus/RegisterRunAction DefaultRunAction
 
 

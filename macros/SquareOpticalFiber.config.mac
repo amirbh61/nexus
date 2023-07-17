@@ -53,8 +53,8 @@
 
 ## CLUSTER ONLY, Write output hitpoint text and hdf5 files ##
 /SquareOpticalFiber/SquareFiberSD/Output/sipmPath /gpfs0/arazi/users/amirbenh/Resolving_Power/nexus/test_outputs/SiPM_hits.txt
-/SquareOpticalFiber/SquareFiberSD/Output/tpbPath /gpfs0/arazi/users/amirbenh/Resolving_Power/nexus/test_outputs/TPB_hits.txt
-#/nexus/persistency/outputFile /gpfs0/arazi/users/amirbenh/Resolving_Power/nexus/test_outputs/SquareFiber.next
+#/SquareOpticalFiber/SquareFiberSD/Output/tpbPath /gpfs0/arazi/users/amirbenh/Resolving_Power/nexus/test_outputs/TPB_hits.txt
+/nexus/persistency/outputFile /gpfs0/arazi/users/amirbenh/Resolving_Power/nexus/test_outputs/SquareFiber.next
 
 
 ## Write hdf file ##
