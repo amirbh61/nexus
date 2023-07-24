@@ -832,6 +832,8 @@ namespace opticalprops {
     return mpt;
   }
 
+
+
   /// PolishedAl ///
   G4MaterialPropertiesTable* PolishedAl()
   {
@@ -925,8 +927,6 @@ namespace opticalprops {
 
     return mpt;
 }
-
-
 
 
 

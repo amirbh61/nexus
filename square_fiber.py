@@ -19,7 +19,7 @@ pd.set_option('display.max_rows', 500)
 import glob
 import re
 from mpl_toolkits.axes_grid1 import make_axes_locatable
-
+from scipy import ndimage
 
 
 
@@ -172,23 +172,90 @@ plt.show()
 # In[1]
 # Create PSFs
 
-def psf_creator():
-    # '''
-    # Gives a picture of the SiPM (sensor wall) response to an event involving 
-    # the emission of light in the EL gap.
-    # Depends on the EL and tracking plane gaps.
-    # Returns the Point Spread Function (PSF) of smooth PSF.
-    # '''
-    # x,y = el_light() #MC light on wall
+def smooth_PSF(PSF):
+    '''
+    Smoothes the PSF matrix based on the fact the ideal PSF should have radial
+    symmetry.
+    Receives:
+        PSF: ndarray, the PSF 2d array
+    Returns:
+        smooth_PSF: ndarray, the smoothed PSF 2d array
+    '''
+
+    x_cm, y_cm = ndimage.measurements.center_of_mass(PSF)
+    x_cm, y_cm = int(x_cm), int(y_cm)
+    psf_size = PSF.shape[0]
+    x,y = np.indices((psf_size,psf_size))
+    smooth_PSF = np.zeros((psf_size,psf_size))
+    r = np.arange(0,(1/np.sqrt(2))*psf_size,1)
+    for radius in r:
+        R = np.full((1, psf_size), radius)
+        circle = (np.abs(np.hypot(x-x_cm, y-y_cm)-R) < 0.6).astype(int)
+        circle_ij = np.where(circle==1)
+        smooth_PSF[circle_ij] = np.mean(PSF[circle_ij])
     
-    # PSF = np.zeros((500,500))
-    # PSF, x_hist, y_hist = np.histogram2d(x, y, range=[[-500, 500], [-500, 500]],bins=500)
+    return smooth_PSF
+
+
+
+def psf_creator(geo_directory,to_plot=True,to_smooth=True):
+    '''
+    Gives a picture of the SiPM (sensor wall) response to an event involving 
+    the emission of light in the EL gap.
+    Receives:
+        geo_directory: str, path to geometry directory
+        to_plot: bool, flag - if True, plots the PSF
+        to_smooth: bool, flag - if True, smoothes the PSF
+    Returns:
+        PSF: ndarray, the Point Spread Function
+    '''
     
-    # #Smooth the PSF
-    # smoothed_PSF = smooth_PSF(PSF)
-    # np.save(evt_PSF_output,smoothed_PSF)
-    # # np.save(evt_PSF_output,PSF) #unsmoothed
-    return 
+    os.chdir(path_to_dataset + "/" + dir)
+    print('\nWorking on directory:'+f'\n{os.getcwd()}')
+    SiPM_files = glob.glob(r'SiPM*')
+    
+    # pattern to extract x,y values of each event from file name
+    pattern = r"-?\d+.\d+"
+
+    PSF_list = []
+    bins = 500
+    for filename in SiPM_files:
+        # Load hitmap
+        hitmap = np.array(np.genfromtxt(filename)[:,0:2])
+        # Store x,y values of event
+        matches = re.findall(pattern, filename)
+        x_event = float(matches[0])
+        y_event = float(matches[1])
+        # shift each event to center        
+        shifted_hitmap = hitmap - [x_event, y_event]
+        # Add all shifted maps to create the geometry's PSF
+        PSF_list.append(shifted_hitmap)
+
+    # Concatenate all shifted hitmaps into a single array
+    PSF = np.vstack(PSF_list)
+    PSF, x_hist, y_hist = np.histogram2d(PSF[:,0], PSF[:,1],
+                                         range=[[-100,100],[-100,100]],
+                                         bins=bins)
+    
+    if to_plot:
+        plt.hist2d(PSF[:,0],PSF[:,1],
+                   bins=(bins, bins), cmap=plt.cm.jet)
+        plt.xlabel('[mm]')
+        plt.ylabel('[mm]')
+        plt.title('PSF')
+        plt.colorbar()
+        plt.show()
+
+    if to_smooth:
+        #Smooth the PSF
+        PSF = smooth_PSF(PSF)
+        plt.imshow(PSF)
+        plt.show()
+        # np.save(evt_PSF_output,smoothed_PSF)
+        # np.save(evt_PSF_output,PSF) #unsmoothed
+    return PSF
+
+
 
 # estimates entire dataset size on disk
 def estimate_dataset_size_on_disk(factor):
@@ -220,7 +287,7 @@ def estimate_dataset_size_on_disk(factor):
 estimate_dataset_size_on_disk(factor=1)
 
 # In[2]
-# plot SiPM and TPB hits
+# plot SiPM and TPB hits, basically just show a sample of database
 path_to_dataset = r'/media/amir/9C33-6BBD/NEXT_work/Geant4/nexus/' + \
                   r'small_cluster_hitpoints_dataset/SquareFiberMacrosAndOutputs'
 
@@ -252,20 +319,24 @@ for geometry in geometry_dirs:
         fig, (ax0,ax1) = plt.subplots(1,2,figsize=(20,10))
         
         # Save the mappable object for the colorbar
-        hist_sipm = ax0.hist2d(sipm_x_coords,sipm_y_coords, bins=(300, 300), cmap=plt.cm.jet)
+        hist_sipm = ax0.hist2d(sipm_x_coords,sipm_y_coords,
+                               bins=(300, 300), cmap=plt.cm.jet)
         ax0.set_title("SiPM hits")
         
         divider0 = make_axes_locatable(ax0)
         cax0 = divider0.append_axes("right", size="5%", pad=0.05)
-        
+        ax0.set_xlabel('[mm]')
+        ax0.set_ylabel('[mm]')
         # Pass the mappable object (hist0[3]) to colorbar
         fig.colorbar(hist_sipm[3], cax=cax0)
         
-        hist_tpb = ax1.hist2d(tpb_x_coords,tpb_y_coords, bins=(300, 300), cmap=plt.cm.jet)
+        hist_tpb = ax1.hist2d(tpb_x_coords, tpb_y_coords,
+                              bins=(300, 300), cmap=plt.cm.jet)
         ax1.set_xlim([-n_sipms_per_side*pitch,n_sipms_per_side*pitch])
         ax1.set_ylim([-n_sipms_per_side*pitch,n_sipms_per_side*pitch])
         ax1.set_title("TPB hits")
-        
+        ax1.set_xlabel('[mm]')
+        ax1.set_ylabel('[mm]')
         divider1 = make_axes_locatable(ax1)
         cax1 = divider1.append_axes("right", size="5%", pad=0.05)
         
@@ -276,19 +347,88 @@ for geometry in geometry_dirs:
         plt.show()
 
 
+# In[3]
+# Generate PSF and save
+path_to_dataset = r'/media/amir/9C33-6BBD/NEXT_work/Geant4/nexus/' + \
+                  r'small_cluster_hitpoints_dataset/SquareFiberMacrosAndOutputs'
+
+geometry_dirs = os.listdir(path_to_dataset)
+PSFS = []
+for dir in geometry_dirs:
+    PSF = psf_creator(dir,to_plot=True,to_smooth=False)
+    
+    # save_PSF = r'PSF.npy'
+    # np.save(save_PSF,PSF)
+    
+# In[4]
+# combine 2 events
+
+def combine_PSFs(filename1, filename2):
+    '''
+    This function take 2 sets of hit points from two files, simulating the light from 2 sources hitting
+    the tracking plane and merges them into one.
+    '''
+    pattern = r"[-+]?\d*\.\d+|\d+"
+    
+    # Load hitpoints from files
+    PSF1 = np.genfromtxt(filename1)[:,0:2]
+    PSF2 = np.genfromtxt(filename2)[:,0:2]
+    
+    # Extract positions from filenames
+    matches1 = re.findall(pattern, filename1)
+    x1_event = float(matches1[0])
+    y1_event = float(matches1[1])
+
+    matches2 = re.findall(pattern, filename2)
+    x2_event = float(matches2[0])
+    y2_event = float(matches2[1])
+    
+    # Shift hitpoints so that events are at their declared positions
+    PSF1 += [x1_event, y1_event]
+    PSF2 += [x2_event, y2_event]
+    
+    # Calculate distance and angle between events
+    distance_between_sources = np.hypot(x2_event - x1_event, y2_event - y1_event)
+    angle = np.arctan2(y2_event - y1_event, x2_event - x1_event)
+    
+    # Compute the vector from center of mass of PSF1 to PSF2
+    cm_vector_x = np.cos(angle)
+    cm_vector_y = np.sin(angle)
+    
+    # Calculate the point where PSF2 should be shifted to
+    shift_point_x = x1_event + cm_vector_x * distance_between_sources
+    shift_point_y = y1_event + cm_vector_y * distance_between_sources
+    
+    # Shift PSF2 to the desired position
+    shift_x = shift_point_x - x2_event
+    shift_y = shift_point_y - y2_event
+    shifted_PSF2 = PSF2 + [shift_x, shift_y]
+    
+    # Combine the shifted PSF2 and PSF1
+    combined_PSF = np.concatenate([PSF1, shifted_PSF2], axis=0)
+    
+    # Calculate center of mass of the combined PSF
+    combined_cm_x, combined_cm_y = np.mean(combined_PSF, axis=0)
+    
+    # Shift the combined PSF so that the center of mass is at (0, 0)
+    centered_combined_PSF = combined_PSF - [combined_cm_x, combined_cm_y]
+    
+    # Create a 2D histogram
+    plt.hist2d(centered_combined_PSF[:, 0], centered_combined_PSF[:, 1], bins=(100, 100), cmap=plt.cm.jet)
+    plt.colorbar()
+    plt.show()
 
 
+filename1 = r'/media/amir/9C33-6BBD/NEXT_work/Geant4/nexus/' + \
+r'small_cluster_hitpoints_dataset/SquareFiberMacrosAndOutputs/' + \
+r'ELGap=10mm_pitch=5mm_distanceFiberHolder=2mm_distanceAnodeHolder=2.5mm_holderThickness=10mm/' + \
+r'SiPM_hits_x=-2.5mm_y=-2.0mm.txt'
 
+filename2 = r'/media/amir/9C33-6BBD/NEXT_work/Geant4/nexus/' + \
+r'small_cluster_hitpoints_dataset/SquareFiberMacrosAndOutputs/' + \
+r'ELGap=10mm_pitch=5mm_distanceFiberHolder=2mm_distanceAnodeHolder=2.5mm_holderThickness=10mm/' + \
+r'SiPM_hits_x=2.5mm_y=1.5mm.txt'
 
-
-
-
-
-
-
-
-
-
-
+combine_PSFs(filename1, filename2)
 
 
