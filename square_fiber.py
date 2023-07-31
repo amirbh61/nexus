@@ -264,7 +264,7 @@ def estimate_dataset_size_on_disk(factor):
 
     Parameters
     ----------
-    factor : float, dataset factor - 1 for 100K photons per sim, 4.62 for 
+    factor : float, dataset factor - equals 1 for 100K photons per sim, 4.62 for 
     462K per sim, etc.
 
     Returns
@@ -272,9 +272,8 @@ def estimate_dataset_size_on_disk(factor):
     None.
 
     '''
-    datset_size_factor_per_100K = 1 # 1 is for 100K photons per sim
-    single_sipm_file_size = datset_size_factor_per_100K*0.008 # mb
-    single_tpb_file_size = datset_size_factor_per_100K*2 # mb
+    single_sipm_file_size = factor*0.008 # mb
+    single_tpb_file_size = factor*2 # mb
     geometry_group = [18,18,18]
     sims_per_geom = [100,400,961]
     total_files_files = 2*np.sum(np.multiply(geometry_group, sims_per_geom))
@@ -284,7 +283,7 @@ def estimate_dataset_size_on_disk(factor):
     print(f'Total estimated TPB text files size on disk = {int(total_tpb_txt_files_size)} MB')
 
 
-estimate_dataset_size_on_disk(factor=1)
+estimate_dataset_size_on_disk(factor=4.7)
 
 # In[2]
 # plot SiPM and TPB hits, basically just show a sample of database
@@ -362,73 +361,144 @@ for dir in geometry_dirs:
     
 # In[4]
 # combine 2 events
+import itertools
+import random
 
-def combine_PSFs(filename1, filename2):
+def find_equivalent_lattice_points(filename, shift):
     '''
-    This function take 2 sets of hit points from two files, simulating the light from 2 sources hitting
-    the tracking plane and merges them into one.
-    '''
-    pattern = r"[-+]?\d*\.\d+|\d+"
+    This function receives a text file of hitpoints, and looks for symmetrical 
+    lattice points in the surrounding unit cells.
     
+    
+    Receives:
+        filename: str, path to an event text file
+        shift: double, distance to shift the event from its original position
+        
+    Returns:
+        lattice_point: tuple, a lattice point sampled from all possible lattice points
+    '''
+    # need to be on geometry dir 
+    matches = re.findall(xy_pattern, filename)
+    x_event = float(matches[0][0])  # the first element in the first tuple
+    y_event = float(matches[0][1])  # the second element in the first tuple
+    
+    
+    x_lattice_points = [x_event+shift, x_event-shift]
+    y_lattice_points = [y_event+shift, y_event-shift]
+    possible_lattice_points = list(itertools.product(x_lattice_points,y_lattice_points))
+    lattice_point = random.sample(possible_lattice_points, k=1)
+    lattice_point = np.reshape(lattice_point,-1)
+    if shift == 0:
+        lattice_point = [x_event,y_event]
+    return lattice_point
+    
+    
+def shift_event_to_lattice_point(event_file, lattice_point):
+    matches1 = re.findall(xy_pattern, event_file)
+    x_event = float(matches1[0][0])
+    y_event = float(matches1[0][1])
+    event = np.genfromtxt(event_file)[:,0:2]
+    shifted_event = event + [lattice_point[0]-x_event, lattice_point[1]-y_event]
+    return np.array(shifted_event)
+
+    
+def sample_2_events():
+    event_list = glob.glob(r'SiPM_hits*')
+    events = random.sample(event_list, k=2)
+    return events
+
+
+def combine_events(event1_file, event2_file, to_plot=True):
+    '''
+    This function take 2 sets of hit points from two files, simulating the light
+    from 2 sources hitting the tracking plane and merges them into one.
+    '''
     # Load hitpoints from files
-    PSF1 = np.genfromtxt(filename1)[:,0:2]
-    PSF2 = np.genfromtxt(filename2)[:,0:2]
+    event1 = np.genfromtxt(event1_file)[:,0:2]
     
     # Extract positions from filenames
-    matches1 = re.findall(pattern, filename1)
-    x1_event = float(matches1[0])
-    y1_event = float(matches1[1])
+    matches1 = re.findall(xy_pattern, event1_file)
+    x1_event = float(matches1[0][0])
+    y1_event = float(matches1[0][1])
 
-    matches2 = re.findall(pattern, filename2)
-    x2_event = float(matches2[0])
-    y2_event = float(matches2[1])
+    matches2 = re.findall(xy_pattern, event2_file)
+    x2_event = float(matches2[0][0])
+    y2_event = float(matches2[0][1])
     
-    # Shift hitpoints so that events are at their declared positions
-    PSF1 += [x1_event, y1_event]
-    PSF2 += [x2_event, y2_event]
-    
-    # Calculate distance and angle between events
-    distance_between_sources = np.hypot(x2_event - x1_event, y2_event - y1_event)
-    angle = np.arctan2(y2_event - y1_event, x2_event - x1_event)
-    
-    # Compute the vector from center of mass of PSF1 to PSF2
-    cm_vector_x = np.cos(angle)
-    cm_vector_y = np.sin(angle)
-    
-    # Calculate the point where PSF2 should be shifted to
-    shift_point_x = x1_event + cm_vector_x * distance_between_sources
-    shift_point_y = y1_event + cm_vector_y * distance_between_sources
-    
-    # Shift PSF2 to the desired position
-    shift_x = shift_point_x - x2_event
-    shift_y = shift_point_y - y2_event
-    shifted_PSF2 = PSF2 + [shift_x, shift_y]
+    ### The second event will be have its original x,y shifted  ###
+    # Find its new equivalent point in a nearby cell
+    lattice_point = find_equivalent_lattice_points(event2_file, shift=1*pitch)
+    # Shift the event to the new lattice point
+    shifted_event2 = shift_event_to_lattice_point(event2_file, lattice_point)
     
     # Combine the shifted PSF2 and PSF1
-    combined_PSF = np.concatenate([PSF1, shifted_PSF2], axis=0)
+    combined_event = np.concatenate([event1, shifted_event2], axis=0)
     
     # Calculate center of mass of the combined PSF
-    combined_cm_x, combined_cm_y = np.mean(combined_PSF, axis=0)
+    combined_cm_x, combined_cm_y = np.mean(combined_event, axis=0)
+    
+    distance_between_events = np.hypot(x1_event - lattice_point[0],
+                                        y1_event - lattice_point[1])
     
     # Shift the combined PSF so that the center of mass is at (0, 0)
-    centered_combined_PSF = combined_PSF - [combined_cm_x, combined_cm_y]
+    centered_combined_event = combined_event - [combined_cm_x, combined_cm_y]
     
-    # Create a 2D histogram
-    plt.hist2d(centered_combined_PSF[:, 0], centered_combined_PSF[:, 1], bins=(100, 100), cmap=plt.cm.jet)
-    plt.colorbar()
-    plt.show()
+    if to_plot:
+        # Create a 2D histogram
+        plt.figure(figsize=(15,10))
+        # bins = int(np.sqrt(len(event1)+len(shifted_event2)))
+        bins = 200
+        plt.hist2d(centered_combined_event[:, 0], centered_combined_event[:, 1],
+                   bins=((bins, bins)), cmap=plt.cm.jet)
+        plt.colorbar()
+        
+        title = f'Event spacing={np.round(distance_between_events,3)}mm\n'+ \
+                  f'event1: (x,y)={(np.round(x1_event,3),np.round(y1_event,3))},' + \
+                  f'event2: (x,y)={(np.round(lattice_point[0],3),np.round(lattice_point[1],3))}'
+    
+        plt.title(title)
+        plt.show()
 
 
-filename1 = r'/media/amir/9C33-6BBD/NEXT_work/Geant4/nexus/' + \
-r'small_cluster_hitpoints_dataset/SquareFiberMacrosAndOutputs/' + \
-r'ELGap=10mm_pitch=5mm_distanceFiberHolder=2mm_distanceAnodeHolder=2.5mm_holderThickness=10mm/' + \
-r'SiPM_hits_x=-2.5mm_y=-2.0mm.txt'
+## run just one prechosen pair
 
-filename2 = r'/media/amir/9C33-6BBD/NEXT_work/Geant4/nexus/' + \
-r'small_cluster_hitpoints_dataset/SquareFiberMacrosAndOutputs/' + \
-r'ELGap=10mm_pitch=5mm_distanceFiberHolder=2mm_distanceAnodeHolder=2.5mm_holderThickness=10mm/' + \
-r'SiPM_hits_x=2.5mm_y=1.5mm.txt'
+# filename1 = r'/media/amir/9C33-6BBD/NEXT_work/Geant4/nexus/' + \
+# r'small_cluster_hitpoints_dataset/SquareFiberMacrosAndOutputs/' + \
+# r'ELGap=10mm_pitch=5mm_distanceFiberHolder=2mm_distanceAnodeHolder=2.5mm_holderThickness=10mm/' + \
+# r'SiPM_hits_x=-2.5mm_y=-2.0mm.txt'
 
-combine_PSFs(filename1, filename2)
+# filename2 = r'/media/amir/9C33-6BBD/NEXT_work/Geant4/nexus/' + \
+# r'small_cluster_hitpoints_dataset/SquareFiberMacrosAndOutputs/' + \
+# r'ELGap=10mm_pitch=5mm_distanceFiberHolder=2mm_distanceAnodeHolder=2.5mm_holderThickness=10mm/' + \
+# r'SiPM_hits_x=2.5mm_y=1.5mm.txt'
+
+# combine_events(filename1, filename2)
 
 
+
+# define regex pattern for file name
+xy_pattern = r"x=(-?\d*\.\d+)mm_y=(-?\d*\.\d+)mm" # gets x,y of each event
+pitch_pattern = r'pitch=(.*?)_'
+
+path_to_dataset = r'/media/amir/9C33-6BBD/NEXT_work/Geant4/nexus/' + \
+                  r'small_cluster_hitpoints_dataset/SquareFiberMacrosAndOutputs'
+
+n_sipms = 25
+n_sipms_per_side = (n_sipms-1)/2
+
+geometry_dirs = os.listdir(path_to_dataset)
+for geometry in geometry_dirs:
+    os.chdir(path_to_dataset + "/" + geometry)
+    print(f'Current working directory:\n{os.getcwd()}',end='\n')
+    
+    # store pitch value from file name
+    pitch_match = re.search(pitch_pattern, geometry)
+    pitch = pitch_match.group(1)
+    pitch = float(pitch.split('mm')[0]) # stored value in mm
+    print(f'pitch={pitch}mm',end='\n\n')
+        
+    for attempt in range(5):
+        events = sample_2_events()
+
+        combine_events(events[0], events[1], to_plot=True)
+    
