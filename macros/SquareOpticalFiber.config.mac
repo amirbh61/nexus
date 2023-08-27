@@ -48,7 +48,8 @@
 
 ## Write output hitpoint text files ##
 /SquareOpticalFiber/SquareFiberSD/Output/sipmPath /media/amir/9C33-6BBD/NEXT_work/Geant4/nexus/SiPM_hits.txt
-/SquareOpticalFiber/SquareFiberSD/Output/tpbPath /media/amir/9C33-6BBD/NEXT_work/Geant4/nexus/TPB_hits.txt
+/SquareOpticalFiber/SquareFiberSD/Output/tpbPath /dev/null
+#/SquareOpticalFiber/SquareFiberSD/Output/tpbPath /media/amir/9C33-6BBD/NEXT_work/Geant4/nexus/TPB_hits.txt
 
 
 ## CLUSTER ONLY, Write output hitpoint text and hdf5 files ##

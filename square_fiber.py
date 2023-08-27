@@ -20,7 +20,15 @@ import glob
 import re
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 from scipy import ndimage
+import time
+from scipy.signal           import fftconvolve
+from scipy.signal           import convolve
+from invisible_cities.reco.deconv_functions     import richardson_lucy
+from scipy.interpolate import interp2d
 
+# Global settings #
+n_sipms = 25
+n_sipms_per_side = (n_sipms-1)/2
 
 
 
@@ -290,9 +298,6 @@ estimate_dataset_size_on_disk(factor=4.7)
 path_to_dataset = r'/media/amir/9C33-6BBD/NEXT_work/Geant4/nexus/' + \
                   r'small_cluster_hitpoints_dataset/SquareFiberMacrosAndOutputs'
 
-n_sipms = 25
-n_sipms_per_side = (n_sipms-1)/2
-
 geometry_dirs = os.listdir(path_to_dataset)
 for geometry in geometry_dirs:
     os.chdir(path_to_dataset + "/" + geometry)
@@ -318,8 +323,15 @@ for geometry in geometry_dirs:
         fig, (ax0,ax1) = plt.subplots(1,2,figsize=(20,10))
         
         # Save the mappable object for the colorbar
+        
+        # bins_sipm = int(np.sqrt(len(sipm_x_coords)))
+        # bins_tpb = int(np.sqrt(len(tpb_x_coords)))
+        bins_sipm = 300
+        bins_tpb = 300
+              
+        
         hist_sipm = ax0.hist2d(sipm_x_coords,sipm_y_coords,
-                               bins=(300, 300), cmap=plt.cm.jet)
+                               bins=(bins_sipm, bins_sipm), cmap=plt.cm.jet)
         ax0.set_title("SiPM hits")
         
         divider0 = make_axes_locatable(ax0)
@@ -330,7 +342,7 @@ for geometry in geometry_dirs:
         fig.colorbar(hist_sipm[3], cax=cax0)
         
         hist_tpb = ax1.hist2d(tpb_x_coords, tpb_y_coords,
-                              bins=(300, 300), cmap=plt.cm.jet)
+                              bins=(bins_tpb, bins_tpb), cmap=plt.cm.jet)
         ax1.set_xlim([-n_sipms_per_side*pitch,n_sipms_per_side*pitch])
         ax1.set_ylim([-n_sipms_per_side*pitch,n_sipms_per_side*pitch])
         ax1.set_title("TPB hits")
@@ -363,6 +375,10 @@ for dir in geometry_dirs:
 # combine 2 events
 import itertools
 import random
+
+'''
+Create sensor response image for 2 events + interpolation of the signal.
+'''
 
 def find_equivalent_lattice_points(filename, shift):
     '''
@@ -408,7 +424,7 @@ def sample_2_events():
     return events
 
 
-def combine_events(event1_file, event2_file, to_plot=True):
+def combine_events(event1_file, event2_file, shift, to_plot=True):
     '''
     This function take 2 sets of hit points from two files, simulating the light
     from 2 sources hitting the tracking plane and merges them into one.
@@ -427,7 +443,7 @@ def combine_events(event1_file, event2_file, to_plot=True):
     
     ### The second event will be have its original x,y shifted  ###
     # Find its new equivalent point in a nearby cell
-    lattice_point = find_equivalent_lattice_points(event2_file, shift=1*pitch)
+    lattice_point = find_equivalent_lattice_points(event2_file, shift=shift)
     # Shift the event to the new lattice point
     shifted_event2 = shift_event_to_lattice_point(event2_file, lattice_point)
     
@@ -443,21 +459,33 @@ def combine_events(event1_file, event2_file, to_plot=True):
     # Shift the combined PSF so that the center of mass is at (0, 0)
     centered_combined_event = combined_event - [combined_cm_x, combined_cm_y]
     
+    
+    bins = int(np.sqrt(len(event1)+len(shifted_event2)))
+    # bins = 300
+    H, x_hist, y_hist = np.histogram2d(centered_combined_event[:, 0],
+                                       centered_combined_event[:, 1], bins=bins)
+      
     if to_plot:
         # Create a 2D histogram
         plt.figure(figsize=(15,10))
-        # bins = int(np.sqrt(len(event1)+len(shifted_event2)))
-        bins = 200
+
         plt.hist2d(centered_combined_event[:, 0], centered_combined_event[:, 1],
-                   bins=((bins, bins)), cmap=plt.cm.jet)
+                    bins=((bins, bins)), cmap=plt.cm.jet)
+        # plt.imshow(H)   
+       
         plt.colorbar()
         
         title = f'Event spacing={np.round(distance_between_events,3)}mm\n'+ \
-                  f'event1: (x,y)={(np.round(x1_event,3),np.round(y1_event,3))},' + \
+                  f'event1: (x,y)={(np.round(x1_event,3),np.round(y1_event,3))}, ' + \
                   f'event2: (x,y)={(np.round(lattice_point[0],3),np.round(lattice_point[1],3))}'
     
         plt.title(title)
         plt.show()
+        
+        
+
+    return H, x_hist, y_hist, title
+
 
 
 ## run just one prechosen pair
@@ -483,12 +511,11 @@ pitch_pattern = r'pitch=(.*?)_'
 path_to_dataset = r'/media/amir/9C33-6BBD/NEXT_work/Geant4/nexus/' + \
                   r'small_cluster_hitpoints_dataset/SquareFiberMacrosAndOutputs'
 
-n_sipms = 25
-n_sipms_per_side = (n_sipms-1)/2
 
 geometry_dirs = os.listdir(path_to_dataset)
 for geometry in geometry_dirs:
-    os.chdir(path_to_dataset + "/" + geometry)
+    folder = path_to_dataset + "/" + geometry
+    os.chdir(folder)
     print(f'Current working directory:\n{os.getcwd()}',end='\n')
     
     # store pitch value from file name
@@ -496,9 +523,245 @@ for geometry in geometry_dirs:
     pitch = pitch_match.group(1)
     pitch = float(pitch.split('mm')[0]) # stored value in mm
     print(f'pitch={pitch}mm',end='\n\n')
+    
+    # create save paths
+    Save_SR  = f'{folder}/Sensor_Response_2_events_raw'
+    Save_SR_interpolate  = f'{folder}/Sensor_Response_2_events_interpolated'
+    if not os.path.isdir(Save_SR):
+        os.mkdir(Save_SR)
+    if not os.path.isdir(Save_SR_interpolate):
+        os.mkdir(Save_SR_interpolate)
+    source_spacing=2*pitch
+
         
-    for attempt in range(5):
+    for attempt in range(8):
         events = sample_2_events()
 
-        combine_events(events[0], events[1], to_plot=True)
+        H, x_hist, y_hist, title = combine_events(events[0], events[1],
+                                           shift=source_spacing,to_plot=True)
+        # Create a meshgrid for interpolation
+        x_centers = 0.5 * (x_hist[1:] + x_hist[:-1])
+        y_centers = 0.5 * (y_hist[1:] + y_hist[:-1])
+        
+        # Create the interpolation function
+        interp_f = interp2d(x_centers, y_centers, H, kind='cubic')
+        
+        # Create a finer meshgrid for the interpolated data
+        x_fine = np.linspace(x_centers.min(), x_centers.max(), 100)
+        y_fine = np.linspace(y_centers.min(), y_centers.max(), 100)
+        
+        hist_interpolated = interp_f(x_fine, y_fine)
+               
+        ### SAVE ###
+        SR_output = Save_SR + f'/source_spacing={source_spacing}mm_pair_id={attempt}'
+        SR_interpolation_output = Save_SR_interpolate + \
+        f'/source_spacing={source_spacing}mm_pair_id={attempt}'
+        
+        # Save H (2D histogram)
+        np.save(SR_output+"_hist.npy", H)
+        with open(SR_output+"_hist_details.txt", "w") as file:
+            file.write(title)
+        np.save(SR_output+"_x_bins.npy", x_hist)
+        np.save(SR_output+"_y_bins.npy", y_hist)
+        # Save interpolation
+        np.save(SR_interpolation_output+"_hist.npy", hist_interpolated)
+        with open(SR_interpolation_output+"_hist_details.txt", "w") as file:
+            file.write(title)
+        np.save(SR_interpolation_output+"_x_fine.npy", x_fine)
+        np.save(SR_interpolation_output+"_y_fine.npy", y_fine)
     
+# In[5]
+'''
+Plot sensor response and interpolated data
+'''
+
+def file_content_to_string(filename):
+    with open(filename, 'r') as f:
+        return f.read().strip().replace("\n", ", ")
+
+
+
+xy_pattern = r"x=(-?\d*\.\d+)mm_y=(-?\d*\.\d+)mm" # gets x,y of each event
+pitch_pattern = r'pitch=(.*?)_'
+
+path_to_dataset = r'/media/amir/9C33-6BBD/NEXT_work/Geant4/nexus/' + \
+                  r'small_cluster_hitpoints_dataset/SquareFiberMacrosAndOutputs'
+
+
+geometry_dirs = os.listdir(path_to_dataset)
+for geometry in geometry_dirs:
+    folder = path_to_dataset + "/" + geometry
+    os.chdir(folder)
+    print(f'Current working directory:\n{os.getcwd()}',end='\n')
+    
+    Load_SR  = f'{folder}/Sensor_Response_2_events_raw'
+    Load_SR_interpolate  = f'{folder}/Sensor_Response_2_events_interpolated'
+    
+    for i in range(int(len(glob.glob(Load_SR+r'/*.npy'))/3)):
+        
+        two_events_raw_hist = np.load(glob.glob(Load_SR + f'/*id={i}_hist.npy')[0])
+        two_events_x_bins = np.load(glob.glob(Load_SR + f'/*id={i}_x_bins.npy')[0])
+        two_events_y_bins = np.load(glob.glob(Load_SR + f'/*id={i}_y_bins.npy')[0])
+    
+        two_events_interpolated_hist = np.load(glob.glob(
+            Load_SR_interpolate + f'/*id={i}_hist.npy')[0])
+        two_events_x_fine = np.load(glob.glob(Load_SR_interpolate +
+                                              f'/*id={i}_x_fine.npy')[0])
+        two_events_y_fine = np.load(glob.glob(Load_SR_interpolate +
+                                              f'/*id={i}_y_fine.npy')[0])
+        
+        title_file = glob.glob(Load_SR_interpolate + f'/*id={i}_hist_details.txt')[0]
+        title = file_content_to_string(title_file)
+    
+    
+        fig, (ax0,ax1) = plt.subplots(1,2,figsize=(17,7), dpi=300)
+        im = ax0.imshow(two_events_raw_hist,interpolation='none', origin='lower',
+                        extent=[two_events_x_fine.min(), two_events_x_fine.max(),
+                                two_events_y_fine.min(), two_events_y_fine.max()])
+        ax0.set_title('Sensor response')
+        ax0.set_xlabel('x [mm]')
+        ax0.set_ylabel('y [mm]')
+        divider = make_axes_locatable(ax0)
+        cax = divider.append_axes("right", size="5%", pad=0.05)
+        fig.colorbar(im, cax=cax)
+    
+    
+        im = ax1.imshow(two_events_interpolated_hist, origin='lower',
+                        extent=[two_events_x_fine.min(), two_events_x_fine.max(),
+                                two_events_y_fine.min(), two_events_y_fine.max()])
+        
+        ax1.set_title('Sensor response after interpolation')
+        ax1.set_xlabel('x[mm]')
+        ax1.set_ylabel('y [mm]')
+        divider = make_axes_locatable(ax1)
+        cax = divider.append_axes("right", size="5%", pad=0.05)
+        fig.colorbar(im, cax=cax)
+        fig.suptitle(title)
+        fig.tight_layout()
+        plt.show()
+
+        save_SR_plots = f'{folder}/SR_plots'
+        if not os.path.isdir(save_SR_plots):
+            os.mkdir(save_SR_plots)
+        save_path = save_SR_plots + f'/pair_id={i}'
+        fig.savefig(save_path, format='jpg', dpi=300, bbox_inches='tight' )
+
+
+
+
+    
+    
+# In[6]
+'''
+RL deconvolution calculation and save
+'''
+section_clock_start = time.process_time()
+
+def richardson_lucy(image, psf, iterations=75, iter_thr=0.):
+    """Richardson-Lucy deconvolution (modification from scikit-image package).
+
+    The modification adds a value=0 protection, the possibility to stop iterating
+    after reaching a given threshold and the generalization to n-dim of the
+    PSF mirroring.
+
+    Parameters
+    ----------
+    image : ndarray
+       Input degraded image (can be N dimensional).
+    psf : ndarray
+       The point spread function.
+    iterations : int, optional
+       Number of iterations. This parameter plays the role of
+       regularisation.
+    iter_thr : float, optional
+       Threshold on the relative difference between iterations to stop iterating.
+
+    Returns
+    -------
+    im_deconv : ndarray
+       The deconvolved image.
+    Examples
+    --------
+    >>> from skimage import color, data, restoration
+    >>> camera = color.rgb2gray(data.camera())
+    >>> from scipy.signal import convolve2d
+    >>> psf = np.ones((5, 5)) / 25
+    >>> camera = convolve2d(camera, psf, 'same')
+    >>> camera += 0.1 * camera.std() * np.random.standard_normal(camera.shape)
+    >>> deconvolved = restoration.richardson_lucy(camera, psf, 5)
+    References
+    ----------
+    .. [1] https://en.wikipedia.org/wiki/Richardson%E2%80%93Lucy_deconvolution
+    """
+    # compute the times for direct convolution and the fft method. The fft is of
+    # complexity O(N log(N)) for each dimension and the direct method does
+    # straight arithmetic (and is O(n*k) to add n elements k times)
+    direct_time = np.prod(image.shape + psf.shape)
+    fft_time    = np.sum([n*np.log(n) for n in image.shape + psf.shape])
+
+    # see whether the fourier transform convolution method or the direct
+    # convolution method is faster (discussed in scikit-image PR #1792)
+    time_ratio = 40.032 * fft_time / direct_time
+    if time_ratio <= 1 or len(image.shape) > 2:
+        convolve_method = fftconvolve
+    else:
+        convolve_method = convolve
+
+    image      = image.astype(np.float)
+    psf        = psf.astype(np.float)
+    im_deconv  = 0.5 * np.ones(image.shape)
+    s          = slice(None, None, -1)
+    psf_mirror = psf[(s,) * psf.ndim] ### Allow for n-dim mirroring.
+    eps        = np.finfo(image.dtype).eps ### Protection against 0 value
+    ref_image  = image/image.max()
+    lowest_value = 4.94E-324
+    
+    for i in range(iterations):
+        x = convolve_method(im_deconv, psf, 'same')
+        np.place(x, x==0, eps) ### Protection against 0 value
+        relative_blur = image / x
+        im_deconv *= convolve_method(relative_blur, psf_mirror, 'same')
+        with np.errstate(divide='ignore', invalid='ignore'):
+            rel_diff = np.sum(np.divide(((im_deconv/im_deconv.max() - ref_image)**2), ref_image))
+        if i>50:
+            print(f'{i},rel_diff={rel_diff}')     
+        if rel_diff < iter_thr: ### Break if a given threshold is reached.
+            break   
+        ref_image = im_deconv/im_deconv.max()     
+        ref_image[ref_image<=lowest_value] = lowest_value      
+        rel_diff_checkout = rel_diff # Store last value of rel_diff before it becomes NaN
+    return rel_diff_checkout, i, im_deconv
+
+
+def remove_digits_beyond_first_significant(num):
+    '''
+    This function cuts a float when when the first significant digit is shown
+    after the decimal point.
+    for example: 
+        if given 0.00001023, returns 0.00001
+    '''
+    new_string = ''
+    string = '{:.15f}'.format(num)
+    for counter,element in enumerate(string):
+        if element == '0' or element == '.':
+            new_string = new_string + element
+        else: break
+    return float(new_string + element) 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
