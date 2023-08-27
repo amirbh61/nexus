@@ -311,7 +311,7 @@ for geometry in geometry_dirs:
         
     SiPM_files = glob.glob(r'SiPM*')
     TPB_files = glob.glob(r'TPB*')
-    for i in range(10,12):
+    for i in range(5,12):
         SR_response = np.genfromtxt(SiPM_files[i])[:,0:2]
         sipm_x_coords = SR_response[:,0]
         sipm_y_coords = SR_response[:,1]
@@ -324,10 +324,10 @@ for geometry in geometry_dirs:
         
         # Save the mappable object for the colorbar
         
-        # bins_sipm = int(np.sqrt(len(sipm_x_coords)))
-        # bins_tpb = int(np.sqrt(len(tpb_x_coords)))
-        bins_sipm = 300
-        bins_tpb = 300
+        bins_sipm = int(np.sqrt(len(sipm_x_coords)))
+        bins_tpb = int(np.sqrt(len(tpb_x_coords)))
+        # bins_sipm = 300
+        # bins_tpb = 300
               
         
         hist_sipm = ax0.hist2d(sipm_x_coords,sipm_y_coords,
@@ -531,7 +531,7 @@ for geometry in geometry_dirs:
         os.mkdir(Save_SR)
     if not os.path.isdir(Save_SR_interpolate):
         os.mkdir(Save_SR_interpolate)
-    source_spacing=2*pitch
+    source_spacing=5*pitch
 
         
     for attempt in range(8):

@@ -20,6 +20,156 @@ import itertools
 
 
 # In[0]
+
+'''
+Option to create events in a circular pattern so each octant is symmetrical.
+
+'''
+
+import numpy as np
+import matplotlib.pyplot as plt
+
+def points_on_circle_octant(center, radius):
+    """Generate points on 1/8th of a circle ensuring intersections with axes, diagonals, and 15 and 30-degree lines."""
+    # Angles corresponding to x-axis, 15-degree from x-axis, 30-degree from x-axis, y=x, 
+    # 30-degree from y-axis, 15-degree from y-axis, and y-axis intersections
+    t = [0, np.pi/12, np.pi/6, np.pi/4, np.pi/3, 5*np.pi/12, np.pi/2]
+    x = center[0] + radius * np.cos(t)
+    y = center[1] + radius * np.sin(t)
+    return x, y
+
+def reflect_points(x, y):
+    """Reflect points across all the symmetry lines of a circle."""
+    points = [(x, y), (x, -y), (-x, y), (-x, -y),
+              (y, x), (y, -x), (-y, x), (-y, -x)]
+    return points
+
+def is_inside_square(point, square_size):
+    """Check if a point is inside a square centered at the origin."""
+    half_size = square_size / 2.0
+    return -half_size <= point[0] <= half_size and -half_size <= point[1] <= half_size
+
+# Parameters
+square_size = 10.0  # Side length of the square
+center = (0, 0)  # Center of the square and circles
+radii = np.arange(0, np.sqrt(2)*square_size/2, 0.5)  # Radii of circles increase by 0.5mm
+
+# Plot
+plt.figure(figsize=(10, 10))
+plt.plot([-square_size/2, square_size/2, square_size/2, -square_size/2, -square_size/2], 
+         [-square_size/2, -square_size/2, square_size/2, square_size/2, -square_size/2], 'g-', label="Square")
+
+# Adding the origin
+plt.plot(0, 0, 'bo')
+
+for radius in radii[1:]:
+    x, y = points_on_circle_octant(center, radius)
+    
+    # Plot the circle itself
+    circle = plt.Circle(center, radius, color='r', fill=False, linestyle='--')
+    plt.gca().add_patch(circle)
+    
+    for px, py in zip(x, y):
+        for ref_pt in reflect_points(px, py):
+            if is_inside_square(ref_pt, square_size):
+                plt.plot(ref_pt[0], ref_pt[1], 'bo')
+
+plt.gca().set_aspect('equal', adjustable='box')
+plt.xlabel('X (mm)')
+plt.ylabel('Y (mm)')
+plt.title('Symmetric Points in Circles Inside a Square')
+plt.legend()
+plt.grid(True)
+plt.show()
+
+
+
+'''
+Show square grid with octant of symmetry
+'''
+
+# Create the square points
+x = np.arange(-5, 25, 1)
+y = np.arange(-5, 25, 1)
+
+X, Y = np.meshgrid(x, y)
+
+# Plotting
+fig, ax = plt.subplots()
+
+# Plot the points
+ax.scatter(X, Y, color='blue', marker='o',s=1.5)
+
+# Highlight the boundaries of the octant (x >= 0 and y <= x)
+ax.plot([5, 25], [5, 25], alpha=0.5, color='black', linewidth=2) # y=x line
+ax.plot([5, 5], [5, 25], alpha=0.5, color='black', linewidth=2) # Vertical line splitting the octant
+
+ax.plot([0, 0], [10, 0], alpha=0.5, color='black', linewidth=2) # Vertical line splitting the octant
+ax.plot([10, 0], [10, 10], alpha=0.5, color='black', linewidth=2) # Vertical line splitting the octant
+ax.plot([10, 10], [10, 0], alpha=0.5, color='black', linewidth=2) # Vertical line splitting the octant
+ax.plot([10, 0], [0, 0], alpha=0.5, color='black', linewidth=2) # Vertical line splitting the octant
+
+
+
+# Set the limits and display
+# ax.set_xlim(-1, 11)
+# ax.set_ylim(-1, 11)
+ax.set_aspect('equal')
+plt.show()
+
+
+
+
+import numpy as np
+import matplotlib.pyplot as plt
+
+'''
+Show square grid with octant of symmetry
+'''
+
+# Create the square points
+x = np.arange(-5, 25, 1)
+y = np.arange(-5, 25, 1)
+
+X, Y = np.meshgrid(x, y)
+
+# Plotting
+fig, ax = plt.subplots()
+
+# Plot the points
+ax.scatter(X, Y, color='blue', marker='o', s=1.5)
+
+# Highlight the boundaries of the octant
+ax.plot([5, 25], [5, 25], alpha=0.5, color='black', linewidth=2) # y=x line
+ax.plot([5, 5], [5, 25], alpha=0.5, color='black', linewidth=2) # Vertical line splitting the octant
+ax.plot([0, 0], [10, 0], alpha=0.5, color='black', linewidth=2)
+ax.plot([10, 0], [10, 10], alpha=0.5, color='black', linewidth=2)
+ax.plot([10, 10], [10, 0], alpha=0.5, color='black', linewidth=2)
+ax.plot([10, 0], [0, 0], alpha=0.5, color='black', linewidth=2)
+
+# Draw concentric circles inside the octant
+radii = np.arange(1, 20, 1)
+theta = np.linspace(np.pi/4, np.pi/2, 1000)
+
+for r in radii:
+    x_circle = r * np.cos(theta) + 5
+    y_circle = r * np.sin(theta) + 5
+    
+    # Mask to ensure circle segments are inside the octant
+    mask = np.logical_and(y_circle >= x_circle, x_circle >= 5)
+    ax.plot(x_circle[mask], y_circle[mask], color='black', alpha=0.5, linewidth=1)
+
+# Set square aspect ratio
+ax.set_aspect('equal')
+plt.show()
+
+
+
+
+
+
+
+# In[1]
 # generate new geant4 macros for all geometries and all possible runs
 
 # # Geometry parameters
