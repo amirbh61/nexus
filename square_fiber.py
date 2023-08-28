@@ -25,6 +25,7 @@ from scipy.signal           import fftconvolve
 from scipy.signal           import convolve
 from invisible_cities.reco.deconv_functions     import richardson_lucy
 from scipy.interpolate import interp2d
+from scipy.signal import find_peaks, peak_widths
 
 # Global settings #
 n_sipms = 25
@@ -204,6 +205,40 @@ def smooth_PSF(PSF):
     
     return smooth_PSF
 
+def assign_hit_to_SiPM(hit, pitch, n):
+    """
+    Assign a hit to a SiPM based on its coordinates.
+    
+    Args:
+    - hit (tuple): The (x, y) coordinates of the hit.
+    - pitch (float): The spacing between SiPMs.
+    - n (int): The number of SiPMs on one side of the square grid.
+    
+    Returns:
+    - (int, int): The assigned SiPM coordinates.
+    """
+    
+    half_grid_length = (n-1) * pitch / 2
+
+    x, y = hit
+
+    # First, check the central SiPM and its immediate neighbors
+    for i in [0, -pitch, pitch]:
+        for j in [0, -pitch, pitch]:
+            if -pitch/2 <= x - i < pitch/2 and -pitch/2 <= y - j < pitch/2:
+                return (i, j)
+
+    # If not found in the central SiPM or its neighbors, search the rest of the grid
+    for i in np.linspace(-half_grid_length, half_grid_length, n):
+        for j in np.linspace(-half_grid_length, half_grid_length, n):
+            if abs(i) > pitch or abs(j) > pitch:  # Skip the previously checked SiPMs
+                if i - pitch/2 <= x < i + pitch/2 and j - pitch/2 <= y < j + pitch/2:
+                    return (i, j)
+    
+    # Return None if hit doesn't belong to any SiPM
+    return None
+
+
 
 
 def psf_creator(geo_directory,to_plot=True,to_smooth=True):
@@ -219,15 +254,36 @@ def psf_creator(geo_directory,to_plot=True,to_smooth=True):
     '''
     
     os.chdir(path_to_dataset + "/" + dir)
-    print('\nWorking on directory:'+f'\n{os.getcwd()}')
+    working_dir = r'Working on directory:'+f'\n{os.getcwd()}'
+    print(working_dir)
     SiPM_files = glob.glob(r'SiPM*')
     
     # pattern to extract x,y values of each event from file name
     pattern = r"-?\d+.\d+"
 
     PSF_list = []
-    bins = 500
-    for filename in SiPM_files:
+    size = 100
+    bins = 200
+    # Search for the pitch value pattern
+    match = re.search(r"_pitch=(\d+(?:\.\d+)?)mm", working_dir)
+    pitch = float(match.group(1))
+    
+    ### General way of creating PSF ###
+    # for filename in SiPM_files:
+    #     # Load hitmap
+    #     hitmap = np.array(np.genfromtxt(filename)[:,0:2])
+    #     # Store x,y values of event
+    #     matches = re.findall(pattern, filename)
+    #     x_event = float(matches[0])
+    #     y_event = float(matches[1])
+    #     # shift each event to center        
+    #     shifted_hitmap = hitmap - [x_event, y_event]
+    #     # Add all shifted maps to create the geometry's PSF
+    #     PSF_list.append(shifted_hitmap)
+        
+        
+    ### assign each hit to its corresponding SiPM ###
+    for filename in SiPM_files:      
         # Load hitmap
         hitmap = np.array(np.genfromtxt(filename)[:,0:2])
         # Store x,y values of event
@@ -236,31 +292,58 @@ def psf_creator(geo_directory,to_plot=True,to_smooth=True):
         y_event = float(matches[1])
         # shift each event to center        
         shifted_hitmap = hitmap - [x_event, y_event]
-        # Add all shifted maps to create the geometry's PSF
-        PSF_list.append(shifted_hitmap)
+    
+        # Assign each hit to a SiPM and update the hitmap
+        new_hitmap = []
+        for hit in shifted_hitmap:
+            sipm = assign_hit_to_SiPM(hit=hit, pitch=pitch, n=n_sipms)
+            if sipm:  # if the hit belongs to a SiPM
+                new_hitmap.append(sipm)
+        PSF_list.append(np.array(new_hitmap))
+        
+        
 
     # Concatenate all shifted hitmaps into a single array
     PSF = np.vstack(PSF_list)
     PSF, x_hist, y_hist = np.histogram2d(PSF[:,0], PSF[:,1],
-                                         range=[[-100,100],[-100,100]],
+                                         range=[[-size/2,size/2],[-size/2,size/2]],
                                          bins=bins)
     
-    if to_plot:
-        plt.hist2d(PSF[:,0],PSF[:,1],
-                   bins=(bins, bins), cmap=plt.cm.jet)
-        plt.xlabel('[mm]')
-        plt.ylabel('[mm]')
-        plt.title('PSF')
-        plt.colorbar()
-        plt.show()
 
     if to_smooth:
-        #Smooth the PSF
+        #Smoothes the PSF
         PSF = smooth_PSF(PSF)
-        plt.imshow(PSF)
+        
+    if to_plot:
+        fig, (ax0, ax1) = plt.subplots(1, 2, figsize=(16.5,8))
+        fig.suptitle(r'Current geometry:' + f'\n{os.path.basename(os.getcwd())}', fontsize=15)
+        im = ax0.imshow(PSF, extent=[-size/2, size/2, -size/2, size/2])
+        ax0.set_xlabel('x [mm]');
+        ax0.set_ylabel('y [mm]');
+        ax0.set_title('PSF image')
+        # fig.colorbar(im, orientation='vertical', location='left')
+        divider = make_axes_locatable(ax0)
+        cax = divider.append_axes("right", size="5%", pad=0.05)
+        plt.colorbar(im, cax=cax)
+        
+        y = PSF.sum(axis=0) 
+        peaks, _ = find_peaks(y)
+        fwhm = np.max(peak_widths(y, peaks, rel_height=0.5)[0])
+        ax1.plot(np.arange(-size,size,1), y, linewidth=2)
+        ax1.set_xlabel('mm')
+        ax1.set_ylabel('Charge sum along y axis')
+        ax1.set_title('Charge sum')
+        ax1.grid(linewidth=1)
+        fwhm_text = f"FWHM = {fwhm:.3f}"  # format to have 3 decimal places
+        ax1.text(0.95, 0.95, fwhm_text, transform=ax1.transAxes, 
+                 verticalalignment='top', horizontalalignment='right', 
+                 color='red', fontsize=12, fontweight='bold',
+                 bbox=dict(facecolor='white', edgecolor='red',
+                           boxstyle='round,pad=0.5'))
+
+        fig.tight_layout()
         plt.show()
-        # np.save(evt_PSF_output,smoothed_PSF)
-        # np.save(evt_PSF_output,PSF) #unsmoothed
+        
     return PSF
 
 
@@ -293,6 +376,7 @@ def estimate_dataset_size_on_disk(factor):
 
 estimate_dataset_size_on_disk(factor=4.7)
 
+
 # In[2]
 # plot SiPM and TPB hits, basically just show a sample of database
 path_to_dataset = r'/media/amir/9C33-6BBD/NEXT_work/Geant4/nexus/' + \
@@ -324,10 +408,10 @@ for geometry in geometry_dirs:
         
         # Save the mappable object for the colorbar
         
-        bins_sipm = int(np.sqrt(len(sipm_x_coords)))
-        bins_tpb = int(np.sqrt(len(tpb_x_coords)))
-        # bins_sipm = 300
-        # bins_tpb = 300
+        # bins_sipm = int(np.sqrt(len(sipm_x_coords)))
+        # bins_tpb = int(np.sqrt(len(tpb_x_coords)))
+        bins_sipm = 200
+        bins_tpb = 200
               
         
         hist_sipm = ax0.hist2d(sipm_x_coords,sipm_y_coords,
@@ -460,8 +544,8 @@ def combine_events(event1_file, event2_file, shift, to_plot=True):
     centered_combined_event = combined_event - [combined_cm_x, combined_cm_y]
     
     
-    bins = int(np.sqrt(len(event1)+len(shifted_event2)))
-    # bins = 300
+    # bins = int(np.sqrt(len(event1)+len(shifted_event2)))
+    bins = 300
     H, x_hist, y_hist = np.histogram2d(centered_combined_event[:, 0],
                                        centered_combined_event[:, 1], bins=bins)
       
@@ -531,7 +615,7 @@ for geometry in geometry_dirs:
         os.mkdir(Save_SR)
     if not os.path.isdir(Save_SR_interpolate):
         os.mkdir(Save_SR_interpolate)
-    source_spacing=5*pitch
+    source_spacing=3*pitch
 
         
     for attempt in range(8):
