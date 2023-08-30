@@ -268,7 +268,7 @@ def psf_creator(geo_directory,to_plot=True,to_smooth=True):
     match = re.search(r"_pitch=(\d+(?:\.\d+)?)mm", working_dir)
     pitch = float(match.group(1))
     
-    ### General way of creating PSF ###
+    # ## General way of creating PSF ###
     # for filename in SiPM_files:
     #     # Load hitmap
     #     hitmap = np.array(np.genfromtxt(filename)[:,0:2])
@@ -282,26 +282,28 @@ def psf_creator(geo_directory,to_plot=True,to_smooth=True):
     #     PSF_list.append(shifted_hitmap)
         
         
-    ### assign each hit to its corresponding SiPM ###
-    for filename in SiPM_files:      
+    # ### assign each hit to its corresponding SiPM ###
+    for filename in SiPM_files:
         # Load hitmap
         hitmap = np.array(np.genfromtxt(filename)[:,0:2])
+        
         # Store x,y values of event
         matches = re.findall(pattern, filename)
         x_event = float(matches[0])
         y_event = float(matches[1])
-        # shift each event to center        
-        shifted_hitmap = hitmap - [x_event, y_event]
-    
-        # Assign each hit to a SiPM and update the hitmap
+        
+        # Assign each hit to a SiPM before shifting the hitmap
         new_hitmap = []
-        for hit in shifted_hitmap:
+        for hit in hitmap:
             sipm = assign_hit_to_SiPM(hit=hit, pitch=pitch, n=n_sipms)
             if sipm:  # if the hit belongs to a SiPM
                 new_hitmap.append(sipm)
-        PSF_list.append(np.array(new_hitmap))
+       
+        new_hitmap = np.array(new_hitmap)
         
-        
+        # Now, shift each event to center
+        shifted_hitmap = new_hitmap - [x_event, y_event]
+        PSF_list.append(shifted_hitmap)
 
     # Concatenate all shifted hitmaps into a single array
     PSF = np.vstack(PSF_list)
@@ -444,8 +446,11 @@ for geometry in geometry_dirs:
 
 # In[3]
 # Generate PSF and save
-path_to_dataset = r'/media/amir/9C33-6BBD/NEXT_work/Geant4/nexus/' + \
-                  r'small_cluster_hitpoints_dataset/SquareFiberMacrosAndOutputs'
+# path_to_dataset = r'/media/amir/9C33-6BBD/NEXT_work/Geant4/nexus/' + \
+#                   r'small_cluster_hitpoints_dataset/SquareFiberMacrosAndOutputs'
+                  
+path_to_dataset = r'/home/amir/Products/geant4/geant4-v11.0.1/MySims/nexus/' + \
+                    r'SquareFiberMacrosAndOutputsRandomFaceGen'
 
 geometry_dirs = os.listdir(path_to_dataset)
 PSFS = []
@@ -455,6 +460,56 @@ for dir in geometry_dirs:
     # save_PSF = r'PSF.npy'
     # np.save(save_PSF,PSF)
     
+    
+    
+# Show TPB Teflon hits on a single text file, can be removed later
+size = 100
+bins = 200
+pitch = 5
+
+file = r'/media/amir/9C33-6BBD/NEXT_work/Geant4/nexus/small_cluster_hitpoints_dataset/TPB_hits.txt'
+hitmap = np.array(np.genfromtxt(file)[:,0:2])
+PSF, x_hist, y_hist = np.histogram2d(hitmap[:,0], hitmap[:,1],
+                                     range=[[-size/2,size/2],[-size/2,size/2]],
+                                     bins=bins)
+fig, (ax0, ax1) = plt.subplots(1, 2, figsize=(16.5,8))
+fig.suptitle(r'Teflon hit map', fontsize=15)
+im = ax0.imshow(PSF, extent=[-size/2, size/2, -size/2, size/2])
+ax0.set_xlabel('x [mm]');
+ax0.set_ylabel('y [mm]');
+ax0.set_title('PSF image')
+# fig.colorbar(im, orientation='vertical', location='left')
+divider = make_axes_locatable(ax0)
+cax = divider.append_axes("right", size="5%", pad=0.05)
+plt.colorbar(im, cax=cax)
+
+y = PSF.sum(axis=0) 
+peaks, _ = find_peaks(y)
+fwhm = np.max(peak_widths(y, peaks, rel_height=0.5)[0])
+ax1.plot(np.arange(-size,size,1), y, linewidth=2)
+ax1.set_xlabel('mm')
+ax1.set_ylabel('Charge sum along y axis')
+ax1.set_title('Charge sum')
+ax1.grid(linewidth=1)
+fwhm_text = f"FWHM = {fwhm:.3f}"  # format to have 3 decimal places
+ax1.text(0.95, 0.95, fwhm_text, transform=ax1.transAxes, 
+         verticalalignment='top', horizontalalignment='right', 
+         color='red', fontsize=12, fontweight='bold',
+         bbox=dict(facecolor='white', edgecolor='red',
+                   boxstyle='round,pad=0.5'))
+# Set x-ticks for ax1
+tick_positions = np.arange(-size/2 + 2.5, size/2, 5)
+# ax1.set_xticks(tick_positions, rotation=45)
+
+# Draw vertical lines at each tick position
+for tick in tick_positions:
+    ax1.axvline(tick, color='gray', alpha=1, linestyle='--')
+
+fig.tight_layout()
+plt.show()
+
+
+
 # In[4]
 # combine 2 events
 import itertools

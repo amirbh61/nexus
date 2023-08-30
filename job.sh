@@ -12,4 +12,3 @@ do
   ./build/nexus -b -n 462500 "${macro}"
   echo "$macro" >> macros_sent_to_cluster.txt
 done
-

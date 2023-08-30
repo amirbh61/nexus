@@ -11,7 +11,7 @@ do
     job_count=$(qstat | grep -E '^[0-9]' | grep "$username" | wc -l)  # Check the number of jobs in the queue
     if [ "$job_count" -lt "$max_jobs" ]; then
       # If the number of jobs is less than the maximum, submit a new job
-      qsub -q fairshare.q -o ~/Resolving_Power/nexus/SquareFiberCluster_outputs -e ~/Resolving_Power/nexus/SquareFiberCluster_errors test_job.sh "$geometry_folder"
+      qsub -q fairshare.q -o ~/Resolving_Power/nexus/SquareFiberCluster_outputs -e ~/Resolving_Power/nexus/SquareFiberCluster_errors job.sh "$geometry_folder"
       echo "$geometry_folder" >> geometries_sent_to_cluster.txt
       break
     else
