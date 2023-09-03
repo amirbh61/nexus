@@ -77,15 +77,12 @@ G4bool SquareFiberSD::ProcessHits(G4Step* step, G4TouchableHistory*) {
 
 
   // CASE FOR ONLY WLSE PHOTON COORDINATES
-  // if (materialName == "TPB" && track->GetParentID() == 0 &&
-  //    track->GetStep()->GetPostStepPoint()->GetProcessDefinedStep()->GetProcessName() == "OpWLS" ) {
-
-
-  if (materialName == "TPB" && track->GetParentID() == 0) {
-    G4ThreeVector position = step->GetPostStepPoint()->GetPosition();
+  if (materialName == "TPB" && track->GetParentID() == 0 &&
+     track->GetStep()->GetPostStepPoint()->GetProcessDefinedStep()->GetProcessName() == "OpWLS" ) {
+      G4ThreeVector position = step->GetPostStepPoint()->GetPosition();
     WritePositionToTextFile(tpbOutputFile_, position);
-
   }
+
   
   if (materialName == "G4_Si" &&
       track->GetStep()->GetPostStepPoint()->GetProcessDefinedStep()->GetProcessName() == "OpAbsorption"){

@@ -40,8 +40,8 @@
 
 
 /Geometry/SquareOpticalFiber/ELGap 10 mm
-/Geometry/SquareOpticalFiber/pitch 5 mm
-/Geometry/SquareOpticalFiber/distanceFiberHolder 2 mm
+/Geometry/SquareOpticalFiber/pitch 10 mm
+/Geometry/SquareOpticalFiber/distanceFiberHolder 5 mm
 /Geometry/SquareOpticalFiber/distanceAnodeHolder 2.5 mm
 /Geometry/SquareOpticalFiber/holderThickness 10 mm
 /Geometry/SquareOpticalFiber/TPBThickness 2.2 um 

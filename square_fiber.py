@@ -262,35 +262,42 @@ def psf_creator(geo_directory,to_plot=True,to_smooth=True):
     pattern = r"-?\d+.\d+"
 
     PSF_list = []
-    size = 100
-    bins = 200
+    total_photons = 0
+    size = 100 # keep the same for all future histograms
+    bins = 100 # keep the same for all future histograms
+    
+    # For DEBUGGING
+    plot_event = False
+    plot_sipm_assigned_event = False
+    plot_shifted_event = False
+    plot_accomulated_events = False
+    
+    
     # Search for the pitch value pattern
     match = re.search(r"_pitch=(\d+(?:\.\d+)?)mm", working_dir)
     pitch = float(match.group(1))
-    
-    # ## General way of creating PSF ###
-    # for filename in SiPM_files:
-    #     # Load hitmap
-    #     hitmap = np.array(np.genfromtxt(filename)[:,0:2])
-    #     # Store x,y values of event
-    #     matches = re.findall(pattern, filename)
-    #     x_event = float(matches[0])
-    #     y_event = float(matches[1])
-    #     # shift each event to center        
-    #     shifted_hitmap = hitmap - [x_event, y_event]
-    #     # Add all shifted maps to create the geometry's PSF
-    #     PSF_list.append(shifted_hitmap)
-        
-        
-    # ### assign each hit to its corresponding SiPM ###
-    for filename in SiPM_files:
+
+    ### assign each hit to its corresponding SiPM ###
+    for filename in tqdm(SiPM_files):
         # Load hitmap
         hitmap = np.array(np.genfromtxt(filename)[:,0:2])
+        total_photons += len(hitmap)
         
-        # Store x,y values of event
+        # Store x,)y values of event
         matches = re.findall(pattern, filename)
         x_event = float(matches[0])
         y_event = float(matches[1])
+        
+        if plot_event:
+            single_event, x_hist, y_hist = np.histogram2d(hitmap[:,0], hitmap[:,1],
+                                                  range=[[-size/2,size/2],[-size/2,size/2]],
+                                                  bins=bins)
+            plt.imshow(single_event,extent=[-size/2, size/2, -size/2, size/2])
+            plt.title("Single Geant4 event")
+            plt.xlabel('x [mm]');
+            plt.ylabel('y [mm]');
+            plt.colorbar()
+            plt.show()
         
         # Assign each hit to a SiPM before shifting the hitmap
         new_hitmap = []
@@ -301,11 +308,52 @@ def psf_creator(geo_directory,to_plot=True,to_smooth=True):
        
         new_hitmap = np.array(new_hitmap)
         
+        
+        if plot_sipm_assigned_event:
+            sipm_assigned_event, x_hist, y_hist = np.histogram2d(new_hitmap[:,0], new_hitmap[:,1],
+                                                  range=[[-size/2,size/2],[-size/2,size/2]],
+                                                  bins=bins)     
+            plt.imshow(sipm_assigned_event,extent=[-size/2, size/2, -size/2, size/2])
+            plt.title("Single Geant4 event, after assigned to SiPMs")
+            plt.xlabel('x [mm]');
+            plt.ylabel('y [mm]');
+            plt.colorbar()
+            plt.show()
+        
+        
+        
         # Now, shift each event to center
         shifted_hitmap = new_hitmap - [x_event, y_event]
+        if plot_shifted_event:
+            shifted_event, x_hist, y_hist = np.histogram2d(shifted_hitmap[:,0], shifted_hitmap[:,1],
+                                                  range=[[-size/2,size/2],[-size/2,size/2]],
+                                                  bins=bins)     
+            plt.imshow(shifted_event,extent=[-size/2, size/2, -size/2, size/2])
+            plt.title("Shifted Geant4 event, after assigned to SiPMs")
+            plt.xlabel('x [mm]');
+            plt.ylabel('y [mm]');
+            plt.colorbar()
+            plt.show()
+        
+        
+        
         PSF_list.append(shifted_hitmap)
+        
+        if plot_accomulated_events:
+            PSF = np.vstack(PSF_list)
+            PSF, x_hist, y_hist = np.histogram2d(PSF[:,0], PSF[:,1],
+                                                  range=[[-size/2,size/2],[-size/2,size/2]],
+                                                  bins=bins)
+            plt.imshow(PSF,extent=[-size/2, size/2, -size/2, size/2])
+            plt.title("Accumulated Geant4 events, after assigned to SiPMs and shifted")
+            plt.xlabel('x [mm]');
+            plt.ylabel('y [mm]');
+            plt.colorbar()
+            plt.show()
+        
+        
 
-    # Concatenate all shifted hitmaps into a single array
+    # Concatenate ALL shifted hitmaps into a single array
     PSF = np.vstack(PSF_list)
     PSF, x_hist, y_hist = np.histogram2d(PSF[:,0], PSF[:,1],
                                          range=[[-size/2,size/2],[-size/2,size/2]],
@@ -318,23 +366,23 @@ def psf_creator(geo_directory,to_plot=True,to_smooth=True):
         
     if to_plot:
         fig, (ax0, ax1) = plt.subplots(1, 2, figsize=(16.5,8))
-        fig.suptitle(r'Current geometry:' + f'\n{os.path.basename(os.getcwd())}', fontsize=15)
+        title = f'{total_photons}/100M photon hits, current geometry:' + f'\n{os.path.basename(os.getcwd())}'
+        fig.suptitle(title, fontsize=15)
         im = ax0.imshow(PSF, extent=[-size/2, size/2, -size/2, size/2])
         ax0.set_xlabel('x [mm]');
         ax0.set_ylabel('y [mm]');
         ax0.set_title('PSF image')
-        # fig.colorbar(im, orientation='vertical', location='left')
         divider = make_axes_locatable(ax0)
         cax = divider.append_axes("right", size="5%", pad=0.05)
         plt.colorbar(im, cax=cax)
         
-        y = PSF.sum(axis=0) 
+        y = PSF[int(size/2),:]
         peaks, _ = find_peaks(y)
         fwhm = np.max(peak_widths(y, peaks, rel_height=0.5)[0])
-        ax1.plot(np.arange(-size,size,1), y, linewidth=2)
+        ax1.plot(np.arange(-size/2,size/2,1), y/np.sum(y), linewidth=2) #normalize
         ax1.set_xlabel('mm')
-        ax1.set_ylabel('Charge sum along y axis')
-        ax1.set_title('Charge sum')
+        ax1.set_ylabel('Charge')
+        ax1.set_title('Charge along x axis')
         ax1.grid(linewidth=1)
         fwhm_text = f"FWHM = {fwhm:.3f}"  # format to have 3 decimal places
         ax1.text(0.95, 0.95, fwhm_text, transform=ax1.transAxes, 
@@ -412,8 +460,8 @@ for geometry in geometry_dirs:
         
         # bins_sipm = int(np.sqrt(len(sipm_x_coords)))
         # bins_tpb = int(np.sqrt(len(tpb_x_coords)))
-        bins_sipm = 200
-        bins_tpb = 200
+        bins_sipm = 100
+        bins_tpb = 100
               
         
         hist_sipm = ax0.hist2d(sipm_x_coords,sipm_y_coords,
@@ -450,30 +498,35 @@ for geometry in geometry_dirs:
 #                   r'small_cluster_hitpoints_dataset/SquareFiberMacrosAndOutputs'
                   
 path_to_dataset = r'/home/amir/Products/geant4/geant4-v11.0.1/MySims/nexus/' + \
-                    r'SquareFiberMacrosAndOutputsRandomFaceGen'
+    r'SquareFiberMacrosAndOutputsRandomFaceGen/' 
 
+
+# /home/amir/Products/geant4/geant4-v11.0.1/
+# MySims/nexus/SquareFiberMacrosAndOutputsRandomFaceGen/
+# ELGap=10mm_pitch=10mm_distanceFiberHolder=5mm_distanceAnodeHolder=2.5mm_holderThickness=10mm
 geometry_dirs = os.listdir(path_to_dataset)
 PSFS = []
-for dir in geometry_dirs:
-    PSF = psf_creator(dir,to_plot=True,to_smooth=False)
+# for dir in geometry_dirs:
+#     PSF = psf_creator(dir,to_plot=True,to_smooth=False)
     
-    # save_PSF = r'PSF.npy'
-    # np.save(save_PSF,PSF)
+#     save_PSF = r'PSF.npy'
+#     np.save(save_PSF,PSF)
     
     
-    
+load_PSF = glob.glob(path_to_dataset + r'/*/PSF.npy')[0]
+PSF = np.load(load_PSF)
 # Show TPB Teflon hits on a single text file, can be removed later
 size = 100
-bins = 200
-pitch = 5
+bins = 100
+pitch = 10
 
 file = r'/media/amir/9C33-6BBD/NEXT_work/Geant4/nexus/small_cluster_hitpoints_dataset/TPB_hits.txt'
 hitmap = np.array(np.genfromtxt(file)[:,0:2])
 PSF, x_hist, y_hist = np.histogram2d(hitmap[:,0], hitmap[:,1],
-                                     range=[[-size/2,size/2],[-size/2,size/2]],
-                                     bins=bins)
+                                      range=[[-size/2,size/2],[-size/2,size/2]],
+                                      bins=bins)
 fig, (ax0, ax1) = plt.subplots(1, 2, figsize=(16.5,8))
-fig.suptitle(r'Teflon hit map', fontsize=15)
+fig.suptitle(r'TPB hit map, 10M photons fired forward', fontsize=15)
 im = ax0.imshow(PSF, extent=[-size/2, size/2, -size/2, size/2])
 ax0.set_xlabel('x [mm]');
 ax0.set_ylabel('y [mm]');
@@ -483,30 +536,84 @@ divider = make_axes_locatable(ax0)
 cax = divider.append_axes("right", size="5%", pad=0.05)
 plt.colorbar(im, cax=cax)
 
-y = PSF.sum(axis=0) 
+# y = PSF.sum(axis=0) 
+y = PSF[int(size/2),:]
 peaks, _ = find_peaks(y)
 fwhm = np.max(peak_widths(y, peaks, rel_height=0.5)[0])
-ax1.plot(np.arange(-size,size,1), y, linewidth=2)
+ax1.plot(np.arange(-size/2,size/2,1),y/np.sum(PSF[int(size/2),:]),
+         linewidth=2) # normalize cross section
 ax1.set_xlabel('mm')
-ax1.set_ylabel('Charge sum along y axis')
-ax1.set_title('Charge sum')
+ax1.set_ylabel('Charge')
+ax1.set_title('Charge along x axis')
 ax1.grid(linewidth=1)
 fwhm_text = f"FWHM = {fwhm:.3f}"  # format to have 3 decimal places
 ax1.text(0.95, 0.95, fwhm_text, transform=ax1.transAxes, 
-         verticalalignment='top', horizontalalignment='right', 
-         color='red', fontsize=12, fontweight='bold',
-         bbox=dict(facecolor='white', edgecolor='red',
-                   boxstyle='round,pad=0.5'))
-# Set x-ticks for ax1
-tick_positions = np.arange(-size/2 + 2.5, size/2, 5)
-# ax1.set_xticks(tick_positions, rotation=45)
-
-# Draw vertical lines at each tick position
-for tick in tick_positions:
-    ax1.axvline(tick, color='gray', alpha=1, linestyle='--')
+          verticalalignment='top', horizontalalignment='right', 
+          color='red', fontsize=12, fontweight='bold',
+          bbox=dict(facecolor='white', edgecolor='red',
+                    boxstyle='round,pad=0.5'))
 
 fig.tight_layout()
 plt.show()
+
+
+
+
+
+
+
+## Show TPB hits vs theoretical monte carlo
+# Load theoretical MC PSF
+anode_track_gap = 2.5
+el_gap = 10
+Mfolder = '/home/amir/Desktop/NEXT_work/Resolving_Power/Results/'
+folder = Mfolder + f'Resolving_Power_EL_gap{el_gap}mm_Tracking_Plane_Gap{anode_track_gap}mm/'
+Save_PSF  = f'{folder}PSF/'  
+psf_file_name = 'PSF_matrix'
+evt_PSF_output = Save_PSF + psf_file_name + '.npy'
+MC_PSF = np.load(evt_PSF_output)
+MC_y = MC_PSF[int(size/2),:]
+
+
+
+# plot
+fig, (ax0, ax1) = plt.subplots(1, 2, figsize=(16.5,8))
+fig.suptitle(r'TPB hit map, 10M photons fired forward', fontsize=15)
+im = ax0.imshow(PSF, extent=[-size/2, size/2, -size/2, size/2])
+ax0.set_xlabel('x [mm]')
+ax0.set_ylabel('y [mm]')
+ax0.set_title('PSF image')
+divider = make_axes_locatable(ax0)
+cax = divider.append_axes("right", size="5%", pad=0.05)
+plt.colorbar(im, cax=cax)
+
+y = PSF[int(size/2),:]
+peaks, _ = find_peaks(y)
+fwhm = np.max(peak_widths(y, peaks, rel_height=0.5)[0])
+
+# Adding labels and colors to the plots
+ax1.plot(np.arange(-size/2,size/2,1), y/np.sum(PSF[int(size/2),:]), 
+         linewidth=2, color='blue', label='Geant4 TPB hits, 10M')  # normalize cross section and set color to blue
+ax1.plot(np.arange(-size/2,size/2,1), MC_y/np.sum(MC_PSF[int(size/2),:]), 
+         linewidth=2, color='green', label='MC hits, 10M')  # normalize cross section and set color to red
+
+ax1.set_xlabel('mm')
+ax1.set_ylabel('Charge')
+ax1.set_title('Charge along x axis')
+ax1.grid(linewidth=1)
+fwhm_text = f"FWHM = {fwhm:.3f}"  # format to have 3 decimal places
+ax1.text(0.95, 0.95, fwhm_text, transform=ax1.transAxes, 
+          verticalalignment='top', horizontalalignment='right', 
+          color='red', fontsize=12, fontweight='bold',
+          bbox=dict(facecolor='white', edgecolor='red',
+                    boxstyle='round,pad=0.5'))
+
+ax1.legend(loc='upper left')  # Display the legend
+
+fig.tight_layout()
+plt.show()
+
+
 
 
 

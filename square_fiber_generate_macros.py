@@ -196,8 +196,8 @@ Option to create events in a circular pattern so each octant is symmetrical.
 # Geometry parameters - single geometry , REMOVE AFTER
 geometry_params = {
     'ELGap': ['10'],
-    'pitch': ['5'],
-    'distanceFiberHolder': ['2'],
+    'pitch': ['10'],
+    'distanceFiberHolder': ['5'],
     'distanceAnodeHolder': ['2.5'],
     'holderThickness': ['10'],
     'TPBThickness': ['2.2'] # microns
@@ -217,7 +217,7 @@ if fixed_intervals:
     
 random_events_xy = True
 if random_events_xy:
-    num_samples = 100
+    num_samples = 1000
 
 
 z = 0 # junk number, value has no meaning but must exist as input for geant
