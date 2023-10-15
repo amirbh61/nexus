@@ -310,7 +310,7 @@ void SquareOpticalFiber::Construct(){
     ///// TPB COATING ON FIBER END /////
     G4double TPBFiberSize = fiberSize;
     G4double TPBFiberWidth = 0.5*TPBThickness_;
-    G4Box *fiberTPB = new G4Box("TPB", //name
+    G4Box *fiberTPB = new G4Box("TPB_Fiber", //name
                            TPBFiberSize, //side a
                            TPBFiberSize, //side b
                            TPBFiberWidth); //length
@@ -319,7 +319,7 @@ void SquareOpticalFiber::Construct(){
                                                         fiberTPB, //the fiber object
                                                         // Polyethylene, //material of fiber
                                                         TPB,
-                                                        "TPB"); //name
+                                                        "TPB_Fiber"); //name
 
     G4Color green = G4Color::Green();
     G4VisAttributes* colorTPB = new G4VisAttributes(green);
@@ -416,12 +416,12 @@ void SquareOpticalFiber::Construct(){
 
 
 
-            name = "TPB_(x,y)=(" + x_str + "," + y_str + ")";
+            // name = "TPB_(x,y)=(" + x_str + "," + y_str + ")";
             fiberTPBPhysicalVolume = new G4PVPlacement(
                                                     0,                // no rotation
                                                     G4ThreeVector(x,y,zFiberTPB),  // at (0,0,0)
                                                     fiberTPBLogicalVolume, // its logical volume
-                                                    name,               //its name
+                                                    "TPB_Fiber",               //its name
                                                     worldLogicalVolume,   //its mother volume
                                                     false,            // no boolean operation
                                                     0,                // copy number
@@ -524,20 +524,20 @@ void SquareOpticalFiber::Construct(){
     G4double holderTPBCoatingWidth = TPBFiberWidth; //half width
     G4double holderTPBCoatingLocationZ = zHolder - holderWidth - holderTPBCoatingWidth;
 
-    G4Tubs *holderTPB = new G4Tubs("TPB", //name
+    G4Tubs *holderTPB = new G4Tubs("TPB_Holder", //name
                             holderTPBCoatingInnerRadius, //inner radius
                             holderTPBCoatingOuterRadius, //outer radius
                             holderTPBCoatingWidth, //length
                             0., //initial revolve angle
                             2*M_PI); //final revolve angle
 
-    G4Box *holderHoleTPB= new G4Box("TPB",
+    G4Box *holderHoleTPB= new G4Box("TPB_Holder",
                                 holderTPBCoatingHoleSize,
                                 holderTPBCoatingHoleSize,
                                 holderTPBCoatingWidth);
 
 
-    G4MultiUnion* multiUnionTPB = new G4MultiUnion("TPB");
+    G4MultiUnion* multiUnionTPB = new G4MultiUnion("TPB_Holder");
     for (G4int i=0; i<nHoles*nHoles; i++) {
 
         x = lattice_points[i][0];
@@ -548,9 +548,9 @@ void SquareOpticalFiber::Construct(){
     multiUnionTPB -> Voxelize();
 
     // Subtract the multi-union of holes from the solid
-    G4SubtractionSolid *holePatternTPB = new G4SubtractionSolid("TPB", holderTPB, multiUnionTPB);
+    G4SubtractionSolid *holePatternTPB = new G4SubtractionSolid("TPB_Holder", holderTPB, multiUnionTPB);
 
-    G4LogicalVolume *holePatternTPBLogical = new G4LogicalVolume(holePatternTPB, TPB, "TPB");
+    G4LogicalVolume *holePatternTPBLogical = new G4LogicalVolume(holePatternTPB, TPB, "TPB_Holder");
 
 
     holePatternTPBLogical->SetVisAttributes(colorTPB);
@@ -560,7 +560,7 @@ void SquareOpticalFiber::Construct(){
         holePatternTPBPhysical = new G4PVPlacement(0,
                                                     G4ThreeVector(0,0,holderTPBCoatingLocationZ),
                                                     holePatternTPBLogical,
-                                                    "TPB",
+                                                    "TPB_Holder",
                                                     worldLogicalVolume,
                                                     false,
                                                     0,

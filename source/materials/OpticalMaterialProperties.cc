@@ -1059,6 +1059,20 @@ namespace opticalprops {
     // As Geant4 doesn't allow this possibility, it is set to the value corresponding
     // to Xe scintillation spectrum peak.
     mpt->AddConstProperty("WLSMEANNUMBERPHOTONS", 0.65);
+
+    G4double meanNumberPhotons = mpt->GetConstProperty("WLSMEANNUMBERPHOTONS");
+    G4cout << G4endl;
+    G4cout << G4endl;
+    G4cout << G4endl;
+    G4cout << G4endl;
+    G4cout << G4endl;
+    G4cout << "WLSMEANNUMBERPHOTONS: " << meanNumberPhotons << G4endl;
+    G4cout << G4endl;
+    G4cout << G4endl;
+    G4cout << G4endl;
+    G4cout << G4endl;
+    G4cout << G4endl;
+    
     return mpt;
   }
 

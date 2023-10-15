@@ -241,22 +241,24 @@ def assign_hit_to_SiPM(hit, pitch, n):
 
 
 
-def psf_creator(geo_directory,to_plot=True,to_smooth=True):
+def psf_creator(directory, create_from, to_plot=True,to_smooth=True):
     '''
     Gives a picture of the SiPM (sensor wall) response to an event involving 
     the emission of light in the EL gap.
     Receives:
-        geo_directory: str, path to geometry directory
+        directory: str, path to geometry directory
+        create_from: str, surface to create PSF from. Either "SiPM" or "TPB".
         to_plot: bool, flag - if True, plots the PSF
         to_smooth: bool, flag - if True, smoothes the PSF
     Returns:
         PSF: ndarray, the Point Spread Function
     '''
     
-    os.chdir(path_to_dataset + "/" + dir)
+    os.chdir(directory)
     working_dir = r'Working on directory:'+f'\n{os.getcwd()}'
     print(working_dir)
-    SiPM_files = glob.glob(r'SiPM*')
+    
+    files = glob.glob(f'{create_from}*')
     
     # pattern to extract x,y values of each event from file name
     pattern = r"-?\d+.\d+"
@@ -278,7 +280,7 @@ def psf_creator(geo_directory,to_plot=True,to_smooth=True):
     pitch = float(match.group(1))
 
     ### assign each hit to its corresponding SiPM ###
-    for filename in tqdm(SiPM_files):
+    for filename in tqdm(files):
         # Load hitmap
         hitmap = np.array(np.genfromtxt(filename)[:,0:2])
         total_photons += len(hitmap)
@@ -366,7 +368,7 @@ def psf_creator(geo_directory,to_plot=True,to_smooth=True):
         
     if to_plot:
         fig, (ax0, ax1) = plt.subplots(1, 2, figsize=(16.5,8))
-        title = f'{total_photons}/100M photon hits, current geometry:' + f'\n{os.path.basename(os.getcwd())}'
+        title = f'{total_photons}/10M {create_from} PSF, current geometry:' + f'\n{os.path.basename(os.getcwd())}'
         fig.suptitle(title, fontsize=15)
         im = ax0.imshow(PSF, extent=[-size/2, size/2, -size/2, size/2])
         ax0.set_xlabel('x [mm]');
@@ -379,10 +381,10 @@ def psf_creator(geo_directory,to_plot=True,to_smooth=True):
         y = PSF[int(size/2),:]
         peaks, _ = find_peaks(y)
         fwhm = np.max(peak_widths(y, peaks, rel_height=0.5)[0])
-        ax1.plot(np.arange(-size/2,size/2,1), y/np.sum(y), linewidth=2) #normalize
+        ax1.plot(np.arange(-size/2,size/2,1), y/np.sum(PSF), linewidth=2) #normalize
         ax1.set_xlabel('mm')
         ax1.set_ylabel('Charge')
-        ax1.set_title('Charge along x axis')
+        ax1.set_title('Charge profile')
         ax1.grid(linewidth=1)
         fwhm_text = f"FWHM = {fwhm:.3f}"  # format to have 3 decimal places
         ax1.text(0.95, 0.95, fwhm_text, transform=ax1.transAxes, 
@@ -504,65 +506,13 @@ path_to_dataset = r'/home/amir/Products/geant4/geant4-v11.0.1/MySims/nexus/' + \
 # /home/amir/Products/geant4/geant4-v11.0.1/
 # MySims/nexus/SquareFiberMacrosAndOutputsRandomFaceGen/
 # ELGap=10mm_pitch=10mm_distanceFiberHolder=5mm_distanceAnodeHolder=2.5mm_holderThickness=10mm
+
+
+
 geometry_dirs = os.listdir(path_to_dataset)
-PSFS = []
-# for dir in geometry_dirs:
-#     PSF = psf_creator(dir,to_plot=True,to_smooth=False)
-    
-#     save_PSF = r'PSF.npy'
-#     np.save(save_PSF,PSF)
-    
-    
-load_PSF = glob.glob(path_to_dataset + r'/*/PSF.npy')[0]
-PSF = np.load(load_PSF)
-# Show TPB Teflon hits on a single text file, can be removed later
 size = 100
 bins = 100
-pitch = 10
 
-file = r'/media/amir/9C33-6BBD/NEXT_work/Geant4/nexus/small_cluster_hitpoints_dataset/TPB_hits.txt'
-hitmap = np.array(np.genfromtxt(file)[:,0:2])
-PSF, x_hist, y_hist = np.histogram2d(hitmap[:,0], hitmap[:,1],
-                                      range=[[-size/2,size/2],[-size/2,size/2]],
-                                      bins=bins)
-fig, (ax0, ax1) = plt.subplots(1, 2, figsize=(16.5,8))
-fig.suptitle(r'TPB hit map, 10M photons fired forward', fontsize=15)
-im = ax0.imshow(PSF, extent=[-size/2, size/2, -size/2, size/2])
-ax0.set_xlabel('x [mm]');
-ax0.set_ylabel('y [mm]');
-ax0.set_title('PSF image')
-# fig.colorbar(im, orientation='vertical', location='left')
-divider = make_axes_locatable(ax0)
-cax = divider.append_axes("right", size="5%", pad=0.05)
-plt.colorbar(im, cax=cax)
-
-# y = PSF.sum(axis=0) 
-y = PSF[int(size/2),:]
-peaks, _ = find_peaks(y)
-fwhm = np.max(peak_widths(y, peaks, rel_height=0.5)[0])
-ax1.plot(np.arange(-size/2,size/2,1),y/np.sum(PSF[int(size/2),:]),
-         linewidth=2) # normalize cross section
-ax1.set_xlabel('mm')
-ax1.set_ylabel('Charge')
-ax1.set_title('Charge along x axis')
-ax1.grid(linewidth=1)
-fwhm_text = f"FWHM = {fwhm:.3f}"  # format to have 3 decimal places
-ax1.text(0.95, 0.95, fwhm_text, transform=ax1.transAxes, 
-          verticalalignment='top', horizontalalignment='right', 
-          color='red', fontsize=12, fontweight='bold',
-          bbox=dict(facecolor='white', edgecolor='red',
-                    boxstyle='round,pad=0.5'))
-
-fig.tight_layout()
-plt.show()
-
-
-
-
-
-
-
-## Show TPB hits vs theoretical monte carlo
 # Load theoretical MC PSF
 anode_track_gap = 2.5
 el_gap = 10
@@ -572,50 +522,196 @@ Save_PSF  = f'{folder}PSF/'
 psf_file_name = 'PSF_matrix'
 evt_PSF_output = Save_PSF + psf_file_name + '.npy'
 MC_PSF = np.load(evt_PSF_output)
-MC_y = MC_PSF[int(size/2),:]
 
 
 
-# plot
-fig, (ax0, ax1) = plt.subplots(1, 2, figsize=(16.5,8))
-fig.suptitle(r'TPB hit map, 10M photons fired forward', fontsize=15)
-im = ax0.imshow(PSF, extent=[-size/2, size/2, -size/2, size/2])
-ax0.set_xlabel('x [mm]')
-ax0.set_ylabel('y [mm]')
-ax0.set_title('PSF image')
-divider = make_axes_locatable(ax0)
-cax = divider.append_axes("right", size="5%", pad=0.05)
-plt.colorbar(im, cax=cax)
+# create full paths
+for i in range(len(geometry_dirs)):
+    geometry_dirs[i] = os.path.join(path_to_dataset, geometry_dirs[i])
+    
+# Generate a PSF for each geometry   
+for dir in geometry_dirs:
+    
+    # Search for the pitch value pattern in dir
+    match = re.search(r"_pitch=(\d+(?:\.\d+)?)mm", dir)
+    pitch = float(match.group(1))
+    
+    PSF_SiPM = psf_creator(dir,create_from="SiPM",to_plot=True,to_smooth=False)
+    PSF_TPB = psf_creator(dir,create_from="TPB",to_plot=True,to_smooth=False)
+     
+    # # save PSFs
+    # save_PSF_SiPM = r'PSF_SiPM.npy'
+    # np.save(save_PSF_SiPM,PSF_SiPM)
+    # save_PSF_TPB = r'PSF_TPB.npy'
+    # np.save(save_PSF_TPB,PSF_TPB)
+    
+    
+    #### Show TPB hits vs theoretical monte carlo ####
+    
+    MC_y = MC_PSF[int(size/2),:]
+    
+    # plot
+    PSF = PSF_TPB
+    fig, (ax0, ax1) = plt.subplots(1, 2, figsize=(16.5,8))
+    fig.suptitle(r'Fiber TPB PSF, 10M photons fired forward', fontsize=15)
+    im = ax0.imshow(PSF, extent=[-size/2, size/2, -size/2, size/2])
+    ax0.set_xlabel('x [mm]')
+    ax0.set_ylabel('y [mm]')
+    ax0.set_title('PSF image')
+    divider = make_axes_locatable(ax0)
+    cax = divider.append_axes("right", size="5%", pad=0.05)
+    plt.colorbar(im, cax=cax)
 
-y = PSF[int(size/2),:]
-peaks, _ = find_peaks(y)
-fwhm = np.max(peak_widths(y, peaks, rel_height=0.5)[0])
+    y = PSF[int(size/2),:]
+    peaks, _ = find_peaks(y)
+    fwhm = np.max(peak_widths(y, peaks, rel_height=0.5)[0])
 
-# Adding labels and colors to the plots
-ax1.plot(np.arange(-size/2,size/2,1), y/np.sum(PSF[int(size/2),:]), 
-         linewidth=2, color='blue', label='Geant4 TPB hits, 10M')  # normalize cross section and set color to blue
-ax1.plot(np.arange(-size/2,size/2,1), MC_y/np.sum(MC_PSF[int(size/2),:]), 
-         linewidth=2, color='green', label='MC hits, 10M')  # normalize cross section and set color to red
+    # Adding labels and colors to the plots
+    ax1.plot(np.arange(-size/2,size/2,1), y/np.sum(PSF), 
+             linewidth=2, color='blue', label='Geant4 TPB hits')  # normalize cross section and set color to blue
+    ax1.plot(np.arange(-size/2,size/2,1), MC_y/np.sum(MC_PSF), 
+             linewidth=2, color='green', label='MC hits')  # normalize cross section and set color to red
 
-ax1.set_xlabel('mm')
-ax1.set_ylabel('Charge')
-ax1.set_title('Charge along x axis')
-ax1.grid(linewidth=1)
-fwhm_text = f"FWHM = {fwhm:.3f}"  # format to have 3 decimal places
-ax1.text(0.95, 0.95, fwhm_text, transform=ax1.transAxes, 
-          verticalalignment='top', horizontalalignment='right', 
-          color='red', fontsize=12, fontweight='bold',
-          bbox=dict(facecolor='white', edgecolor='red',
-                    boxstyle='round,pad=0.5'))
+    ax1.set_xlabel('mm')
+    ax1.set_ylabel('Charge')
+    ax1.set_title('Charge profile')
+    ax1.grid(linewidth=1)
+    fwhm_text = f"FWHM = {fwhm:.3f}"  # format to have 3 decimal places
+    ax1.text(0.95, 0.95, fwhm_text, transform=ax1.transAxes, 
+              verticalalignment='top', horizontalalignment='right', 
+              color='red', fontsize=12, fontweight='bold',
+              bbox=dict(facecolor='white', edgecolor='red',
+                        boxstyle='round,pad=0.5'))
 
-ax1.legend(loc='upper left')  # Display the legend
+    ax1.legend(loc='upper left')  # Display the legend
 
-fig.tight_layout()
-plt.show()
+    fig.tight_layout()
+    plt.show()
+    
+    print('\n')
+    print(f'area TPB = {np.trapz(y/np.sum(PSF))}')
+    print(f'area MC = {np.trapz(MC_y/np.sum(MC_PSF))}',end='\n\n\n')
+
+
+    # # plot around center uit cell
+    # plt.imshow(PSF[40:60,40:60],extent=[-10,10,-10,10])
+    # plt.title("Fiber TPB PSF, zoom")
+    # plt.colorbar()
+    # plt.show()
+    
+    
+    
+    
+    
+    
+    
+
+    
+    
+# load_PSF = glob.glob(path_to_dataset + r'/*/PSF.npy')[0]
+# PSF = np.load(load_PSF)
+# # Show TPB Teflon hits on a single text file, can be removed later
+
+
+# file = r'/media/amir/9C33-6BBD/NEXT_work/Geant4/nexus/' +\
+#         r'small_cluster_hitpoints_dataset/fibers_6mm_in_10M/TPB_hits.txt'
+# hitmap = np.array(np.genfromtxt(file)[:,0:2])
+# PSF, x_hist, y_hist = np.histogram2d(hitmap[:,0], hitmap[:,1],
+#                                       range=[[-size/2,size/2],[-size/2,size/2]],
+#                                       bins=bins)
+# fig, (ax0, ax1) = plt.subplots(1, 2, figsize=(16.5,8))
+# fig.suptitle(r'TPB hit map, 10M photons fired forward', fontsize=15)
+# im = ax0.imshow(PSF, extent=[-size/2, size/2, -size/2, size/2])
+# ax0.set_xlabel('x [mm]');
+# ax0.set_ylabel('y [mm]');
+# ax0.set_title('PSF image')
+# # fig.colorbar(im, orientation='vertical', location='left')
+# divider = make_axes_locatable(ax0)
+# cax = divider.append_axes("right", size="5%", pad=0.05)
+# plt.colorbar(im, cax=cax)
+
+# # y = PSF.sum(axis=0) 
+# y = PSF[int(size/2),:]
+# peaks, _ = find_peaks(y)
+# fwhm = np.max(peak_widths(y, peaks, rel_height=0.5)[0])
+# ax1.plot(np.arange(-size/2,size/2,1),y/np.sum(PSF[int(size/2),:]),
+#          linewidth=2) # normalize cross section
+# ax1.set_xlabel('mm')
+# ax1.set_ylabel('Charge')
+# ax1.set_title('Charge profile')
+# ax1.grid(linewidth=1)
+# fwhm_text = f"FWHM = {fwhm:.3f}"  # format to have 3 decimal places
+# ax1.text(0.95, 0.95, fwhm_text, transform=ax1.transAxes, 
+#           verticalalignment='top', horizontalalignment='right', 
+#           color='red', fontsize=12, fontweight='bold',
+#           bbox=dict(facecolor='white', edgecolor='red',
+#                     boxstyle='round,pad=0.5'))
+
+# fig.tight_layout()
+# plt.show()
 
 
 
+# ## Show TPB hits vs theoretical monte carlo
+# # Load theoretical MC PSF
+# anode_track_gap = 2.5
+# el_gap = 10
 
+# # Load theoretical PSF
+# Mfolder = '/home/amir/Desktop/NEXT_work/Resolving_Power/Results/'
+# folder = Mfolder + f'Resolving_Power_EL_gap{el_gap}mm_Tracking_Plane_Gap{anode_track_gap}mm/'
+# Save_PSF  = f'{folder}PSF/'  
+# psf_file_name = 'PSF_matrix'
+# evt_PSF_output = Save_PSF + psf_file_name + '.npy'
+# MC_PSF = np.load(evt_PSF_output)
+
+# MC_y = MC_PSF[int(size/2),:]
+
+
+
+# # plot
+# fig, (ax0, ax1) = plt.subplots(1, 2, figsize=(16.5,8))
+# fig.suptitle(r'TPB hit map, 10M photons fired forward', fontsize=15)
+# im = ax0.imshow(PSF, extent=[-size/2, size/2, -size/2, size/2])
+# ax0.set_xlabel('x [mm]')
+# ax0.set_ylabel('y [mm]')
+# ax0.set_title('PSF image')
+# divider = make_axes_locatable(ax0)
+# cax = divider.append_axes("right", size="5%", pad=0.05)
+# plt.colorbar(im, cax=cax)
+
+# y = PSF[int(size/2),:]
+# peaks, _ = find_peaks(y)
+# fwhm = np.max(peak_widths(y, peaks, rel_height=0.5)[0])
+
+# # Adding labels and colors to the plots
+# ax1.plot(np.arange(-size/2,size/2,1), y/np.sum(PSF[int(size/2),:]), 
+#          linewidth=2, color='blue', label='Geant4 TPB hits, 10M')  # normalize cross section and set color to blue
+# ax1.plot(np.arange(-size/2,size/2,1), MC_y/np.sum(MC_PSF[int(size/2),:]), 
+#          linewidth=2, color='green', label='MC hits, 10M')  # normalize cross section and set color to red
+
+# ax1.set_xlabel('mm')
+# ax1.set_ylabel('Charge')
+# ax1.set_title('Charge profile')
+# ax1.grid(linewidth=1)
+# fwhm_text = f"FWHM = {fwhm:.3f}"  # format to have 3 decimal places
+# ax1.text(0.95, 0.95, fwhm_text, transform=ax1.transAxes, 
+#           verticalalignment='top', horizontalalignment='right', 
+#           color='red', fontsize=12, fontweight='bold',
+#           bbox=dict(facecolor='white', edgecolor='red',
+#                     boxstyle='round,pad=0.5'))
+
+# ax1.legend(loc='upper left')  # Display the legend
+
+# fig.tight_layout()
+# plt.show()
+
+
+
+# # plot around center uit cell
+# plt.imshow(PSF[40:60,40:60],extent=[-10,10,-10,10])
+# plt.colorbar()
+# plt.show()
 
 # In[4]
 # combine 2 events

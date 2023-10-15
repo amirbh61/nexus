@@ -63,37 +63,87 @@ SquareFiberSD::~SquareFiberSD() {
 
 
 
+// ORIGINAL VERSION
 
-G4bool SquareFiberSD::ProcessHits(G4Step* step, G4TouchableHistory*) {
-  G4Material* material = step->GetPreStepPoint()->GetMaterial();
-  // G4Material* material = step->GetPostStepPoint()->GetMaterial();
+// G4bool SquareFiberSD::ProcessHits(G4Step* step, G4TouchableHistory*) {
+//   G4Material* material = step->GetPreStepPoint()->GetMaterial();
+//   //G4Material* material = step->GetPostStepPoint()->GetMaterial();
 
-  std::string materialName = material->GetName();
-  G4Track* track = step->GetTrack();
+//   std::string materialName = material->GetName();
 
-  // std::cout << "Material: " << materialName << std::endl;
-  // std::cout << "track->GetParentID() = " << track->GetParentID() << std::endl;
-  // std::cout << "track->GetCurrentStepNumber() = " << track->GetCurrentStepNumber() << std::endl;
+//   std::string volumeName = step->GetPreStepPoint()->GetTouchable()->GetVolume()->GetName();
+//   G4Track* track = step->GetTrack();
+
+//   // std::cout << "Material: " << materialName << std::endl;
+//   // std::cout << "track->GetParentID() = " << track->GetParentID() << std::endl;
+//   // std::cout << "track->GetCurrentStepNumber() = " << track->GetCurrentStepNumber() << std::endl;
 
 
-  // CASE FOR ONLY WLSE PHOTON COORDINATES
-  if (materialName == "TPB" && track->GetParentID() == 0 &&
-     track->GetStep()->GetPostStepPoint()->GetProcessDefinedStep()->GetProcessName() == "OpWLS" ) {
-      G4ThreeVector position = step->GetPostStepPoint()->GetPosition();
-    WritePositionToTextFile(tpbOutputFile_, position);
-  }
+//   // Record photons interacting in the Fiber TPB only
+//   if (volumeName == "TPB_Fiber" && track->GetParentID() == 0 &&
+//      track->GetStep()->GetPostStepPoint()->GetProcessDefinedStep()->GetProcessName() == "OpWLS" ) {
+//       G4ThreeVector position = step->GetPostStepPoint()->GetPosition();
+//       WritePositionToTextFile(tpbOutputFile_, position);
+//   }
 
   
-  if (materialName == "G4_Si" &&
-      track->GetStep()->GetPostStepPoint()->GetProcessDefinedStep()->GetProcessName() == "OpAbsorption"){
+//   if (materialName == "G4_Si" &&
+//       track->GetStep()->GetPostStepPoint()->GetProcessDefinedStep()->GetProcessName() == "OpAbsorption"){
 
+//     G4ThreeVector position = step->GetPreStepPoint()->GetPosition();
+//     WritePositionToTextFile(sipmOutputFile_, position);
+
+//   }
+
+//   return true;
+// }
+
+
+
+
+G4bool SquareFiberSD::ProcessHits(G4Step* step, G4TouchableHistory*) {
+  // Get the name of the volume where interaction happens
+  std::string volumeName = step->GetPreStepPoint()->GetTouchable()->GetVolume()->GetName();
+  G4Track* track = step->GetTrack();
+
+  // CASE FOR ONLY WLSE PHOTON COORDINATES
+  if (volumeName == "TPB_Fiber" && track->GetParentID() == 0 &&
+     track->GetStep()->GetPostStepPoint()->GetProcessDefinedStep()->GetProcessName() == "OpWLS" ) {
+      G4ThreeVector position = step->GetPostStepPoint()->GetPosition();
+      WritePositionToTextFile(tpbOutputFile_, position);
+  }
+
+  // If you still want to check based on material for the Si detector, uncomment and use the below lines
+  // G4Material* material = step->GetPreStepPoint()->GetMaterial();
+  // std::string materialName = material->GetName();
+  
+  // Assuming that "G4_Si" is the material name and not the volume name for this condition
+  if (step->GetPreStepPoint()->GetMaterial()->GetName() == "G4_Si" &&
+      track->GetStep()->GetPostStepPoint()->GetProcessDefinedStep()->GetProcessName() == "OpAbsorption") {
     G4ThreeVector position = step->GetPreStepPoint()->GetPosition();
     WritePositionToTextFile(sipmOutputFile_, position);
-
   }
 
   return true;
 }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 void SquareFiberSD::WritePositionToTextFile(std::ofstream& file, G4ThreeVector position) {
