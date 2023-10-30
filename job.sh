@@ -9,6 +9,6 @@ geometry_folder=$1
 # Loop over all .init.mac files in the geometry folder
 for macro in $(find "$geometry_folder" -name "*.init.mac")
 do
-  ./build/nexus -b -n 462500 "${macro}"
+  ./build/nexus -b -n 100000 "${macro}"
   echo "$macro" >> macros_sent_to_cluster.txt
 done

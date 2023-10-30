@@ -205,6 +205,8 @@ def smooth_PSF(PSF):
     
     return smooth_PSF
 
+
+
 def assign_hit_to_SiPM(hit, pitch, n):
     """
     Assign a hit to a SiPM based on its coordinates.
@@ -222,13 +224,13 @@ def assign_hit_to_SiPM(hit, pitch, n):
 
     x, y = hit
 
-    # First, check the central SiPM and its immediate neighbors
+    # First, check the central SiPM
     for i in [0, -pitch, pitch]:
         for j in [0, -pitch, pitch]:
             if -pitch/2 <= x - i < pitch/2 and -pitch/2 <= y - j < pitch/2:
                 return (i, j)
 
-    # If not found in the central SiPM or its neighbors, search the rest of the grid
+    # If not found in the central SiPM, search the rest of the grid
     for i in np.linspace(-half_grid_length, half_grid_length, n):
         for j in np.linspace(-half_grid_length, half_grid_length, n):
             if abs(i) > pitch or abs(j) > pitch:  # Skip the previously checked SiPMs
@@ -264,7 +266,7 @@ def psf_creator(directory, create_from, to_plot=True,to_smooth=True):
     pattern = r"-?\d+.\d+"
 
     PSF_list = []
-    total_photons = 0
+    total_photon_hits = 0
     size = 100 # keep the same for all future histograms
     bins = 100 # keep the same for all future histograms
     
@@ -283,9 +285,9 @@ def psf_creator(directory, create_from, to_plot=True,to_smooth=True):
     for filename in tqdm(files):
         # Load hitmap
         hitmap = np.array(np.genfromtxt(filename)[:,0:2])
-        total_photons += len(hitmap)
+        total_photon_hits += len(hitmap)
         
-        # Store x,)y values of event
+        # Store x,y values of event
         matches = re.findall(pattern, filename)
         x_event = float(matches[0])
         y_event = float(matches[1])
@@ -326,6 +328,8 @@ def psf_creator(directory, create_from, to_plot=True,to_smooth=True):
         
         # Now, shift each event to center
         shifted_hitmap = new_hitmap - [x_event, y_event]
+    
+        
         if plot_shifted_event:
             shifted_event, x_hist, y_hist = np.histogram2d(shifted_hitmap[:,0], shifted_hitmap[:,1],
                                                   range=[[-size/2,size/2],[-size/2,size/2]],
@@ -336,7 +340,6 @@ def psf_creator(directory, create_from, to_plot=True,to_smooth=True):
             plt.ylabel('y [mm]');
             plt.colorbar()
             plt.show()
-        
         
         
         PSF_list.append(shifted_hitmap)
@@ -368,7 +371,7 @@ def psf_creator(directory, create_from, to_plot=True,to_smooth=True):
         
     if to_plot:
         fig, (ax0, ax1) = plt.subplots(1, 2, figsize=(16.5,8))
-        title = f'{total_photons}/10M {create_from} PSF, current geometry:' + f'\n{os.path.basename(os.getcwd())}'
+        title = f'{total_photon_hits}/100M {create_from} PSF, current geometry:' + f'\n{os.path.basename(os.getcwd())}'
         fig.suptitle(title, fontsize=15)
         im = ax0.imshow(PSF, extent=[-size/2, size/2, -size/2, size/2])
         ax0.set_xlabel('x [mm]');
@@ -496,11 +499,11 @@ for geometry in geometry_dirs:
 
 # In[3]
 # Generate PSF and save
-# path_to_dataset = r'/media/amir/9C33-6BBD/NEXT_work/Geant4/nexus/' + \
-#                   r'small_cluster_hitpoints_dataset/SquareFiberMacrosAndOutputs'
+path_to_dataset = r'/media/amir/9C33-6BBD/NEXT_work/Geant4/nexus/' + \
+                  r'small_cluster_hitpoints_dataset/SquareFiberMacrosAndOutputsCluster'
                   
-path_to_dataset = r'/home/amir/Products/geant4/geant4-v11.0.1/MySims/nexus/' + \
-    r'SquareFiberMacrosAndOutputsRandomFaceGen/' 
+# path_to_dataset = r'/home/amir/Products/geant4/geant4-v11.0.1/MySims/nexus/' + \
+#     r'SquareFiberMacrosAndOutputsRandomFaceGen/' 
 
 
 # /home/amir/Products/geant4/geant4-v11.0.1/
@@ -522,7 +525,10 @@ Save_PSF  = f'{folder}PSF/'
 psf_file_name = 'PSF_matrix'
 evt_PSF_output = Save_PSF + psf_file_name + '.npy'
 MC_PSF = np.load(evt_PSF_output)
-
+plt.imshow(MC_PSF)
+plt.colorbar()
+plt.title("Generic Monte Carlo PSF, 10M photons")
+plt.show()
 
 
 # create full paths
@@ -553,7 +559,7 @@ for dir in geometry_dirs:
     # plot
     PSF = PSF_TPB
     fig, (ax0, ax1) = plt.subplots(1, 2, figsize=(16.5,8))
-    fig.suptitle(r'Fiber TPB PSF, 10M photons fired forward', fontsize=15)
+    fig.suptitle(r'Fiber TPB PSF, 100M photons fired forward', fontsize=15)
     im = ax0.imshow(PSF, extent=[-size/2, size/2, -size/2, size/2])
     ax0.set_xlabel('x [mm]')
     ax0.set_ylabel('y [mm]')

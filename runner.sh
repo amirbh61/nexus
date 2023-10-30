@@ -19,5 +19,5 @@ do
       sleep 60
     fi
   done
-break # send only first geometry
+# break # send only first geometry
 done

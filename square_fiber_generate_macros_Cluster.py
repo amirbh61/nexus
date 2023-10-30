@@ -53,8 +53,8 @@ import itertools
 geometry_params = {
     'ELGap': ['10'],
     'pitch': ['10'],
-    'distanceFiberHolder': ['2'],
-    'distanceAnodeHolder': ['2.5'],
+    'distanceFiberHolder': ['-1','2','5'],
+    'distanceAnodeHolder': ['10'],
     'holderThickness': ['10'],
     'TPBThickness': ['2.2'] # microns
 }
