@@ -13,6 +13,9 @@
 #include <sstream>
 #include <cstdio>
 
+#include <iomanip>  // for std::fixed and std::setprecision
+
+
 
 
 namespace nexus{
@@ -108,9 +111,11 @@ G4bool SquareFiberSD::ProcessHits(G4Step* step, G4TouchableHistory*) {
 
   // CASE FOR ONLY WLSE PHOTON COORDINATES
   if (volumeName == "TPB_Fiber" && track->GetParentID() == 0 &&
-     track->GetStep()->GetPostStepPoint()->GetProcessDefinedStep()->GetProcessName() == "OpWLS" ) {
-      G4ThreeVector position = step->GetPostStepPoint()->GetPosition();
-      WritePositionToTextFile(tpbOutputFile_, position);
+      track->GetStep()->GetPostStepPoint()->GetProcessDefinedStep()->GetProcessName() == "OpWLS" ) {
+
+    G4ThreeVector position = step->GetPostStepPoint()->GetPosition();
+    WritePositionToTextFile(tpbOutputFile_, position.x(), position.y());
+
   }
 
   // If you still want to check based on material for the Si detector, uncomment and use the below lines
@@ -120,39 +125,24 @@ G4bool SquareFiberSD::ProcessHits(G4Step* step, G4TouchableHistory*) {
   // Assuming that "G4_Si" is the material name and not the volume name for this condition
   if (step->GetPreStepPoint()->GetMaterial()->GetName() == "G4_Si" &&
       track->GetStep()->GetPostStepPoint()->GetProcessDefinedStep()->GetProcessName() == "OpAbsorption") {
+    
     G4ThreeVector position = step->GetPreStepPoint()->GetPosition();
-    WritePositionToTextFile(sipmOutputFile_, position);
+    WritePositionToTextFile(sipmOutputFile_, position.x(), position.y());
   }
 
   return true;
 }
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-void SquareFiberSD::WritePositionToTextFile(std::ofstream& file, G4ThreeVector position) {
-  if (file.is_open()) {
-    file << position.x() << " " << position.y() << " " << position.z() << std::endl;
-  } else {
-    throw std::runtime_error("Error: Unable to write position to output file!");
-  }
+void SquareFiberSD::WritePositionToTextFile(std::ofstream& file, double x, double y) {
+    if (file.is_open()) {
+        file << std::fixed << std::setprecision(3)
+             << x << " " << y << std::endl;
+    } else {
+        throw std::runtime_error("Error: Unable to write position to output file!");
+    }
 }
+
 
 
 void SquareFiberSD::SetSipmPath(const G4String& path) {

@@ -41,6 +41,8 @@ namespace nexus {
         /// Return vertex within region <region> of the chamber
         G4ThreeVector GenerateVertex(const G4String& region) const;
 
+        G4double sigma_ = 0; // Standard deviation value for transverse diffusion
+
         // Controlled from macro
         G4ThreeVector specific_vertex_;
         G4double ELGap_;

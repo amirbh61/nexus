@@ -17,7 +17,8 @@ namespace nexus {
 
     G4bool ProcessHits(G4Step* step, G4TouchableHistory* history);
 
-    void WritePositionToTextFile(std::ofstream&, G4ThreeVector);
+    void WritePositionToTextFile(std::ofstream&, double x, double y);
+
 
     // // Setters for output file paths
     void SetSipmPath(const G4String& path);

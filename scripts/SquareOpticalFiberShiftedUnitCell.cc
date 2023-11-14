@@ -68,7 +68,8 @@ void SquareOpticalFiber::Construct(){
     bool claddingExists = true; // a flag -> needed for specific geometry change for cladding
     bool wallsExists = false; // a flag -> needed for specific geometry change for walls
     bool holderExists = true; // a flag -> needed for specific geometry change for holder
-    bool holderTPBExist = false; // a flag -> needed for specific geometry change for holder TPB
+    bool holderTPBExist = true; // a flag -> needed for specific geometry change for holder TPB
+
   
     ///// Materials /////
 
@@ -224,7 +225,7 @@ void SquareOpticalFiber::Construct(){
     if (numberOfSiPMs%2 == 0) throw std::runtime_error("SiPM Number must be an ODD number !!");
     G4double maxCoord = (numberOfSiPMs-1) * pitch_ / 2.0;
     G4float zSiPM = cylLength + thicknessSiPM - delta;
-
+    G4double halfPitch = pitch_ / 2.0;
 
 
     ///// SQUARE FIBER CORE /////
@@ -340,10 +341,9 @@ void SquareOpticalFiber::Construct(){
     G4VPhysicalVolume *SiPMPhysicalVolume;
     G4String name;
 
-    //for square lattice
-    for (G4double x=-maxCoord; x<=maxCoord; x+=pitch_){
-        for (G4double y=-maxCoord; y<=maxCoord; y+=pitch_){
-
+    // For square lattice, 0,0 is middle of 4 sipms
+    for (G4double x = -maxCoord - halfPitch; x <= maxCoord - halfPitch; x += pitch_) {
+        for (G4double y = -maxCoord - halfPitch; y <= maxCoord - halfPitch; y += pitch_) {
 
             std::vector<double> point;
             point.push_back(x);
@@ -516,47 +516,46 @@ void SquareOpticalFiber::Construct(){
     }
 
 
-    G4LogicalVolume *holePatternTPBLogical;
+    // ///// TPB LAYER FOR TEFLON HOLDER /////
+    G4double holderTPBCoatingInnerRadius = holderInnerRadius;
+    G4double holderTPBCoatingOuterRadius = holderOuterRadius;
+    G4double holderTPBCoatingHoleSize = holderHoleSize;
+    G4double holderTPBCoatingWidth = TPBFiberWidth; //half width
+    G4double holderTPBCoatingLocationZ = zHolder - holderWidth - holderTPBCoatingWidth;
+
+    G4Tubs *holderTPB = new G4Tubs("TPB_Holder", //name
+                            holderTPBCoatingInnerRadius, //inner radius
+                            holderTPBCoatingOuterRadius, //outer radius
+                            holderTPBCoatingWidth, //length
+                            0., //initial revolve angle
+                            2*M_PI); //final revolve angle
+
+    G4Box *holderHoleTPB= new G4Box("TPB_Holder",
+                                holderTPBCoatingHoleSize,
+                                holderTPBCoatingHoleSize,
+                                holderTPBCoatingWidth);
+
+
+    G4MultiUnion* multiUnionTPB = new G4MultiUnion("TPB_Holder");
+    for (G4int i=0; i<nHoles*nHoles; i++) {
+
+        x = lattice_points[i][0];
+        y = lattice_points[i][1];
+        holeTransform = G4Translate3D(x,y,0);
+        multiUnionTPB->AddNode(*holderHoleTPB, holeTransform);
+    }
+    multiUnionTPB -> Voxelize();
+
+    // Subtract the multi-union of holes from the solid
+    G4SubtractionSolid *holePatternTPB = new G4SubtractionSolid("TPB_Holder", holderTPB, multiUnionTPB);
+
+    G4LogicalVolume *holePatternTPBLogical = new G4LogicalVolume(holePatternTPB, TPB, "TPB_Holder");
+
+
+    holePatternTPBLogical->SetVisAttributes(colorTPB);
+
+    G4VPhysicalVolume *holePatternTPBPhysical;
     if (holderTPBExist){
-        ///// TPB LAYER FOR TEFLON HOLDER /////
-        G4double holderTPBCoatingInnerRadius = holderInnerRadius;
-        G4double holderTPBCoatingOuterRadius = holderOuterRadius;
-        G4double holderTPBCoatingHoleSize = holderHoleSize;
-        G4double holderTPBCoatingWidth = TPBFiberWidth; //half width
-        G4double holderTPBCoatingLocationZ = zHolder - holderWidth - holderTPBCoatingWidth;
-
-        G4Tubs *holderTPB = new G4Tubs("TPB_Holder", //name
-                                holderTPBCoatingInnerRadius, //inner radius
-                                holderTPBCoatingOuterRadius, //outer radius
-                                holderTPBCoatingWidth, //length
-                                0., //initial revolve angle
-                                2*M_PI); //final revolve angle
-
-        G4Box *holderHoleTPB= new G4Box("TPB_Holder",
-                                    holderTPBCoatingHoleSize,
-                                    holderTPBCoatingHoleSize,
-                                    holderTPBCoatingWidth);
-
-
-        G4MultiUnion* multiUnionTPB = new G4MultiUnion("TPB_Holder");
-        for (G4int i=0; i<nHoles*nHoles; i++) {
-
-            x = lattice_points[i][0];
-            y = lattice_points[i][1];
-            holeTransform = G4Translate3D(x,y,0);
-            multiUnionTPB->AddNode(*holderHoleTPB, holeTransform);
-        }
-        multiUnionTPB -> Voxelize();
-
-        // Subtract the multi-union of holes from the solid
-        G4SubtractionSolid *holePatternTPB = new G4SubtractionSolid("TPB_Holder", holderTPB, multiUnionTPB);
-
-        holePatternTPBLogical = new G4LogicalVolume(holePatternTPB, TPB, "TPB_Holder");
-
-
-        holePatternTPBLogical->SetVisAttributes(colorTPB);
-
-        G4VPhysicalVolume *holePatternTPBPhysical;
         holePatternTPBPhysical = new G4PVPlacement(0,
                                                     G4ThreeVector(0,0,holderTPBCoatingLocationZ),
                                                     holePatternTPBLogical,
@@ -570,6 +569,7 @@ void SquareOpticalFiber::Construct(){
     }
 
 
+
     ///// SENSITIVE DETECTORS /////
 
     // Set the sensitive detector for these volumes
@@ -578,8 +578,7 @@ void SquareOpticalFiber::Construct(){
     G4SDManager* sdManager = G4SDManager::GetSDMpointer();
     sdManager->AddNewDetector(squareFiberSD);
     fiberTPBLogicalVolume->SetSensitiveDetector(squareFiberSD);
-    if(holderTPBExist && holePatternTPBLogical!=nullptr){
-        holePatternTPBLogical->SetSensitiveDetector(squareFiberSD);}
+    holePatternTPBLogical->SetSensitiveDetector(squareFiberSD);
     SiPMLogicalVolume->SetSensitiveDetector(squareFiberSD);
 
 
@@ -749,18 +748,6 @@ G4ThreeVector SquareOpticalFiber::GenerateVertex(const G4String& region) const {
         G4double zGen = z_dist_(gen_);
         G4ThreeVector genPoint(xGen, yGen, zGen);
         return genPoint;
-    }
-    else if (region == "LINE_SOURCE_EL_TRANSVERSE_DIFFUSION"){
-        std::normal_distribution<double> x_dist(specific_vertex_.x(), sigma_);
-        std::normal_distribution<double> y_dist(specific_vertex_.y(), sigma_);
-        G4double xGen = x_dist(gen_);
-        G4double yGen = y_dist(gen_);
-
-        G4double ELGapEnd = distanceFiberHolder_ - 0.5 * holderThickness_ - TPBThickness_ - distanceAnodeHolder_;
-        G4double ELGapStart = ELGapEnd - ELGap_;
-        std::uniform_real_distribution<double> z_dist(ELGapStart, ELGapEnd);
-        G4double zGen = z_dist(gen_);
-        return G4ThreeVector(xGen, yGen, zGen);
     }
     else {
       G4Exception("[SquareOpticalFiber]", "GenerateVertex()", FatalException,

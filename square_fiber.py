@@ -192,17 +192,16 @@ def smooth_PSF(PSF):
     '''
 
     x_cm, y_cm = ndimage.measurements.center_of_mass(PSF)
-    x_cm, y_cm = int(x_cm), int(y_cm)
+    # x_cm, y_cm = int(x_cm), int(y_cm)
     psf_size = PSF.shape[0]
     x,y = np.indices((psf_size,psf_size))
     smooth_PSF = np.zeros((psf_size,psf_size))
     r = np.arange(0,(1/np.sqrt(2))*psf_size,1)
     for radius in r:
         R = np.full((1, psf_size), radius)
-        circle = (np.abs(np.hypot(x-x_cm, y-y_cm)-R) < 0.6).astype(int)
+        circle = (np.abs(np.hypot(x-x_cm, y-y_cm)-R) <= 0.6).astype(int)
         circle_ij = np.where(circle==1)
         smooth_PSF[circle_ij] = np.mean(PSF[circle_ij])
-    
     return smooth_PSF
 
 
@@ -283,9 +282,27 @@ def psf_creator(directory, create_from, to_plot=True,to_smooth=True):
 
     ### assign each hit to its corresponding SiPM ###
     for filename in tqdm(files):
-        # Load hitmap
-        hitmap = np.array(np.genfromtxt(filename)[:,0:2])
-        total_photon_hits += len(hitmap)
+
+        # Check if file is empty and skip if it is
+        if os.path.getsize(filename) == 0:
+            continue
+        
+        # Load hitmap from file
+        hitmap = np.genfromtxt(filename)
+        
+        # Check if hitmap is empty
+        if hitmap.size == 0:
+            continue
+        
+        # If hitmap has a single line, it's considered a 1D array
+        if len(hitmap.shape) == 1:
+            hitmap = np.array([hitmap[0:2]])  # Convert to 2D array with single row
+            total_photon_hits += 1
+        else:
+            # Multiple lines in hitmap
+            hitmap = hitmap[:, 0:2]
+            total_photon_hits += len(hitmap)
+
         
         # Store x,y values of event
         matches = re.findall(pattern, filename)
@@ -384,7 +401,7 @@ def psf_creator(directory, create_from, to_plot=True,to_smooth=True):
         y = PSF[int(size/2),:]
         peaks, _ = find_peaks(y)
         fwhm = np.max(peak_widths(y, peaks, rel_height=0.5)[0])
-        ax1.plot(np.arange(-size/2,size/2,1), y/np.sum(PSF), linewidth=2) #normalize
+        ax1.plot(np.arange(-size/2,size/2,1), y, linewidth=2) #normalize
         ax1.set_xlabel('mm')
         ax1.set_ylabel('Charge')
         ax1.set_title('Charge profile')
@@ -403,132 +420,59 @@ def psf_creator(directory, create_from, to_plot=True,to_smooth=True):
 
 
 
+
 # estimates entire dataset size on disk
-def estimate_dataset_size_on_disk(factor):
+def estimate_geant4_TPB_hits_size_on_disk(pitch,spacing_between_sources):
     '''
     Estimates entire dataset size on disk
 
     Parameters
     ----------
-    factor : float, dataset factor - equals 1 for 100K photons per sim, 4.62 for 
-    462K per sim, etc.
+    pitch : float, distance between SiPMs, in mm
+    spacing_between_sources : float, distance between sources, in mm
 
     Returns
     -------
     None.
 
     '''
-    single_sipm_file_size = factor*0.008 # mb
-    single_tpb_file_size = factor*2 # mb
-    geometry_group = [18,18,18]
-    sims_per_geom = [100,400,961]
-    total_files_files = 2*np.sum(np.multiply(geometry_group, sims_per_geom))
-    total_sipm_txt_files_size = 0.5*total_files_files * single_sipm_file_size     
-    total_tpb_txt_files_size = 0.5*total_files_files * single_tpb_file_size   
-    print(f'Total estimated Sipm text files size on disk = {int(total_sipm_txt_files_size)} MB')
-    print(f'Total estimated TPB text files size on disk = {int(total_tpb_txt_files_size)} MB')
+    n_events = (pitch/spacing_between_sources)**2
+    n_photons_per_source = 1850*500
+    total_photons_per_geometry = n_events*n_photons_per_source
+    total_photons_for_all_18_geometries = 18*total_photons_per_geometry
+    total_size_on_disk_GB = total_photons_for_all_18_geometries * (3/pitch)**2*0.65*16*10**-9
+    print(f'Number of events per geometry = {int(n_events)}')
+    print(f'Total estimated text files size on disk = {int(total_size_on_disk_GB)} GB')
 
+estimate_geant4_TPB_hits_size_on_disk(15.6,0.5)
 
-estimate_dataset_size_on_disk(factor=4.7)
 
 
 # In[2]
-# plot SiPM and TPB hits, basically just show a sample of database
-path_to_dataset = r'/media/amir/9C33-6BBD/NEXT_work/Geant4/nexus/' + \
-                  r'small_cluster_hitpoints_dataset/SquareFiberMacrosAndOutputs'
 
-geometry_dirs = os.listdir(path_to_dataset)
-for geometry in geometry_dirs:
-    os.chdir(path_to_dataset + "/" + geometry)
-    print(os.getcwd())
-    
-    # get the pitch value
-    match = re.search('pitch=(.*?)_', geometry)
-    if match:
-        pitch = match.group(1)
-        pitch = float(pitch.split('mm')[0]) # stored value in mm
-        
-    SiPM_files = glob.glob(r'SiPM*')
-    TPB_files = glob.glob(r'TPB*')
-    for i in range(5,12):
-        SR_response = np.genfromtxt(SiPM_files[i])[:,0:2]
-        sipm_x_coords = SR_response[:,0]
-        sipm_y_coords = SR_response[:,1]
-        
-        TPB_response = np.genfromtxt(TPB_files[i])[:,0:2]
-        tpb_x_coords = TPB_response[:,0]
-        tpb_y_coords = TPB_response[:,1]
-        
-        fig, (ax0,ax1) = plt.subplots(1,2,figsize=(20,10))
-        
-        # Save the mappable object for the colorbar
-        
-        # bins_sipm = int(np.sqrt(len(sipm_x_coords)))
-        # bins_tpb = int(np.sqrt(len(tpb_x_coords)))
-        bins_sipm = 100
-        bins_tpb = 100
-              
-        
-        hist_sipm = ax0.hist2d(sipm_x_coords,sipm_y_coords,
-                               bins=(bins_sipm, bins_sipm), cmap=plt.cm.jet)
-        ax0.set_title("SiPM hits")
-        
-        divider0 = make_axes_locatable(ax0)
-        cax0 = divider0.append_axes("right", size="5%", pad=0.05)
-        ax0.set_xlabel('[mm]')
-        ax0.set_ylabel('[mm]')
-        # Pass the mappable object (hist0[3]) to colorbar
-        fig.colorbar(hist_sipm[3], cax=cax0)
-        
-        hist_tpb = ax1.hist2d(tpb_x_coords, tpb_y_coords,
-                              bins=(bins_tpb, bins_tpb), cmap=plt.cm.jet)
-        ax1.set_xlim([-n_sipms_per_side*pitch,n_sipms_per_side*pitch])
-        ax1.set_ylim([-n_sipms_per_side*pitch,n_sipms_per_side*pitch])
-        ax1.set_title("TPB hits")
-        ax1.set_xlabel('[mm]')
-        ax1.set_ylabel('[mm]')
-        divider1 = make_axes_locatable(ax1)
-        cax1 = divider1.append_axes("right", size="5%", pad=0.05)
-        
-        # Pass the mappable object (hist1[3]) to colorbar
-        fig.colorbar(hist_tpb[3], cax=cax1)
-        
-        fig.suptitle(geometry + r'/' + SiPM_files[i])
-        plt.show()
-
-
-# In[3]
 # Generate PSF and save
 path_to_dataset = r'/media/amir/9C33-6BBD/NEXT_work/Geant4/nexus/' + \
-                  r'small_cluster_hitpoints_dataset/SquareFiberMacrosAndOutputsCluster'
+                  r'small_cluster_hitpoints_dataset/SquareFiberMacrosAndOutputsCloseEL10KSources'
                   
-# path_to_dataset = r'/home/amir/Products/geant4/geant4-v11.0.1/MySims/nexus/' + \
-#     r'SquareFiberMacrosAndOutputsRandomFaceGen/' 
-
-
-# /home/amir/Products/geant4/geant4-v11.0.1/
-# MySims/nexus/SquareFiberMacrosAndOutputsRandomFaceGen/
-# ELGap=10mm_pitch=10mm_distanceFiberHolder=5mm_distanceAnodeHolder=2.5mm_holderThickness=10mm
-
-
 
 geometry_dirs = os.listdir(path_to_dataset)
 size = 100
 bins = 100
+MC_folder = '/home/amir/Desktop/NEXT_work/Resolving_Power/Results/'
+plot_MC_PSF = True
 
+# maybe remove
 # Load theoretical MC PSF
-anode_track_gap = 2.5
-el_gap = 10
-Mfolder = '/home/amir/Desktop/NEXT_work/Resolving_Power/Results/'
-folder = Mfolder + f'Resolving_Power_EL_gap{el_gap}mm_Tracking_Plane_Gap{anode_track_gap}mm/'
-Save_PSF  = f'{folder}PSF/'  
-psf_file_name = 'PSF_matrix'
-evt_PSF_output = Save_PSF + psf_file_name + '.npy'
-MC_PSF = np.load(evt_PSF_output)
-plt.imshow(MC_PSF)
-plt.colorbar()
-plt.title("Generic Monte Carlo PSF, 10M photons")
-plt.show()
+# anode_track_gap = 2.5
+# el_gap = 10
+# # Enter parameters manually
+# anode_track_gap = float(input("Please enter the value for anode_track_gap (in mm): "))
+# el_gap = float(input("Please enter the value for el_gap (in mm): "))
+
+# # Output the entered values to confirm
+# print(f"Value entered for anode_track_gap: {anode_track_gap} mm")
+# print(f"Value entered for el_gap: {el_gap} mm")
+
 
 
 # create full paths
@@ -538,12 +482,31 @@ for i in range(len(geometry_dirs)):
 # Generate a PSF for each geometry   
 for dir in geometry_dirs:
     
-    # Search for the pitch value pattern in dir
+    # Search for the geometry parameter patterns in dir name
+    match = re.search(r"ELGap=(\d+(?:\.\d+)?)mm", dir)
+    el_gap = float(match.group(1))
+    match = re.search(r"distanceAnodeHolder=(\d+(?:\.\d+)?)mm", dir)
+    anode_track_gap = float(match.group(1))
     match = re.search(r"_pitch=(\d+(?:\.\d+)?)mm", dir)
     pitch = float(match.group(1))
     
-    PSF_SiPM = psf_creator(dir,create_from="SiPM",to_plot=True,to_smooth=False)
-    PSF_TPB = psf_creator(dir,create_from="TPB",to_plot=True,to_smooth=False)
+    # Load generic Monte Carlo PSF
+    folder = MC_folder + f'Resolving_Power_EL_gap{el_gap}mm_Tracking_Plane_Gap{anode_track_gap}mm/'
+    Save_PSF  = f'{folder}PSF/'  
+    psf_file_name = 'PSF_matrix'
+    evt_PSF_output = Save_PSF + psf_file_name + '.npy'
+    MC_PSF = np.load(evt_PSF_output)
+    if plot_MC_PSF:
+        plt.imshow(MC_PSF)
+        plt.colorbar()
+        plt.title(f"Generic MC PSF EL={el_gap}, anode distance={anode_track_gap}, 10M photons")
+        plt.show()
+    
+    
+    
+    
+    # PSF_SiPM = psf_creator(dir,create_from="SiPM",to_plot=True,to_smooth=True)
+    PSF_TPB = psf_creator(dir,create_from="TPB",to_plot=True,to_smooth=True)
      
     # # save PSFs
     # save_PSF_SiPM = r'PSF_SiPM.npy'
@@ -558,6 +521,7 @@ for dir in geometry_dirs:
     
     # plot
     PSF = PSF_TPB
+    # PSF = PSF_SiPM
     fig, (ax0, ax1) = plt.subplots(1, 2, figsize=(16.5,8))
     fig.suptitle(r'Fiber TPB PSF, 100M photons fired forward', fontsize=15)
     im = ax0.imshow(PSF, extent=[-size/2, size/2, -size/2, size/2])
@@ -573,9 +537,9 @@ for dir in geometry_dirs:
     fwhm = np.max(peak_widths(y, peaks, rel_height=0.5)[0])
 
     # Adding labels and colors to the plots
-    ax1.plot(np.arange(-size/2,size/2,1), y/np.sum(PSF), 
+    ax1.plot(np.arange(-size/2,size/2,1), y/np.max(y), 
              linewidth=2, color='blue', label='Geant4 TPB hits')  # normalize cross section and set color to blue
-    ax1.plot(np.arange(-size/2,size/2,1), MC_y/np.sum(MC_PSF), 
+    ax1.plot(np.arange(-size/2,size/2,1), MC_y/np.max(MC_y), 
              linewidth=2, color='green', label='MC hits')  # normalize cross section and set color to red
 
     ax1.set_xlabel('mm')
@@ -590,7 +554,7 @@ for dir in geometry_dirs:
                         boxstyle='round,pad=0.5'))
 
     ax1.legend(loc='upper left')  # Display the legend
-
+    ax1.set_ylim([0,1.1])
     fig.tight_layout()
     plt.show()
     
@@ -599,7 +563,7 @@ for dir in geometry_dirs:
     print(f'area MC = {np.trapz(MC_y/np.sum(MC_PSF))}',end='\n\n\n')
 
 
-    # # plot around center uit cell
+    # # plot around center unit cell
     # plt.imshow(PSF[40:60,40:60],extent=[-10,10,-10,10])
     # plt.title("Fiber TPB PSF, zoom")
     # plt.colorbar()
