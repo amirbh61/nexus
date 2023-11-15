@@ -38,6 +38,7 @@ void SquareFiberSteppingAction::UserSteppingAction(const G4Step* step)
 
     if (volumeName == "TPB_Fiber" && track->GetParentID() == 0 && processName == "OpWLS") {
       track->SetTrackStatus(G4TrackStatus::fStopAndKill);
+
       G4cout << "G4OpticalPhoton::Definition(): ---> " << G4OpticalPhoton::Definition() << G4endl;
       G4cout << "particleType = " << particleType << G4endl;
       G4cout << "volumeName = " << volumeName << G4endl;

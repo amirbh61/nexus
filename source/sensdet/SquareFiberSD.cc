@@ -109,13 +109,12 @@ G4bool SquareFiberSD::ProcessHits(G4Step* step, G4TouchableHistory*) {
   std::string volumeName = step->GetPreStepPoint()->GetTouchable()->GetVolume()->GetName();
   G4Track* track = step->GetTrack();
 
-  // CASE FOR ONLY WLSE PHOTON COORDINATES
+  // COORDINATES FOR ONLY ABSORBED UV PHOTONS
   if (volumeName == "TPB_Fiber" && track->GetParentID() == 0 &&
       track->GetStep()->GetPostStepPoint()->GetProcessDefinedStep()->GetProcessName() == "OpWLS" ) {
 
     G4ThreeVector position = step->GetPostStepPoint()->GetPosition();
     WritePositionToTextFile(tpbOutputFile_, position.x(), position.y());
-
   }
 
   // If you still want to check based on material for the Si detector, uncomment and use the below lines

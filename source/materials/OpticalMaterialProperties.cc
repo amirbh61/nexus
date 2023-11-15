@@ -1058,7 +1058,14 @@ namespace opticalprops {
     // According to the paper, the QE of TPB depends on the incident wavelength.
     // As Geant4 doesn't allow this possibility, it is set to the value corresponding
     // to Xe scintillation spectrum peak.
-    mpt->AddConstProperty("WLSMEANNUMBERPHOTONS", 0.65);
+
+    /*
+    WLSMEANNUMBERPHOTONS=0.53 According to paper:
+    "Measurements of the intrinsic quantum efficiency and absorption
+    length of tetraphenyl butadiene thin films in the vacuum
+    ultraviolet regime", page 13, Fig. 16
+    */
+    mpt->AddConstProperty("WLSMEANNUMBERPHOTONS", 0.53);
 
     // G4double meanNumberPhotons = mpt->GetConstProperty("WLSMEANNUMBERPHOTONS");
     // G4cout << G4endl;

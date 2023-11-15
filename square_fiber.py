@@ -424,7 +424,7 @@ def psf_creator(directory, create_from, to_plot=True,to_smooth=True):
 # estimates entire dataset size on disk
 def estimate_geant4_TPB_hits_size_on_disk(pitch,spacing_between_sources):
     '''
-    Estimates entire dataset size on disk
+    Estimates entire Geant4 PSF linear source event database size on disk
 
     Parameters
     ----------
@@ -440,12 +440,35 @@ def estimate_geant4_TPB_hits_size_on_disk(pitch,spacing_between_sources):
     n_photons_per_source = 1850*500
     total_photons_per_geometry = n_events*n_photons_per_source
     total_photons_for_all_18_geometries = 18*total_photons_per_geometry
-    total_size_on_disk_GB = total_photons_for_all_18_geometries * (3/pitch)**2*0.65*16*10**-9
+    total_size_on_disk_GB = total_photons_for_all_18_geometries * (3/pitch)**2*16*10**-9
     print(f'Number of events per geometry = {int(n_events)}')
-    print(f'Total estimated text files size on disk = {int(total_size_on_disk_GB)} GB')
+    print(f'Total estimated text files size on disk = {float(total_size_on_disk_GB)} GB')
+    
+    
+    
+# estimates entire dataset size on disk
+def estimate_TPB_PSF_database_size_on_disk(n_events,n_photons_per_source):
+    '''
+    Estimates entire Geant4 TPB PSF dataset size on disk
+
+    Parameters
+    ----------
+    n_events : float, number of line sources created in the unitcell
+    n_photons_per_source : float, number of photons per line source
+
+    Returns
+    -------
+    None.
+
+    '''
+    total_photons_per_geometry = n_events*n_photons_per_source
+    total_photons_for_all_18_geometries = 18*total_photons_per_geometry
+    total_size_on_disk_GB = total_photons_for_all_18_geometries * (3/pitch)**2*16*10**-9
+    print(f'Number of events per geometry = {int(n_events)}')
+    print(f'Total estimated text files size on disk = {float(total_size_on_disk_GB)} GB')
 
 estimate_geant4_TPB_hits_size_on_disk(15.6,0.5)
-
+estimate_TPB_PSF_database_size_on_disk(10000,10000)
 
 
 # In[2]
