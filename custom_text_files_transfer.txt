@@ -1,0 +1,9 @@
+transfering only text files while keeping the directory tree structure
+
+GENERALLY:
+rsync -avz --include='*/' --include='*.txt' --exclude='*' ./<directory_path> amir@<ip>:<destination_path>
+
+EXAMPLE:
+rsync -avz --include='*/' --include='*.txt' --exclude='*' ./SquareFiberMacrosAndOutputsCloseEL10KSources1mmEL amir@132.72.12.172:/media/amir/9C33-6BBD/NEXT_work/Geant4/nexus/small_cluster_hitpoints_dataset
+
+

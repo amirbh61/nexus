@@ -27,7 +27,7 @@ import itertools
 #     'pitch': ['5', '10', '15.6'],
 #     'distanceFiberHolder': ['-1', '2', '5'],
 #     'distanceAnodeHolder': ['2.5', '5', '10'],
-#     'holderThickness': [10'],
+#     'holderThickness': ['10'],
 #     'TPBThickness': ['2.2'] # microns
 # }
 

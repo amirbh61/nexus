@@ -124,14 +124,14 @@ size = 100 #figure/matrix
 psf_plot_edge = 50
 PSF_list = []
 el_gap = 10
-# anode_track_gap = 0
+# anode_track_gap = 10
 anode_track_gap = 2.5
 
 # while anode_track_gap <= 3:
 start = time.process_time()
    
 #create all sub directories
-folder = Mfolder + f'Resolving_Power_EL_gap{el_gap}mm_Tracking_Plane_Gap{anode_track_gap}mm/'
+folder = Mfolder + f'Resolving_Power_EL_gap{float(el_gap)}mm_Tracking_Plane_Gap{float(anode_track_gap)}mm/'
 dirpath = os.path.join(f'{folder}')# def convolution_2dplot_centering():
 if not os.path.isdir(dirpath):
     os.mkdir(dirpath)
