@@ -21,25 +21,25 @@ import itertools
 # In[0]
 # generate new geant4 macros for all geometries and all possible runs
 
-# # Geometry parameters
-# geometry_params = {
-#     'ELGap': ['1', '10'],
-#     'pitch': ['5', '10', '15.6'],
-#     'distanceFiberHolder': ['-1', '2', '5'],
-#     'distanceAnodeHolder': ['2.5', '5', '10'],
-#     'holderThickness': ['10'],
-#     'TPBThickness': ['2.2'] # microns
-# }
+# Geometry parameters
+geometry_params = {
+     'ELGap': ['1', '10'],
+     'pitch': ['5', '10', '15.6'],
+     'distanceFiberHolder': ['-1', '2', '5'],
+     'distanceAnodeHolder': ['2.5', '5', '10'],
+     'holderThickness': ['10'],
+     'TPBThickness': ['2.2'] # microns
+}
 
 # # Geometry parameters - CLUSTER small test database, DELETE LATER
-# geometry_params = {
-#     'ELGap': ['10'],
-#     'pitch': ['5', '10'],
+#geometry_params = {
+#     'ELGap': ['1','10'],
+#     'pitch': ['10'],
 #     'distanceFiberHolder': ['2'],
-#     'distanceAnodeHolder': ['2.5', '10'],
+#     'distanceAnodeHolder': ['10'],
 #     'holderThickness': ['10'],
 #     'TPBThickness': ['2.2']  # microns
-# }
+#}
 
 # # Run parameters
 # run_params = {
@@ -49,16 +49,6 @@ import itertools
 # }
 
 
-# Geometry parameters - single geometry , REMOVE AFTER
-geometry_params = {
-    'ELGap': ['10'],
-    'pitch': ['10'],
-    'distanceFiberHolder': ['-1','2','5'],
-    'distanceAnodeHolder': ['10'],
-    'holderThickness': ['10'],
-    'TPBThickness': ['2.2'] # microns
-}
-
 # Run parameters
 run_params = {
     'x': ['0'],
@@ -67,14 +57,15 @@ run_params = {
 }
 
 # Chose mode of source generation
-fixed_intervals = False # edges are included !
+fixed_intervals = True # edges are included !
 if fixed_intervals:
-    unit_cell_source_spacing = 0.5 # mm, spacing between sources in different runs
+    unit_cell_source_spacing = 0.2 # mm, spacing between sources in different runs
+    sub_dir = r'Geant4_Kr_events'
     
-random_events_xy = True
+random_events_xy = False
 if random_events_xy:
-    num_samples = 100
-
+    num_samples = 10000
+    sub_dir = 'Geant4_PSF_events'
 
 
 
@@ -82,7 +73,7 @@ seed = 10000
 
 original_config_macro_path = r'/gpfs0/arazi/users/amirbenh/Resolving_Power/nexus/macros/SquareOpticalFiberCluster.config.mac'
 original_init_macro_path = r'/gpfs0/arazi/users/amirbenh/Resolving_Power/nexus/macros/SquareOpticalFiberCluster.init.mac'
-output_macro_Mfolder = r'/gpfs0/arazi/users/amirbenh/Resolving_Power/nexus/SquareFiberMacrosAndOutputs/'
+output_macro_Mfolder = r'/gpfs0/arazi/users/amirbenh/Resolving_Power/nexus/SquareFiberDatabase/'
 
 if not os.path.isdir(output_macro_Mfolder):
     os.mkdir(output_macro_Mfolder)
@@ -109,10 +100,12 @@ for i, combination in enumerate(geometry_combinations):
                                             f'distanceFiberHolder={combination[2]}mm_'
                                             f'distanceAnodeHolder={combination[3]}mm_'
                                             f'holderThickness={combination[4]}mm')
+	
+    output_macro_geom_folder = os.path.join(output_macro_geom_folder,sub_dir)
 
     # Create directory if it doesn't exist
     if not os.path.isdir(output_macro_geom_folder):
-        os.mkdir(output_macro_geom_folder)
+        os.makedirs(output_macro_geom_folder, exist_ok=True)
 
     # Update x and y values in run_params for the 'pitch' parameter
     for key, value in zip(geometry_params.keys(), combination):
@@ -186,7 +179,6 @@ for i, combination in enumerate(geometry_combinations):
                 # Write the new init macro to a new file
                 with open(output_init_macro_path, "w") as f:
                     f.write(init_macro)
-                print(f'create geometry macro:\n{output_macro_geom_folder}')
                 
                 
     if random_events_xy:
@@ -229,4 +221,10 @@ for i, combination in enumerate(geometry_combinations):
             # Write the new init macro to a new file
             with open(output_init_macro_path, "w") as f:
                 f.write(init_macro)
-            print(f'create geometry macro:\n{output_macro_geom_folder}')
+
+
+    print(f'Finished creating ALL geometry macros for path:\n{output_macro_geom_folder}')
+
+
+
+

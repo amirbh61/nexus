@@ -265,7 +265,6 @@ def psf_creator(directory, create_from, to_plot=True,to_smooth=True):
     pattern = r"-?\d+.\d+"
 
     PSF_list = []
-    total_photon_hits = 0
     size = 100 # keep the same for all future histograms
     bins = 100 # keep the same for all future histograms
     
@@ -297,11 +296,9 @@ def psf_creator(directory, create_from, to_plot=True,to_smooth=True):
         # If hitmap has a single line, it's considered a 1D array
         if len(hitmap.shape) == 1:
             hitmap = np.array([hitmap[0:2]])  # Convert to 2D array with single row
-            total_photon_hits += 1
         else:
             # Multiple lines in hitmap
             hitmap = hitmap[:, 0:2]
-            total_photon_hits += len(hitmap)
 
         
         # Store x,y values of event
@@ -386,98 +383,107 @@ def psf_creator(directory, create_from, to_plot=True,to_smooth=True):
         #Smoothes the PSF
         PSF = smooth_PSF(PSF)
         
-    if to_plot:
-        fig, (ax0, ax1) = plt.subplots(1, 2, figsize=(16.5,8))
-        title = f'{total_photon_hits}/100M {create_from} PSF, current geometry:' + f'\n{os.path.basename(os.getcwd())}'
-        fig.suptitle(title, fontsize=15)
-        im = ax0.imshow(PSF, extent=[-size/2, size/2, -size/2, size/2])
-        ax0.set_xlabel('x [mm]');
-        ax0.set_ylabel('y [mm]');
-        ax0.set_title('PSF image')
-        divider = make_axes_locatable(ax0)
-        cax = divider.append_axes("right", size="5%", pad=0.05)
-        plt.colorbar(im, cax=cax)
-        
-        y = PSF[int(size/2),:]
-        peaks, _ = find_peaks(y)
-        fwhm = np.max(peak_widths(y, peaks, rel_height=0.5)[0])
-        ax1.plot(np.arange(-size/2,size/2,1), y, linewidth=2) #normalize
-        ax1.set_xlabel('mm')
-        ax1.set_ylabel('Charge')
-        ax1.set_title('Charge profile')
-        ax1.grid(linewidth=1)
-        fwhm_text = f"FWHM = {fwhm:.3f}"  # format to have 3 decimal places
-        ax1.text(0.95, 0.95, fwhm_text, transform=ax1.transAxes, 
-                 verticalalignment='top', horizontalalignment='right', 
-                 color='red', fontsize=12, fontweight='bold',
-                 bbox=dict(facecolor='white', edgecolor='red',
-                           boxstyle='round,pad=0.5'))
-
-        fig.tight_layout()
-        plt.show()
+    if to_plot:        
+        _ = plot_PSF(PSF=PSF,size=size)
         
     return PSF
 
 
+def plot_PSF(PSF,size=100):
+    total_TPB_photon_hits = int(np.sum(PSF))
+    
+    fig, (ax0, ax1) = plt.subplots(1, 2, figsize=(16.5,8), dpi=600)
+    title = f'{total_TPB_photon_hits}/100M TPB hits PSF, current geometry:' + f'\n{os.path.basename(os.getcwd())}'
+    fig.suptitle(title, fontsize=15)
+    im = ax0.imshow(PSF, extent=[-size/2, size/2, -size/2, size/2])
+    ax0.set_xlabel('x [mm]');
+    ax0.set_ylabel('y [mm]');
+    ax0.set_title('PSF image')
+    divider = make_axes_locatable(ax0)
+    cax = divider.append_axes("right", size="5%", pad=0.05)
+    plt.colorbar(im, cax=cax)
+    
+    y = PSF[int(size/2),:]
+    peaks, _ = find_peaks(y)
+    fwhm = np.max(peak_widths(y, peaks, rel_height=0.5)[0])
+    ax1.plot(np.arange(-size/2,size/2,1), y, linewidth=2) #normalize
+    ax1.set_xlabel('mm')
+    ax1.set_ylabel('Charge')
+    ax1.set_title('Charge profile')
+    ax1.grid(linewidth=1)
+    fwhm_text = f"FWHM = {fwhm:.3f}"  # format to have 3 decimal places
+    ax1.text(0.95, 0.95, fwhm_text, transform=ax1.transAxes, 
+             verticalalignment='top', horizontalalignment='right', 
+             color='red', fontsize=12, fontweight='bold',
+             bbox=dict(facecolor='white', edgecolor='red',
+                       boxstyle='round,pad=0.5'))
+
+    fig.tight_layout()
+    plt.show()
+    return fig
 
 
-# estimates entire dataset size on disk
-def estimate_geant4_TPB_hits_size_on_disk(pitch,spacing_between_sources):
-    '''
-    Estimates entire Geant4 PSF linear source event database size on disk
 
-    Parameters
-    ----------
-    pitch : float, distance between SiPMs, in mm
-    spacing_between_sources : float, distance between sources, in mm
 
-    Returns
-    -------
-    None.
 
-    '''
-    n_events = (pitch/spacing_between_sources)**2
-    n_photons_per_source = 1850*500
-    total_photons_per_geometry = n_events*n_photons_per_source
-    total_photons_for_all_18_geometries = 18*total_photons_per_geometry
-    total_size_on_disk_GB = total_photons_for_all_18_geometries * (3/pitch)**2*16*10**-9
-    print(f'Number of events per geometry = {int(n_events)}')
-    print(f'Total estimated text files size on disk = {float(total_size_on_disk_GB)} GB')
+
+# # estimates entire dataset size on disk
+# def estimate_geant4_TPB_hits_size_on_disk(pitch,spacing_between_sources):
+#     '''
+#     Estimates entire Geant4 PSF linear source event database size on disk
+
+#     Parameters
+#     ----------
+#     pitch : float, distance between SiPMs, in mm
+#     spacing_between_sources : float, distance between sources, in mm
+
+#     Returns
+#     -------
+#     None.
+
+#     '''
+#     n_events = (pitch/spacing_between_sources)**2
+#     n_photons_per_source = 1850*500
+#     total_photons_per_geometry = n_events*n_photons_per_source
+#     total_photons_for_all_18_geometries = 18*total_photons_per_geometry
+#     total_size_on_disk_GB = total_photons_for_all_18_geometries * (3/pitch)**2*16*10**-9
+#     print(f'Number of events per geometry = {int(n_events)}')
+#     print(f'Total estimated text files size on disk = {float(total_size_on_disk_GB)} GB')
     
     
     
-# estimates entire dataset size on disk
-def estimate_TPB_PSF_database_size_on_disk(n_events,n_photons_per_source):
-    '''
-    Estimates entire Geant4 TPB PSF dataset size on disk
+# # estimates entire dataset size on disk
+# def estimate_TPB_PSF_database_size_on_disk(n_events,n_photons_per_source,pitch):
+#     '''
+#     Estimates entire Geant4 TPB PSF dataset size on disk
 
-    Parameters
-    ----------
-    n_events : float, number of line sources created in the unitcell
-    n_photons_per_source : float, number of photons per line source
+#     Parameters
+#     ----------
+#     n_events : float, number of line sources created in the unitcell
+#     n_photons_per_source : float, number of photons per line source
 
-    Returns
-    -------
-    None.
+#     Returns
+#     -------
+#     None.
 
-    '''
-    total_photons_per_geometry = n_events*n_photons_per_source
-    total_photons_for_all_18_geometries = 18*total_photons_per_geometry
-    total_size_on_disk_GB = total_photons_for_all_18_geometries * (3/pitch)**2*16*10**-9
-    print(f'Number of events per geometry = {int(n_events)}')
-    print(f'Total estimated text files size on disk = {float(total_size_on_disk_GB)} GB')
+#     '''
+#     total_photons_per_geometry = n_events*n_photons_per_source
+#     total_photons_for_all_18_geometries = 18*total_photons_per_geometry
+#     total_size_on_disk_GB = total_photons_for_all_18_geometries * (3/pitch)**2*16*10**-9
+#     print(f'Number of events per geometry = {int(n_events)}')
+#     print(f'Total estimated text files size on disk = {float(total_size_on_disk_GB)} GB')
 
-estimate_geant4_TPB_hits_size_on_disk(15.6,0.5)
-estimate_TPB_PSF_database_size_on_disk(10000,10000)
+# estimate_geant4_TPB_hits_size_on_disk(15.6,0.5,15.5)
+# estimate_TPB_PSF_database_size_on_disk(10000,10000,15.6)
 
 
 # In[2]
 
 # Generate PSF and save
 path_to_dataset = r'/media/amir/9C33-6BBD/NEXT_work/Geant4/nexus/' + \
-                  r'small_cluster_hitpoints_dataset/SquareFiberMacrosAndOutputsCloseEL10KSources'
+                   r'small_cluster_hitpoints_dataset/SquareFiberMacrosAndOutputsCloseEL10KSources'
                   
-
+# path_to_dataset = r'/media/amir/Extreme Pro/SquareFiberDatabase'
 geometry_dirs = os.listdir(path_to_dataset)
 size = 100
 bins = 100
@@ -706,7 +712,53 @@ for dir in geometry_dirs:
 # plt.colorbar()
 # plt.show()
 
+
 # In[4]
+# Generate all TPB PSFs from SquareFiberDataset
+
+TO_GENERATE = False
+size = 100
+bins = 100
+path_to_dataset = '/media/amir/Extreme Pro/SquareFiberDatabase'
+
+# List full paths of the Geant4_PSF_events folders inside SquareFiberDatabase
+geometry_dirs = [os.path.join(path_to_dataset, d, 'Geant4_PSF_events') for d in os.listdir(path_to_dataset) 
+              if os.path.isdir(os.path.join(path_to_dataset, d, 'Geant4_PSF_events'))]
+
+if TO_GENERATE:
+    for dir in geometry_dirs:
+        PSF_TPB = psf_creator(dir,create_from="TPB",to_plot=True,to_smooth=False)
+        os.chdir(dir)
+        os.chdir('..')
+        save_PSF = r'PSF.npy'
+        np.save(save_PSF,PSF_TPB)
+
+# In[5]
+# plot and save all TPB PSFs from SquareFiberDataset in their respective folders
+
+path_to_dataset = '/media/amir/Extreme Pro/SquareFiberDatabase'
+
+# List full paths of the Geant4_PSF_events folders inside SquareFiberDatabase
+geometry_dirs = [os.path.join(path_to_dataset, d) for d in os.listdir(path_to_dataset)
+                 if os.path.isdir(os.path.join(path_to_dataset, d))]
+
+for dir in tqdm(geometry_dirs):
+    os.chdir(dir)
+    working_dir = r'Working on directory:'+f'\n{os.getcwd()}'
+    print(working_dir)
+    
+    PSF = np.load(r'PSF.npy')
+    
+    fig = plot_PSF(PSF=PSF)
+        
+    save_path = r'PSF_plot.jpg'
+    
+    # fig.savefig(save_path)  
+    plt.close(fig)  
+
+
+
+# In[6]
 # combine 2 events
 import itertools
 import random

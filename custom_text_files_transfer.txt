@@ -7,3 +7,14 @@ EXAMPLE:
 rsync -avz --include='*/' --include='*.txt' --exclude='*' ./SquareFiberMacrosAndOutputsCloseEL10KSources1mmEL amir@132.72.12.172:/media/amir/9C33-6BBD/NEXT_work/Geant4/nexus/small_cluster_hitpoints_dataset
 
 
+Example with selective taking of only needed data for study:
+
+rsync -avz \
+    --include='*/' \
+    --include='Geant4_PSF_events/TPB_hits*.txt' \
+    --include='Geant4_Kr_events/SiPM_hits*.txt' \
+    --exclude='Geant4_PSF_events/*' \
+    --exclude='Geant4_Kr_events/*' \
+    --exclude='*' \
+    ./SquareFiberDatabase \
+    'amir@132.72.12.172:/media/amir/Extreme Pro'
