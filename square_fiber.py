@@ -26,11 +26,21 @@ from scipy.signal           import convolve
 from invisible_cities.reco.deconv_functions     import richardson_lucy
 from scipy.interpolate import interp2d
 from scipy.signal import find_peaks, peak_widths
-
+import random
 # Global settings #
-n_sipms = 25
-n_sipms_per_side = (n_sipms-1)/2
 
+
+n_sipms = 25 # DO NOT CHANGE THIS VALUE
+n_sipms_per_side = (n_sipms-1)/2
+size = 100
+bins = 100
+
+
+path_to_dataset = '/media/amir/Extreme Pro/SquareFiberDatabase'
+
+# List full paths of the Geant4_PSF_events folders inside SquareFiberDatabase
+geometry_dirs = [os.path.join(path_to_dataset, d) for d in os.listdir(path_to_dataset)
+                 if os.path.isdir(os.path.join(path_to_dataset, d))]
 
 
 # In[0]
@@ -205,39 +215,55 @@ def smooth_PSF(PSF):
     return smooth_PSF
 
 
+# #original
+# def assign_hit_to_SiPM_original(hit, pitch, n):
+#     """
+#     Assign a hit to a SiPM based on its coordinates.
+    
+#     Args:
+#     - hit (tuple): The (x, y) coordinates of the hit.
+#     - pitch (float): The spacing between SiPMs.
+#     - n (int): The number of SiPMs on one side of the square grid.
+    
+#     Returns:
+#     - (int, int): The assigned SiPM coordinates.
+#     """
+    
+#     half_grid_length = (n-1) * pitch / 2
+
+#     x, y = hit
+
+#     # First, check the central SiPM
+#     for i in [0, -pitch, pitch]:
+#         for j in [0, -pitch, pitch]:
+#             if -pitch/2 <= x - i < pitch/2 and -pitch/2 <= y - j < pitch/2:
+#                 return (i, j)
+
+#     # If not found in the central SiPM, search the rest of the grid
+#     for i in np.linspace(-half_grid_length, half_grid_length, n):
+#         for j in np.linspace(-half_grid_length, half_grid_length, n):
+#             if abs(i) > pitch or abs(j) > pitch:  # Skip the previously checked SiPMs
+#                 if i - pitch/2 <= x < i + pitch/2 and j - pitch/2 <= y < j + pitch/2:
+#                     return (i, j)
+    
+#     # Return None if hit doesn't belong to any SiPM
+#     return None
+
 
 def assign_hit_to_SiPM(hit, pitch, n):
-    """
-    Assign a hit to a SiPM based on its coordinates.
-    
-    Args:
-    - hit (tuple): The (x, y) coordinates of the hit.
-    - pitch (float): The spacing between SiPMs.
-    - n (int): The number of SiPMs on one side of the square grid.
-    
-    Returns:
-    - (int, int): The assigned SiPM coordinates.
-    """
-    
     half_grid_length = (n-1) * pitch / 2
-
     x, y = hit
 
-    # First, check the central SiPM
-    for i in [0, -pitch, pitch]:
-        for j in [0, -pitch, pitch]:
-            if -pitch/2 <= x - i < pitch/2 and -pitch/2 <= y - j < pitch/2:
-                return (i, j)
+    # Direct calculation to find the nearest grid point
+    nearest_x = round((x + half_grid_length) / pitch) * pitch - half_grid_length
+    nearest_y = round((y + half_grid_length) / pitch) * pitch - half_grid_length
 
-    # If not found in the central SiPM, search the rest of the grid
-    for i in np.linspace(-half_grid_length, half_grid_length, n):
-        for j in np.linspace(-half_grid_length, half_grid_length, n):
-            if abs(i) > pitch or abs(j) > pitch:  # Skip the previously checked SiPMs
-                if i - pitch/2 <= x < i + pitch/2 and j - pitch/2 <= y < j + pitch/2:
-                    return (i, j)
-    
-    # Return None if hit doesn't belong to any SiPM
-    return None
+    # Check if the hit is within the bounds of the SiPM
+    if -half_grid_length <= nearest_x <= half_grid_length and -half_grid_length <= nearest_y <= half_grid_length:
+        return (np.around(nearest_x,1), np.around(nearest_y,1))
+    else:
+        return None
+
 
 
 
@@ -328,15 +354,7 @@ def psf_creator(directory, create_from, to_plot=True,to_smooth=True):
         
         
         if plot_sipm_assigned_event:
-            sipm_assigned_event, x_hist, y_hist = np.histogram2d(new_hitmap[:,0], new_hitmap[:,1],
-                                                  range=[[-size/2,size/2],[-size/2,size/2]],
-                                                  bins=bins)     
-            plt.imshow(sipm_assigned_event,extent=[-size/2, size/2, -size/2, size/2])
-            plt.title("Single Geant4 event, after assigned to SiPMs")
-            plt.xlabel('x [mm]');
-            plt.ylabel('y [mm]');
-            plt.colorbar()
-            plt.show()
+            plot_sensor_response(new_hitmap, bins, size)
         
         
         
@@ -389,6 +407,19 @@ def psf_creator(directory, create_from, to_plot=True,to_smooth=True):
     return PSF
 
 
+def plot_sensor_response(event,bins,size,noise=False):
+    sipm_assigned_event, x_hist, y_hist = np.histogram2d(event[:,0], event[:,1],
+                                          range=[[-size/2,size/2],[-size/2,size/2]],
+                                          bins=bins)  
+    if noise:
+        sipm_assigned_event = np.random.poisson(sipm_assigned_event)
+    plt.imshow(sipm_assigned_event,extent=[-size/2, size/2, -size/2, size/2])
+    plt.title("Sensor response")
+    plt.xlabel('x [mm]');
+    plt.ylabel('y [mm]');
+    plt.colorbar()
+    plt.show()
+
 def plot_PSF(PSF,size=100):
     total_TPB_photon_hits = int(np.sum(PSF))
     
@@ -424,58 +455,26 @@ def plot_PSF(PSF,size=100):
 
 
 
+# # test assign_hit_to_SiPM
+# test_cases = [
+#     ((x, y), pitch, n)
+#     for x in np.linspace(-10, 10, 20)
+#     for y in np.linspace(-10, 10, 20)
+#     for pitch in [1, 2, 3]
+#     for n in [25]
+# ]
 
+# # Compare the outputs of the two functions
+# for hit, pitch, n in test_cases:
+#     result_original = assign_hit_to_SiPM_original(hit, pitch, n)
+#     result_optimized = assign_hit_to_SiPM_optimized(hit, pitch, n)
 
+#     if result_original != result_optimized:
+#         print(f"Discrepancy found for hit {hit}, pitch {pitch}, n {n}:")
+#         print(f"  Original: {result_original}, Optimized: {result_optimized}")
 
-# # estimates entire dataset size on disk
-# def estimate_geant4_TPB_hits_size_on_disk(pitch,spacing_between_sources):
-#     '''
-#     Estimates entire Geant4 PSF linear source event database size on disk
-
-#     Parameters
-#     ----------
-#     pitch : float, distance between SiPMs, in mm
-#     spacing_between_sources : float, distance between sources, in mm
-
-#     Returns
-#     -------
-#     None.
-
-#     '''
-#     n_events = (pitch/spacing_between_sources)**2
-#     n_photons_per_source = 1850*500
-#     total_photons_per_geometry = n_events*n_photons_per_source
-#     total_photons_for_all_18_geometries = 18*total_photons_per_geometry
-#     total_size_on_disk_GB = total_photons_for_all_18_geometries * (3/pitch)**2*16*10**-9
-#     print(f'Number of events per geometry = {int(n_events)}')
-#     print(f'Total estimated text files size on disk = {float(total_size_on_disk_GB)} GB')
-    
-    
-    
-# # estimates entire dataset size on disk
-# def estimate_TPB_PSF_database_size_on_disk(n_events,n_photons_per_source,pitch):
-#     '''
-#     Estimates entire Geant4 TPB PSF dataset size on disk
-
-#     Parameters
-#     ----------
-#     n_events : float, number of line sources created in the unitcell
-#     n_photons_per_source : float, number of photons per line source
-
-#     Returns
-#     -------
-#     None.
-
-#     '''
-#     total_photons_per_geometry = n_events*n_photons_per_source
-#     total_photons_for_all_18_geometries = 18*total_photons_per_geometry
-#     total_size_on_disk_GB = total_photons_for_all_18_geometries * (3/pitch)**2*16*10**-9
-#     print(f'Number of events per geometry = {int(n_events)}')
-#     print(f'Total estimated text files size on disk = {float(total_size_on_disk_GB)} GB')
-
-# estimate_geant4_TPB_hits_size_on_disk(15.6,0.5,15.5)
-# estimate_TPB_PSF_database_size_on_disk(10000,10000,15.6)
-
+# # If no output, then the two functions are consistent for the test cases
+# print("Test completed.")
 
 # In[2]
 
@@ -717,13 +716,6 @@ for dir in geometry_dirs:
 # Generate all TPB PSFs from SquareFiberDataset
 
 TO_GENERATE = False
-size = 100
-bins = 100
-path_to_dataset = '/media/amir/Extreme Pro/SquareFiberDatabase'
-
-# List full paths of the Geant4_PSF_events folders inside SquareFiberDatabase
-geometry_dirs = [os.path.join(path_to_dataset, d, 'Geant4_PSF_events') for d in os.listdir(path_to_dataset) 
-              if os.path.isdir(os.path.join(path_to_dataset, d, 'Geant4_PSF_events'))]
 
 if TO_GENERATE:
     for dir in geometry_dirs:
@@ -735,308 +727,163 @@ if TO_GENERATE:
 
 # In[5]
 # plot and save all TPB PSFs from SquareFiberDataset in their respective folders
+TO_PLOT = False
 
-path_to_dataset = '/media/amir/Extreme Pro/SquareFiberDatabase'
-
-# List full paths of the Geant4_PSF_events folders inside SquareFiberDatabase
-geometry_dirs = [os.path.join(path_to_dataset, d) for d in os.listdir(path_to_dataset)
-                 if os.path.isdir(os.path.join(path_to_dataset, d))]
-
-for dir in tqdm(geometry_dirs):
-    os.chdir(dir)
-    working_dir = r'Working on directory:'+f'\n{os.getcwd()}'
-    print(working_dir)
-    
-    PSF = np.load(r'PSF.npy')
-    
-    fig = plot_PSF(PSF=PSF)
+if TO_PLOT:
+    for dir in tqdm(geometry_dirs):
+        os.chdir(dir)
+        working_dir = r'Working on directory:'+f'\n{os.getcwd()}'
+        print(working_dir)
         
-    save_path = r'PSF_plot.jpg'
-    
-    # fig.savefig(save_path)  
-    plt.close(fig)  
-
-
+        PSF = np.load(r'PSF.npy')
+        
+        fig = plot_PSF(PSF=PSF)
+            
+        save_path = r'PSF_plot.jpg'
+        
+        # fig.savefig(save_path)  
+        plt.close(fig)  
 
 # In[6]
-# combine 2 events
-import itertools
-import random
+# combine events and interpolate
 
-'''
-Create sensor response image for 2 events + interpolation of the signal.
-'''
+# for each geometry
+# sample 2 events -> shift 1 of them to (randint(0,max_n),randint(0,max_n))*(x2,y2)
+# -> make sensor response, save distance (example 16-17mm, 17-18mm), save to unique folder
+# keep pandas dataframe of sources original x,y , shifted m,n integers, shifted final x,y,
+# distance, saved file path
+import cProfile
+import pstats
 
-def find_equivalent_lattice_points(filename, shift):
-    '''
-    This function receives a text file of hitpoints, and looks for symmetrical 
-    lattice points in the surrounding unit cells.
-    
-    
-    Receives:
-        filename: str, path to an event text file
-        shift: double, distance to shift the event from its original position
-        
-    Returns:
-        lattice_point: tuple, a lattice point sampled from all possible lattice points
-    '''
-    # need to be on geometry dir 
-    matches = re.findall(xy_pattern, filename)
-    x_event = float(matches[0][0])  # the first element in the first tuple
-    y_event = float(matches[0][1])  # the second element in the first tuple
-    
-    
-    x_lattice_points = [x_event+shift, x_event-shift]
-    y_lattice_points = [y_event+shift, y_event-shift]
-    possible_lattice_points = list(itertools.product(x_lattice_points,y_lattice_points))
-    lattice_point = random.sample(possible_lattice_points, k=1)
-    lattice_point = np.reshape(lattice_point,-1)
-    if shift == 0:
-        lattice_point = [x_event,y_event]
-    return lattice_point
-    
-    
-def shift_event_to_lattice_point(event_file, lattice_point):
-    matches1 = re.findall(xy_pattern, event_file)
-    x_event = float(matches1[0][0])
-    y_event = float(matches1[0][1])
-    event = np.genfromtxt(event_file)[:,0:2]
-    shifted_event = event + [lattice_point[0]-x_event, lattice_point[1]-y_event]
-    return np.array(shifted_event)
+# def main():
+# override previous settings
+bins = 100
+size = 100
+x_match_str = r"_x=(-?\d+(?:\.\d+)?(?:e-?\d+)?)mm"
+y_match_str = r"_y=(-?\d+(?:\.\d+)?(?:e-?\d+)?)mm"
 
-    
-def sample_2_events():
-    event_list = glob.glob(r'SiPM_hits*')
-    events = random.sample(event_list, k=2)
-    return events
+# for dir in tqdm(geometry_dirs):
+geo_dir = geometry_dirs[0]
+working_dir = geo_dir + r'/Geant4_Kr_events'
+os.chdir(working_dir)
 
+# Search for the geometry pitch in dir name
+pitch_match = re.search(r"_pitch=(\d+(?:\.\d+)?)mm", working_dir)
+pitch = float(pitch_match.group(1))
+print(f'pitch={pitch}')
 
-def combine_events(event1_file, event2_file, shift, to_plot=True):
-    '''
-    This function take 2 sets of hit points from two files, simulating the light
-    from 2 sources hitting the tracking plane and merges them into one.
-    '''
-    # Load hitpoints from files
-    event1 = np.genfromtxt(event1_file)[:,0:2]
-    
-    # Extract positions from filenames
-    matches1 = re.findall(xy_pattern, event1_file)
-    x1_event = float(matches1[0][0])
-    y1_event = float(matches1[0][1])
+event_pattern = "SiPM_hits"
+event_list = [entry.name for entry in os.scandir() if entry.is_file() 
+              and entry.name.startswith(event_pattern)]
+# second for
+event_pair = random.sample(event_list, k=2)
 
-    matches2 = re.findall(xy_pattern, event2_file)
-    x2_event = float(matches2[0][0])
-    y2_event = float(matches2[0][1])
-    
-    ### The second event will be have its original x,y shifted  ###
-    # Find its new equivalent point in a nearby cell
-    lattice_point = find_equivalent_lattice_points(event2_file, shift=shift)
-    # Shift the event to the new lattice point
-    shifted_event2 = shift_event_to_lattice_point(event2_file, lattice_point)
-    
-    # Combine the shifted PSF2 and PSF1
-    combined_event = np.concatenate([event1, shifted_event2], axis=0)
-    
-    # Calculate center of mass of the combined PSF
-    combined_cm_x, combined_cm_y = np.mean(combined_event, axis=0)
-    
-    distance_between_events = np.hypot(x1_event - lattice_point[0],
-                                        y1_event - lattice_point[1])
-    
-    # Shift the combined PSF so that the center of mass is at (0, 0)
-    centered_combined_event = combined_event - [combined_cm_x, combined_cm_y]
-    
-    
-    # bins = int(np.sqrt(len(event1)+len(shifted_event2)))
-    bins = 300
-    H, x_hist, y_hist = np.histogram2d(centered_combined_event[:, 0],
-                                       centered_combined_event[:, 1], bins=bins)
-      
-    if to_plot:
-        # Create a 2D histogram
-        plt.figure(figsize=(15,10))
+# grab event0 x,y original generation coordinates
+x0_match = re.search(x_match_str, event_pair[0])
+x0 = float(x0_match.group(1))
+y0_match = re.search(y_match_str, event_pair[0])
+y0 = float(y0_match.group(1))
 
-        plt.hist2d(centered_combined_event[:, 0], centered_combined_event[:, 1],
-                    bins=((bins, bins)), cmap=plt.cm.jet)
-        # plt.imshow(H)   
-       
-        plt.colorbar()
-        
-        title = f'Event spacing={np.round(distance_between_events,3)}mm\n'+ \
-                  f'event1: (x,y)={(np.round(x1_event,3),np.round(y1_event,3))}, ' + \
-                  f'event2: (x,y)={(np.round(lattice_point[0],3),np.round(lattice_point[1],3))}'
-    
-        plt.title(title)
-        plt.show()
-        
-        
-
-    return H, x_hist, y_hist, title
+# grab event 1 x,y original generation coordinates
+x1_match = re.search(x_match_str, event_pair[1])
+x1 = float(x1_match.group(1))
+y1_match = re.search(y_match_str, event_pair[1])
+y1 = float(y1_match.group(1))
 
 
 
-## run just one prechosen pair
+event_to_stay, event_to_shift = np.genfromtxt(event_pair[0]), np.genfromtxt(event_pair[1])
 
-# filename1 = r'/media/amir/9C33-6BBD/NEXT_work/Geant4/nexus/' + \
-# r'small_cluster_hitpoints_dataset/SquareFiberMacrosAndOutputs/' + \
-# r'ELGap=10mm_pitch=5mm_distanceFiberHolder=2mm_distanceAnodeHolder=2.5mm_holderThickness=10mm/' + \
-# r'SiPM_hits_x=-2.5mm_y=-2.0mm.txt'
+# Assign each hit to a SiPM
+event_to_stay_SR = []
+for hit in event_to_stay:
+    sipm = assign_hit_to_SiPM(hit=hit, pitch=pitch, n=n_sipms)
+    if sipm:  # if the hit belongs to a SiPM
+        event_to_stay_SR.append(sipm)
+   
+event_to_stay_SR = np.array(event_to_stay_SR)
+plot_sensor_response(event_to_stay_SR,bins,size)
 
-# filename2 = r'/media/amir/9C33-6BBD/NEXT_work/Geant4/nexus/' + \
-# r'small_cluster_hitpoints_dataset/SquareFiberMacrosAndOutputs/' + \
-# r'ELGap=10mm_pitch=5mm_distanceFiberHolder=2mm_distanceAnodeHolder=2.5mm_holderThickness=10mm/' + \
-# r'SiPM_hits_x=2.5mm_y=1.5mm.txt'
+# Assign each hit to a SiPM
+event_to_shift_SR = []
+for hit in event_to_shift:
+    sipm = assign_hit_to_SiPM(hit=hit, pitch=pitch, n=n_sipms)
+    if sipm:  # if the hit belongs to a SiPM
+        event_to_shift_SR.append(sipm)
+   
+event_to_shift_SR = np.array(event_to_shift_SR)
+plot_sensor_response(event_to_shift_SR,bins,size)
 
-# combine_events(filename1, filename2)
+# shift "event_shift_SR"
+m, n = np.random.randint(5,6), np.random.randint(5,6) 
+shifted_event_SR = event_to_shift_SR + [m*pitch, n*pitch]
+# Combine the two events
+combined_event_SR = np.concatenate((event_to_stay_SR, shifted_event_SR))
+plot_sensor_response(combined_event_SR, bins, size)
 
+shifted_event_coord = np.array([x1, y1]) + [m*pitch, n*pitch]
+# get distance between stay and shifted
+dist = (np.sqrt((x0-shifted_event_coord[0])**2+(y0-shifted_event_coord[1])**2))
+# get midpoint of stay and shifted
+midpoint = [(x0+shifted_event_coord[0])/2,(y0+shifted_event_coord[1])/2]
+print(f'distance={dist}mm')
+print(f'midpoint={midpoint}mm')
 
+# center combined event using midpoint
+center_combined_event_SR = combined_event_SR - midpoint
+plot_sensor_response(center_combined_event_SR, bins, size)
 
-# define regex pattern for file name
-xy_pattern = r"x=(-?\d*\.\d+)mm_y=(-?\d*\.\d+)mm" # gets x,y of each event
-pitch_pattern = r'pitch=(.*?)_'
-
-path_to_dataset = r'/media/amir/9C33-6BBD/NEXT_work/Geant4/nexus/' + \
-                  r'small_cluster_hitpoints_dataset/SquareFiberMacrosAndOutputs'
-
-
-geometry_dirs = os.listdir(path_to_dataset)
-for geometry in geometry_dirs:
-    folder = path_to_dataset + "/" + geometry
-    os.chdir(folder)
-    print(f'Current working directory:\n{os.getcwd()}',end='\n')
-    
-    # store pitch value from file name
-    pitch_match = re.search(pitch_pattern, geometry)
-    pitch = pitch_match.group(1)
-    pitch = float(pitch.split('mm')[0]) # stored value in mm
-    print(f'pitch={pitch}mm',end='\n\n')
-    
-    # create save paths
-    Save_SR  = f'{folder}/Sensor_Response_2_events_raw'
-    Save_SR_interpolate  = f'{folder}/Sensor_Response_2_events_interpolated'
-    if not os.path.isdir(Save_SR):
-        os.mkdir(Save_SR)
-    if not os.path.isdir(Save_SR_interpolate):
-        os.mkdir(Save_SR_interpolate)
-    source_spacing=3*pitch
-
-        
-    for attempt in range(8):
-        events = sample_2_events()
-
-        H, x_hist, y_hist, title = combine_events(events[0], events[1],
-                                           shift=source_spacing,to_plot=True)
-        # Create a meshgrid for interpolation
-        x_centers = 0.5 * (x_hist[1:] + x_hist[:-1])
-        y_centers = 0.5 * (y_hist[1:] + y_hist[:-1])
-        
-        # Create the interpolation function
-        interp_f = interp2d(x_centers, y_centers, H, kind='cubic')
-        
-        # Create a finer meshgrid for the interpolated data
-        x_fine = np.linspace(x_centers.min(), x_centers.max(), 100)
-        y_fine = np.linspace(y_centers.min(), y_centers.max(), 100)
-        
-        hist_interpolated = interp_f(x_fine, y_fine)
-               
-        ### SAVE ###
-        SR_output = Save_SR + f'/source_spacing={source_spacing}mm_pair_id={attempt}'
-        SR_interpolation_output = Save_SR_interpolate + \
-        f'/source_spacing={source_spacing}mm_pair_id={attempt}'
-        
-        # Save H (2D histogram)
-        np.save(SR_output+"_hist.npy", H)
-        with open(SR_output+"_hist_details.txt", "w") as file:
-            file.write(title)
-        np.save(SR_output+"_x_bins.npy", x_hist)
-        np.save(SR_output+"_y_bins.npy", y_hist)
-        # Save interpolation
-        np.save(SR_interpolation_output+"_hist.npy", hist_interpolated)
-        with open(SR_interpolation_output+"_hist_details.txt", "w") as file:
-            file.write(title)
-        np.save(SR_interpolation_output+"_x_fine.npy", x_fine)
-        np.save(SR_interpolation_output+"_y_fine.npy", y_fine)
-    
-# In[5]
-'''
-Plot sensor response and interpolated data
-'''
-
-def file_content_to_string(filename):
-    with open(filename, 'r') as f:
-        return f.read().strip().replace("\n", ", ")
+# rotate combined event 
+theta = np.arctan2(shifted_event_coord[1]-y0,shifted_event_coord[0]-x0)
+rot_matrix = np.array([[np.cos(theta),-np.sin(theta)],
+                       [np.sin(theta),np.cos(theta)]])
+combined_rotated_event_SR = np.matmul(center_combined_event_SR,rot_matrix)
+plot_sensor_response(combined_rotated_event_SR, bins, size, noise=True)
 
 
 
-xy_pattern = r"x=(-?\d*\.\d+)mm_y=(-?\d*\.\d+)mm" # gets x,y of each event
-pitch_pattern = r'pitch=(.*?)_'
+#### interpolation ####
 
-path_to_dataset = r'/media/amir/9C33-6BBD/NEXT_work/Geant4/nexus/' + \
-                  r'small_cluster_hitpoints_dataset/SquareFiberMacrosAndOutputs'
+# # Create a 2D histogram
+hist, x_edges, y_edges = np.histogram2d(combined_rotated_event_SR[:,0],
+                                        combined_rotated_event_SR[:,1],
+                                        range=[[-size/2, size/2], [-size/2, size/2]],
+                                        bins=bins)
 
+# Compute the centers of the bins
+x_centers = (x_edges[:-1] + x_edges[1:]) / 2
+y_centers = (y_edges[:-1] + y_edges[1:]) / 2
 
-geometry_dirs = os.listdir(path_to_dataset)
-for geometry in geometry_dirs:
-    folder = path_to_dataset + "/" + geometry
-    os.chdir(folder)
-    print(f'Current working directory:\n{os.getcwd()}',end='\n')
-    
-    Load_SR  = f'{folder}/Sensor_Response_2_events_raw'
-    Load_SR_interpolate  = f'{folder}/Sensor_Response_2_events_interpolated'
-    
-    for i in range(int(len(glob.glob(Load_SR+r'/*.npy'))/3)):
-        
-        two_events_raw_hist = np.load(glob.glob(Load_SR + f'/*id={i}_hist.npy')[0])
-        two_events_x_bins = np.load(glob.glob(Load_SR + f'/*id={i}_x_bins.npy')[0])
-        two_events_y_bins = np.load(glob.glob(Load_SR + f'/*id={i}_y_bins.npy')[0])
-    
-        two_events_interpolated_hist = np.load(glob.glob(
-            Load_SR_interpolate + f'/*id={i}_hist.npy')[0])
-        two_events_x_fine = np.load(glob.glob(Load_SR_interpolate +
-                                              f'/*id={i}_x_fine.npy')[0])
-        two_events_y_fine = np.load(glob.glob(Load_SR_interpolate +
-                                              f'/*id={i}_y_fine.npy')[0])
-        
-        title_file = glob.glob(Load_SR_interpolate + f'/*id={i}_hist_details.txt')[0]
-        title = file_content_to_string(title_file)
-    
-    
-        fig, (ax0,ax1) = plt.subplots(1,2,figsize=(17,7), dpi=300)
-        im = ax0.imshow(two_events_raw_hist,interpolation='none', origin='lower',
-                        extent=[two_events_x_fine.min(), two_events_x_fine.max(),
-                                two_events_y_fine.min(), two_events_y_fine.max()])
-        ax0.set_title('Sensor response')
-        ax0.set_xlabel('x [mm]')
-        ax0.set_ylabel('y [mm]')
-        divider = make_axes_locatable(ax0)
-        cax = divider.append_axes("right", size="5%", pad=0.05)
-        fig.colorbar(im, cax=cax)
-    
-    
-        im = ax1.imshow(two_events_interpolated_hist, origin='lower',
-                        extent=[two_events_x_fine.min(), two_events_x_fine.max(),
-                                two_events_y_fine.min(), two_events_y_fine.max()])
-        
-        ax1.set_title('Sensor response after interpolation')
-        ax1.set_xlabel('x[mm]')
-        ax1.set_ylabel('y [mm]')
-        divider = make_axes_locatable(ax1)
-        cax = divider.append_axes("right", size="5%", pad=0.05)
-        fig.colorbar(im, cax=cax)
-        fig.suptitle(title)
-        fig.tight_layout()
-        plt.show()
+# Create meshgrid for centers
+xx, yy = np.meshgrid(x_centers, y_centers)
 
-        save_SR_plots = f'{folder}/SR_plots'
-        if not os.path.isdir(save_SR_plots):
-            os.mkdir(save_SR_plots)
-        save_path = save_SR_plots + f'/pair_id={i}'
-        fig.savefig(save_path, format='jpg', dpi=300, bbox_inches='tight' )
+# Flatten the arrays for interp2d
+x_flat = xx.flatten()
+y_flat = yy.flatten()
+hist_flat = hist.flatten()
+
+# Create cubic interpolation function
+conv_interp = interp2d(x_flat, y_flat, hist_flat, kind='cubic')
+
+# Define the interpolation range
+x_range = np.linspace(-size/2, size/2, num=size)
+y_range = np.linspace(-size/2, size/2, num=size)
+
+# Interpolate over the defined range
+z = conv_interp(x_range, y_range)
+
+# pass
+
+# # Profile the 'main' function and write its stats to 'profile_stats'
+# cProfile.run('main()', 'profile_stats')
+
+# # Create a Stats object and sort the profile by cumulative time
+# p = pstats.Stats('profile_stats')
+# p.sort_stats('cumulative').print_stats(10)  # Print the top 10 time-consuming functions
 
 
+# In[7]
 
-
-    
     
 # In[6]
 '''
