@@ -13,7 +13,6 @@ from matplotlib import pyplot as plt
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 plt.style.use('classic')
 from tqdm import tqdm
-from scipy.interpolate import interp2d as interp2d
 pd.set_option('display.max_columns', None)
 pd.set_option('display.max_rows', 500)
 import glob
@@ -25,6 +24,8 @@ from scipy.signal           import fftconvolve
 from scipy.signal           import convolve
 from invisible_cities.reco.deconv_functions     import richardson_lucy
 from scipy.interpolate import interp2d
+from scipy.interpolate import griddata
+from scipy.interpolate import RectBivariateSpline
 from scipy.signal import find_peaks, peak_widths
 import random
 # Global settings #
@@ -407,18 +408,24 @@ def psf_creator(directory, create_from, to_plot=True,to_smooth=True):
     return PSF
 
 
-def plot_sensor_response(event,bins,size,noise=False):
+def plot_sensor_response(event, bins, size, noise=False):
     sipm_assigned_event, x_hist, y_hist = np.histogram2d(event[:,0], event[:,1],
-                                          range=[[-size/2,size/2],[-size/2,size/2]],
-                                          bins=bins)  
+                                                         range=[[-size/2, size/2], [-size/2, size/2]],
+                                                         bins=bins)  
     if noise:
         sipm_assigned_event = np.random.poisson(sipm_assigned_event)
-    plt.imshow(sipm_assigned_event,extent=[-size/2, size/2, -size/2, size/2])
-    plt.title("Sensor response")
-    plt.xlabel('x [mm]');
-    plt.ylabel('y [mm]');
-    plt.colorbar()
+
+    # Transpose the array to correctly align the axes
+    sipm_assigned_event = sipm_assigned_event.T
+
+    plt.imshow(sipm_assigned_event,
+               extent=[-size/2, size/2, -size/2, size/2], vmin=0)
+    plt.title("Sensor Response")
+    plt.xlabel('x [mm]')
+    plt.ylabel('y [mm]')
+    plt.colorbar(label='Photon hits')
     plt.show()
+
 
 def plot_PSF(PSF,size=100):
     total_TPB_photon_hits = int(np.sum(PSF))
@@ -745,40 +752,55 @@ if TO_PLOT:
         plt.close(fig)  
 
 # In[6]
-# combine events and interpolate
+# combine events and interpolate and RL
 
 # for each geometry
 # sample 2 events -> shift 1 of them to (randint(0,max_n),randint(0,max_n))*(x2,y2)
 # -> make sensor response, save distance (example 16-17mm, 17-18mm), save to unique folder
 # keep pandas dataframe of sources original x,y , shifted m,n integers, shifted final x,y,
 # distance, saved file path
-import cProfile
-import pstats
 
-# def main():
-# override previous settings
-bins = 100
-size = 100
+
+TO_PLOT = True
+dist_min_threshold = 18 #mm
+
+# override previous bins/size settings
+bins = 250
+size = bins
+
+
 x_match_str = r"_x=(-?\d+(?:\.\d+)?(?:e-?\d+)?)mm"
 y_match_str = r"_y=(-?\d+(?:\.\d+)?(?:e-?\d+)?)mm"
 
-# for dir in tqdm(geometry_dirs):
-geo_dir = geometry_dirs[0]
-working_dir = geo_dir + r'/Geant4_Kr_events'
-os.chdir(working_dir)
+# for i,geo_dir in tqdm(enumerate(geometry_dirs)):
+# geo_dir = geometry_dirs[-1]
+geo_dir = ('/media/amir/Extreme Pro/SquareFiberDatabase/' +
+            'ELGap=1mm_pitch=5mm_distanceFiberHolder=-1mm_distanceAnodeHolder=2.5mm_holderThickness=10mm')
 
-# Search for the geometry pitch in dir name
+# assign input and output directories
+print(geo_dir)
+working_dir = geo_dir + r'/Geant4_Kr_events'
+save_dir = geo_dir + '/combined_event_SR' 
+if not os.path.isdir(save_dir):
+    os.mkdir(save_dir)
+
+os.chdir(working_dir)
+PSF = np.load(geo_dir + '/PSF.npy')
+# PSF = smooth_PSF(PSF)
+
+# Search and extract geometry pitch in directory name
 pitch_match = re.search(r"_pitch=(\d+(?:\.\d+)?)mm", working_dir)
 pitch = float(pitch_match.group(1))
-print(f'pitch={pitch}')
-
+# print(f'pitch={pitch}')
 event_pattern = "SiPM_hits"
+
+# for j in tqdm(range(100)):
 event_list = [entry.name for entry in os.scandir() if entry.is_file() 
               and entry.name.startswith(event_pattern)]
 # second for
 event_pair = random.sample(event_list, k=2)
 
-# grab event0 x,y original generation coordinates
+# grab event 0 x,y original generation coordinates
 x0_match = re.search(x_match_str, event_pair[0])
 x0 = float(x0_match.group(1))
 y0_match = re.search(y_match_str, event_pair[0])
@@ -790,8 +812,7 @@ x1 = float(x1_match.group(1))
 y1_match = re.search(y_match_str, event_pair[1])
 y1 = float(y1_match.group(1))
 
-
-
+        
 event_to_stay, event_to_shift = np.genfromtxt(event_pair[0]), np.genfromtxt(event_pair[1])
 
 # Assign each hit to a SiPM
@@ -802,7 +823,7 @@ for hit in event_to_stay:
         event_to_stay_SR.append(sipm)
    
 event_to_stay_SR = np.array(event_to_stay_SR)
-plot_sensor_response(event_to_stay_SR,bins,size)
+
 
 # Assign each hit to a SiPM
 event_to_shift_SR = []
@@ -812,35 +833,39 @@ for hit in event_to_shift:
         event_to_shift_SR.append(sipm)
    
 event_to_shift_SR = np.array(event_to_shift_SR)
-plot_sensor_response(event_to_shift_SR,bins,size)
 
 # shift "event_shift_SR"
-m, n = np.random.randint(5,6), np.random.randint(5,6) 
+# m, n = np.random.randint(0,1), np.random.randint(0,1) 
+m , n = 3,3
 shifted_event_SR = event_to_shift_SR + [m*pitch, n*pitch]
 # Combine the two events
 combined_event_SR = np.concatenate((event_to_stay_SR, shifted_event_SR))
-plot_sensor_response(combined_event_SR, bins, size)
 
 shifted_event_coord = np.array([x1, y1]) + [m*pitch, n*pitch]
 # get distance between stay and shifted
 dist = (np.sqrt((x0-shifted_event_coord[0])**2+(y0-shifted_event_coord[1])**2))
+# if dist < dist_min_threshold:
+#     continue
 # get midpoint of stay and shifted
 midpoint = [(x0+shifted_event_coord[0])/2,(y0+shifted_event_coord[1])/2]
-print(f'distance={dist}mm')
-print(f'midpoint={midpoint}mm')
+print(f'distance = {dist}mm')
+# print(f'midpoint = {midpoint}mm')
 
 # center combined event using midpoint
-center_combined_event_SR = combined_event_SR - midpoint
-plot_sensor_response(center_combined_event_SR, bins, size)
+centered_combined_event_SR = combined_event_SR - midpoint
+
+# # Save combined centered event to suitlable folder according to sources distance
+# save_dir = save_dir + f'/{int(dist)}mm'
+# if not os.path.isdir(save_dir):
+#     os.mkdir(save_dir)
+# save_path = save_dir + f'/{i}.npy'
+# np.save(save_path,centered_combined_event_SR)
 
 # rotate combined event 
 theta = np.arctan2(shifted_event_coord[1]-y0,shifted_event_coord[0]-x0)
 rot_matrix = np.array([[np.cos(theta),-np.sin(theta)],
-                       [np.sin(theta),np.cos(theta)]])
-combined_rotated_event_SR = np.matmul(center_combined_event_SR,rot_matrix)
-plot_sensor_response(combined_rotated_event_SR, bins, size, noise=True)
-
-
+                        [np.sin(theta),np.cos(theta)]])
+combined_rotated_event_SR = np.matmul(centered_combined_event_SR,rot_matrix)
 
 #### interpolation ####
 
@@ -854,37 +879,80 @@ hist, x_edges, y_edges = np.histogram2d(combined_rotated_event_SR[:,0],
 x_centers = (x_edges[:-1] + x_edges[1:]) / 2
 y_centers = (y_edges[:-1] + y_edges[1:]) / 2
 
-# Create meshgrid for centers
-xx, yy = np.meshgrid(x_centers, y_centers)
+hist_hits_x_idx, hist_hits_y_idx = np.where(hist>0)
+hist_hits_x, hist_hits_y = x_centers[hist_hits_x_idx], y_centers[hist_hits_y_idx]
 
-# Flatten the arrays for interp2d
-x_flat = xx.flatten()
-y_flat = yy.flatten()
-hist_flat = hist.flatten()
+hist_hits_vals = hist[hist>0]
 
-# Create cubic interpolation function
-conv_interp = interp2d(x_flat, y_flat, hist_flat, kind='cubic')
 
-# Define the interpolation range
-x_range = np.linspace(-size/2, size/2, num=size)
-y_range = np.linspace(-size/2, size/2, num=size)
+# Define the interpolation grid
+x_range = np.linspace(-size/2, size/2, num=bins)
+y_range = np.linspace(-size/2, size/2, num=bins)
+x_grid, y_grid = np.meshgrid(x_range, y_range)
+# Perform the interpolation
+interp_img = griddata((hist_hits_x, hist_hits_y), hist_hits_vals, (x_grid, y_grid),
+              method='cubic', fill_value=0)
 
-# Interpolate over the defined range
-z = conv_interp(x_range, y_range)
+rel_diff, cutoff_iter, de_conv = richardson_lucy(interp_img, PSF, iterations=75)
+print(f'rel_diff = {rel_diff}')
+print(f'cut off = {cutoff_iter}')
 
-# pass
 
-# # Profile the 'main' function and write its stats to 'profile_stats'
-# cProfile.run('main()', 'profile_stats')
 
-# # Create a Stats object and sort the profile by cumulative time
-# p = pstats.Stats('profile_stats')
-# p.sort_stats('cumulative').print_stats(10)  # Print the top 10 time-consuming functions
-
+if TO_PLOT:
+    # plot sensor responses
+    plot_sensor_response(event_to_stay_SR,bins,size)
+    plot_sensor_response(event_to_shift_SR,bins,size)
+    plot_sensor_response(combined_event_SR, bins, size)
+    plot_sensor_response(centered_combined_event_SR, bins, size)
+    plot_sensor_response(combined_rotated_event_SR, bins, size, noise=True)
+    
+    # plot interpolated combined event
+    plt.imshow(interp_img, extent=[-size/2, size/2, -size/2, size/2], vmin=0)
+    plt.colorbar(label='Photon hits')
+    plt.title('Cubic Interpolation of Combined Rotated event')
+    plt.xlabel('x [mm]')
+    plt.ylabel('y [mm]')
+    plt.show()
+    
+    # plot PSF
+    plt.imshow(PSF,vmin=0)
+    plt.colorbar()
+    plt.xlabel('x [mm]')
+    plt.ylabel('y [mm]')
+    plt.title('PSF')
+    plt.show()
+    
+    # plot deconv
+    plt.imshow(de_conv, extent=[-size/2, size/2, -size/2, size/2], vmin=0)
+    plt.colorbar()
+    plt.xlabel('x [mm]')
+    plt.ylabel('y [mm]')
+    plt.title('RL deconvolution')
+    plt.show()
 
 # In[7]
 
     
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 # In[6]
 '''
 RL deconvolution calculation and save
@@ -957,14 +1025,15 @@ def richardson_lucy(image, psf, iterations=75, iter_thr=0.):
         im_deconv *= convolve_method(relative_blur, psf_mirror, 'same')
         with np.errstate(divide='ignore', invalid='ignore'):
             rel_diff = np.sum(np.divide(((im_deconv/im_deconv.max() - ref_image)**2), ref_image))
-        if i>50:
-            print(f'{i},rel_diff={rel_diff}')     
+        # if i>50:
+        #     print(f'{i},rel_diff={rel_diff}')     
         if rel_diff < iter_thr: ### Break if a given threshold is reached.
             break   
         ref_image = im_deconv/im_deconv.max()     
         ref_image[ref_image<=lowest_value] = lowest_value      
         rel_diff_checkout = rel_diff # Store last value of rel_diff before it becomes NaN
     return rel_diff_checkout, i, im_deconv
+    # return im_deconv
 
 
 def remove_digits_beyond_first_significant(num):
