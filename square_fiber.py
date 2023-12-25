@@ -735,6 +735,7 @@ if TO_GENERATE:
 # In[5]
 # plot and save all TPB PSFs from SquareFiberDataset in their respective folders
 TO_PLOT = False
+TO_SAVE = False
 
 if TO_PLOT:
     for dir in tqdm(geometry_dirs):
@@ -748,7 +749,8 @@ if TO_PLOT:
             
         save_path = r'PSF_plot.jpg'
         
-        # fig.savefig(save_path)  
+        if TO_SAVE:
+            fig.savefig(save_path)  
         plt.close(fig)  
 
 # In[6]
@@ -760,6 +762,129 @@ if TO_PLOT:
 # keep pandas dataframe of sources original x,y , shifted m,n integers, shifted final x,y,
 # distance, saved file path
 
+def peaks(array):
+    fail = 0
+    hight_threshold = 0.1*max(array)
+    peak_idx, properties = find_peaks(array, height = hight_threshold)
+    if len(peak_idx) != 2:
+        fail = 1
+    return fail, peak_idx, properties['peak_heights']
+
+def find_min_between_peaks(array, left, right):
+    return min(array[left:right])
+
+
+def richardson_lucy(image, psf, iterations=50, iter_thr=0.):
+    """Richardson-Lucy deconvolution (modification from scikit-image package).
+
+    The modification adds a value=0 protection, the possibility to stop iterating
+    after reaching a given threshold and the generalization to n-dim of the
+    PSF mirroring.
+
+    Parameters
+    ----------
+    image : ndarray
+       Input degraded image (can be N dimensional).
+    psf : ndarray
+       The point spread function.
+    iterations : int, optional
+       Number of iterations. This parameter plays the role of
+       regularisation.
+    iter_thr : float, optional
+       Threshold on the relative difference between iterations to stop iterating.
+
+    Returns
+    -------
+    im_deconv : ndarray
+       The deconvolved image.
+    Examples
+    --------
+    >>> from skimage import color, data, restoration
+    >>> camera = color.rgb2gray(data.camera())
+    >>> from scipy.signal import convolve2d
+    >>> psf = np.ones((5, 5)) / 25
+    >>> camera = convolve2d(camera, psf, 'same')
+    >>> camera += 0.1 * camera.std() * np.random.standard_normal(camera.shape)
+    >>> deconvolved = restoration.richardson_lucy(camera, psf, 5)
+    References
+    ----------
+    .. [1] https://en.wikipedia.org/wiki/Richardson%E2%80%93Lucy_deconvolution
+    """
+    # compute the times for direct convolution and the fft method. The fft is of
+    # complexity O(N log(N)) for each dimension and the direct method does
+    # straight arithmetic (and is O(n*k) to add n elements k times)
+    direct_time = np.prod(image.shape + psf.shape)
+    fft_time    = np.sum([n*np.log(n) for n in image.shape + psf.shape])
+
+    # see whether the fourier transform convolution method or the direct
+    # convolution method is faster (discussed in scikit-image PR #1792)
+    time_ratio = 40.032 * fft_time / direct_time
+    if time_ratio <= 1 or len(image.shape) > 2:
+        convolve_method = fftconvolve
+    else:
+        convolve_method = convolve
+
+    image      = image.astype(np.float)
+    psf        = psf.astype(np.float)
+    im_deconv  = 0.5 * np.ones(image.shape)
+    s          = slice(None, None, -1)
+    psf_mirror = psf[(s,) * psf.ndim] ### Allow for n-dim mirroring.
+    eps        = np.finfo(image.dtype).eps ### Protection against 0 value
+    ref_image  = image/image.max()
+    # lowest_value = 4.94E-324
+    lowest_value = 4.94E-20
+    
+    
+    for i in range(iterations):
+        x = convolve_method(im_deconv, psf, 'same')
+        np.place(x, x==0, eps) ### Protection against 0 value
+        relative_blur = image / x
+        im_deconv *= convolve_method(relative_blur, psf_mirror, 'same')
+        with np.errstate(divide='ignore', invalid='ignore'):
+            rel_diff = np.sum(np.divide(((im_deconv/im_deconv.max() - ref_image)**2), ref_image))
+        # if i>50:
+        #     print(f'{i},rel_diff={rel_diff}')     
+        if rel_diff < iter_thr: ### Break if a given threshold is reached.
+            break  
+        ref_image = im_deconv/im_deconv.max()     
+        ref_image[ref_image<=lowest_value] = lowest_value      
+        rel_diff_checkout = rel_diff # Store last value of rel_diff before it becomes NaN
+    return rel_diff_checkout, i, im_deconv
+
+
+def P2V(vector):
+    fail, peak_idx, heights = peaks(vector)
+    if fail:
+        print(r'Could not find any peaks for data piece!')
+        return 0
+    else:
+        # Combine peak indices and heights into a list of tuples
+        peaks_with_heights = list(zip(peak_idx, heights))
+     
+        # Sort by height in descending order and select the top two
+        top_two_peaks = sorted(peaks_with_heights, key=lambda x: x[1], reverse=True)[:2]
+
+        # Extract heights of the top two peaks
+        top_heights = [peak[1] for peak in top_two_peaks]
+
+        # Calculate the average height of the top two peaks
+        avg_peak = np.average(top_heights)
+
+        # Ensure indices are in ascending order for slicing
+        left_idx, right_idx = sorted([top_two_peaks[0][0], top_two_peaks[1][0]])
+
+        # print(f'left idx = {left_idx}')
+        # print(f'right idx = {right_idx}')
+
+        # Find the valley height between the two strongest peaks
+        valley_height = find_min_between_peaks(vector, left_idx, right_idx)
+        if valley_height <= 0 and avg_peak > 0:
+            return float('inf')
+
+        avg_P2V = avg_peak / valley_height
+        return avg_P2V
+
+    
 
 TO_PLOT = True
 dist_min_threshold = 18 #mm
@@ -775,7 +900,11 @@ y_match_str = r"_y=(-?\d+(?:\.\d+)?(?:e-?\d+)?)mm"
 # for i,geo_dir in tqdm(enumerate(geometry_dirs)):
 # geo_dir = geometry_dirs[-1]
 geo_dir = ('/media/amir/Extreme Pro/SquareFiberDatabase/' +
-            'ELGap=1mm_pitch=5mm_distanceFiberHolder=-1mm_distanceAnodeHolder=2.5mm_holderThickness=10mm')
+            'ELGap=10mm_pitch=10mm_distanceFiberHolder=-1mm_distanceAnodeHolder=10mm_holderThickness=10mm')
+
+# geo_dir = ('/media/amir/Extreme Pro/SquareFiberDatabase/' +
+#             'ELGap=1mm_pitch=5mm_distanceFiberHolder=-1mm_distanceAnodeHolder=2.5mm_holderThickness=10mm')
+
 
 # assign input and output directories
 print(geo_dir)
@@ -835,8 +964,8 @@ for hit in event_to_shift:
 event_to_shift_SR = np.array(event_to_shift_SR)
 
 # shift "event_shift_SR"
-# m, n = np.random.randint(0,1), np.random.randint(0,1) 
-m , n = 3,3
+m, n = np.random.randint(1,3), np.random.randint(1,3) 
+# m , n = 2,1
 shifted_event_SR = event_to_shift_SR + [m*pitch, n*pitch]
 # Combine the two events
 combined_event_SR = np.concatenate((event_to_stay_SR, shifted_event_SR))
@@ -893,9 +1022,34 @@ x_grid, y_grid = np.meshgrid(x_range, y_range)
 interp_img = griddata((hist_hits_x, hist_hits_y), hist_hits_vals, (x_grid, y_grid),
               method='cubic', fill_value=0)
 
-rel_diff, cutoff_iter, de_conv = richardson_lucy(interp_img, PSF, iterations=75)
-print(f'rel_diff = {rel_diff}')
-print(f'cut off = {cutoff_iter}')
+
+# try P2V without deconv
+x_cm, y_cm = ndimage.measurements.center_of_mass(interp_img)
+x_cm, y_cm = int(x_cm), int(y_cm)
+interp_img_1d = interp_img[y_cm,:]
+avg_P2V_interp = P2V(interp_img_1d)
+print(f'avg_P2V_interp={avg_P2V_interp}')
+
+
+# RL deconvolution
+rel_diff_checkout, cutoff_iter, deconv = richardson_lucy(interp_img, PSF,
+                                                 iterations=75, iter_thr=0.01)
+print(f'rel_diff = {rel_diff_checkout}')
+print(f'cut off iteration = {cutoff_iter}')
+
+
+# try P2V with deconv
+x_cm, y_cm = ndimage.measurements.center_of_mass(deconv)
+x_cm, y_cm = int(x_cm), int(y_cm)
+deconv_1d = deconv[y_cm,:]
+avg_P2V_deconv = P2V(deconv_1d)
+print(f'avg_P2V_deconv={avg_P2V_deconv}')
+
+if rel_diff_checkout >= 1 or avg_P2V_interp > avg_P2V_deconv:
+    avg_P2V = avg_P2V_interp
+else:
+    avg_P2V = avg_P2V_deconv
+print(f'chosen avg_P2V={avg_P2V}')
 
 
 
@@ -923,12 +1077,46 @@ if TO_PLOT:
     plt.title('PSF')
     plt.show()
     
-    # plot deconv
-    plt.imshow(de_conv, extent=[-size/2, size/2, -size/2, size/2], vmin=0)
-    plt.colorbar()
-    plt.xlabel('x [mm]')
-    plt.ylabel('y [mm]')
-    plt.title('RL deconvolution')
+    ## plot deconv + deconv profile
+
+    fig, ax = plt.subplots(2,2,figsize=(15,13))
+    im = ax[0,0].imshow(interp_img, extent=[-size/2, size/2, -size/2, size/2],vmin=0)
+    divider = make_axes_locatable(ax[0,0])
+    cax = divider.append_axes("right", size="5%", pad=0.05)
+    plt.colorbar(im, cax=cax)
+    ax[0,0].set_xlabel('x [mm]')
+    ax[0,0].set_ylabel('y [mm]')
+    ax[0,0].set_title('Interpolated image')
+
+    legend = f'Avg P2V={np.around(avg_P2V_interp,3)}'
+    ax[0,1].plot(np.arange(-size/2, size/2), interp_img_1d,label=legend)
+    ax[0,1].set_xlabel('x [mm]')
+    ax[0,1].set_ylabel('photon hits')
+    ax[0,1].set_title('Interpolated image profile')
+    ax[0,1].grid()
+    ax[0,1].legend(fontsize=10)
+    ax[0,1].set_ylim([0,None])
+    
+    # deconv
+    im = ax[1,0].imshow(deconv, extent=[-size/2, size/2, -size/2, size/2],vmin=0)
+    divider = make_axes_locatable(ax[1,0])
+    cax = divider.append_axes("right", size="5%", pad=0.05)
+    plt.colorbar(im, cax=cax)
+    ax[1,0].set_xlabel('x [mm]')
+    ax[1,0].set_ylabel('y [mm]')
+    ax[1,0].set_title('RL deconvolution')
+    # deconv profile
+    legend = f'Avg P2V={np.around(avg_P2V_deconv,3)}'
+    ax[1,1].plot(np.arange(-size/2, size/2), deconv_1d,label=legend)
+    ax[1,1].set_xlabel('x [mm]')
+    ax[1,1].set_ylabel('photon hits')
+    ax[1,1].set_title('RL deconvolution profile')
+    ax[1,1].grid()
+    ax[1,1].legend(fontsize=10)
+    ax[1,1].set_ylim([0,None])
+    geo_params = geo_dir.split('/SquareFiberDatabase/')[-1]
+    fig.suptitle(f'{geo_params}\nEvent spacing = {np.around(dist,3)}[mm]',fontsize=15)
+    fig.tight_layout()
     plt.show()
 
 # In[7]
@@ -954,110 +1142,6 @@ if TO_PLOT:
 
 
 # In[6]
-'''
-RL deconvolution calculation and save
-'''
-section_clock_start = time.process_time()
-
-def richardson_lucy(image, psf, iterations=75, iter_thr=0.):
-    """Richardson-Lucy deconvolution (modification from scikit-image package).
-
-    The modification adds a value=0 protection, the possibility to stop iterating
-    after reaching a given threshold and the generalization to n-dim of the
-    PSF mirroring.
-
-    Parameters
-    ----------
-    image : ndarray
-       Input degraded image (can be N dimensional).
-    psf : ndarray
-       The point spread function.
-    iterations : int, optional
-       Number of iterations. This parameter plays the role of
-       regularisation.
-    iter_thr : float, optional
-       Threshold on the relative difference between iterations to stop iterating.
-
-    Returns
-    -------
-    im_deconv : ndarray
-       The deconvolved image.
-    Examples
-    --------
-    >>> from skimage import color, data, restoration
-    >>> camera = color.rgb2gray(data.camera())
-    >>> from scipy.signal import convolve2d
-    >>> psf = np.ones((5, 5)) / 25
-    >>> camera = convolve2d(camera, psf, 'same')
-    >>> camera += 0.1 * camera.std() * np.random.standard_normal(camera.shape)
-    >>> deconvolved = restoration.richardson_lucy(camera, psf, 5)
-    References
-    ----------
-    .. [1] https://en.wikipedia.org/wiki/Richardson%E2%80%93Lucy_deconvolution
-    """
-    # compute the times for direct convolution and the fft method. The fft is of
-    # complexity O(N log(N)) for each dimension and the direct method does
-    # straight arithmetic (and is O(n*k) to add n elements k times)
-    direct_time = np.prod(image.shape + psf.shape)
-    fft_time    = np.sum([n*np.log(n) for n in image.shape + psf.shape])
-
-    # see whether the fourier transform convolution method or the direct
-    # convolution method is faster (discussed in scikit-image PR #1792)
-    time_ratio = 40.032 * fft_time / direct_time
-    if time_ratio <= 1 or len(image.shape) > 2:
-        convolve_method = fftconvolve
-    else:
-        convolve_method = convolve
-
-    image      = image.astype(np.float)
-    psf        = psf.astype(np.float)
-    im_deconv  = 0.5 * np.ones(image.shape)
-    s          = slice(None, None, -1)
-    psf_mirror = psf[(s,) * psf.ndim] ### Allow for n-dim mirroring.
-    eps        = np.finfo(image.dtype).eps ### Protection against 0 value
-    ref_image  = image/image.max()
-    lowest_value = 4.94E-324
-    
-    for i in range(iterations):
-        x = convolve_method(im_deconv, psf, 'same')
-        np.place(x, x==0, eps) ### Protection against 0 value
-        relative_blur = image / x
-        im_deconv *= convolve_method(relative_blur, psf_mirror, 'same')
-        with np.errstate(divide='ignore', invalid='ignore'):
-            rel_diff = np.sum(np.divide(((im_deconv/im_deconv.max() - ref_image)**2), ref_image))
-        # if i>50:
-        #     print(f'{i},rel_diff={rel_diff}')     
-        if rel_diff < iter_thr: ### Break if a given threshold is reached.
-            break   
-        ref_image = im_deconv/im_deconv.max()     
-        ref_image[ref_image<=lowest_value] = lowest_value      
-        rel_diff_checkout = rel_diff # Store last value of rel_diff before it becomes NaN
-    return rel_diff_checkout, i, im_deconv
-    # return im_deconv
-
-
-def remove_digits_beyond_first_significant(num):
-    '''
-    This function cuts a float when when the first significant digit is shown
-    after the decimal point.
-    for example: 
-        if given 0.00001023, returns 0.00001
-    '''
-    new_string = ''
-    string = '{:.15f}'.format(num)
-    for counter,element in enumerate(string):
-        if element == '0' or element == '.':
-            new_string = new_string + element
-        else: break
-    return float(new_string + element) 
-
-
-
-
-
-
-
-
 
 
 
