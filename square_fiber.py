@@ -419,7 +419,7 @@ def plot_sensor_response(event, bins, size, noise=False):
     sipm_assigned_event = sipm_assigned_event.T
 
     plt.imshow(sipm_assigned_event,
-               extent=[-size/2, size/2, -size/2, size/2], vmin=0)
+               extent=[-size/2, size/2, -size/2, size/2], vmin=0,origin='lower')
     plt.title("Sensor Response")
     plt.xlabel('x [mm]')
     plt.ylabel('y [mm]')
@@ -720,18 +720,22 @@ for dir in geometry_dirs:
 
 
 # In[4]
-# Generate all TPB PSFs from SquareFiberDataset
+# Generate all PSFs (of geant4 TPB hits) from SquareFiberDataset
 
 TO_GENERATE = False
+TO_PLOT = False
+TO_SAVE = False
 
 if TO_GENERATE:
     for dir in geometry_dirs:
-        PSF_TPB = psf_creator(dir,create_from="TPB",to_plot=True,to_smooth=False)
+        PSF_TPB = psf_creator(dir,create_from="TPB",to_plot=TO_PLOT,to_smooth=False)
         os.chdir(dir)
         os.chdir('..')
-        save_PSF = r'PSF.npy'
-        np.save(save_PSF,PSF_TPB)
-
+        
+        if TO_SAVE:
+            save_PSF = r'PSF.npy'
+            np.save(save_PSF,PSF_TPB)
+            
 # In[5]
 # plot and save all TPB PSFs from SquareFiberDataset in their respective folders
 TO_PLOT = False
@@ -742,25 +746,186 @@ if TO_PLOT:
         os.chdir(dir)
         working_dir = r'Working on directory:'+f'\n{os.getcwd()}'
         print(working_dir)
-        
         PSF = np.load(r'PSF.npy')
-        
         fig = plot_PSF(PSF=PSF)
-            
-        save_path = r'PSF_plot.jpg'
         
         if TO_SAVE:
+            save_path = r'PSF_plot.jpg'
             fig.savefig(save_path)  
         plt.close(fig)  
-
+        
 # In[6]
-# combine events and interpolate and RL
+'''
+Generate and save twin events dataset, after shifting, centering and rotation
+'''
 
-# for each geometry
-# sample 2 events -> shift 1 of them to (randint(0,max_n),randint(0,max_n))*(x2,y2)
-# -> make sensor response, save distance (example 16-17mm, 17-18mm), save to unique folder
-# keep pandas dataframe of sources original x,y , shifted m,n integers, shifted final x,y,
-# distance, saved file path
+def find_highest_number(directory):
+    '''
+    For the case more data is generated and added to existing data,
+    finds the last data sample created by finding the max data number.
+
+    Parameters
+    ----------
+    directory : str
+        The directory of data to search in.
+
+    Returns
+    -------
+    highest_number : int
+        the number of the last data sample created.
+        if not found , returns -1
+
+    '''
+    highest_number = -1  # Start with a default value
+
+    for entry in os.scandir(directory):
+        if entry.is_dir():  # Check if the entry is a directory
+            for file in os.scandir(entry.path):
+                if file.is_file() and file.name.endswith('.npy'):
+                    # Extracting the number from the file name
+                    number = int(file.name.split('.')[0])
+                    highest_number = max(highest_number, number)
+
+    return highest_number
+
+
+TO_GENERATE = False
+TO_SAVE = False
+samples_per_geometry = 100
+
+if TO_GENERATE:
+    x_match_str = r"_x=(-?\d+(?:\.\d+)?(?:e-?\d+)?)mm"
+    y_match_str = r"_y=(-?\d+(?:\.\d+)?(?:e-?\d+)?)mm"
+
+    for i,geo_dir in tqdm(enumerate(geometry_dirs[0:1])):
+        
+        # find min distance that will be of interest
+        match = re.search(r"_pitch=(\d+(?:\.\d+)?)mm", geo_dir)
+        pitch = float(match.group(1))
+        dist_min_threshold = pitch # mm
+
+        # assign input and output directories
+        print(geo_dir)
+        working_dir = geo_dir + r'/Geant4_Kr_events'
+        save_dir = geo_dir + r'/combined_event_SR' 
+        if not os.path.isdir(save_dir):
+            os.mkdir(save_dir)
+
+        os.chdir(working_dir)
+        PSF = np.load(geo_dir + '/PSF.npy')
+        PSF = smooth_PSF(PSF)
+
+        event_pattern = "SiPM_hits"
+        event_list = [entry.name for entry in os.scandir() if entry.is_file() 
+                      and entry.name.startswith(event_pattern)]
+        
+        # in case we add more samples, find highest existing sample number
+        highest_existing_data_number = find_highest_number(save_dir)
+        if highest_existing_data_number == -1:
+            highest_existing_data_number = 0
+
+        for j in tqdm(range(samples_per_geometry+1)):
+            event_pair = random.sample(event_list, k=2)
+    
+            # grab event 0 x,y original generation coordinates
+            x0_match = re.search(x_match_str, event_pair[0])
+            x0 = float(x0_match.group(1))
+            y0_match = re.search(y_match_str, event_pair[0])
+            y0 = float(y0_match.group(1))
+    
+            # grab event 1 x,y original generation coordinates
+            x1_match = re.search(x_match_str, event_pair[1])
+            x1 = float(x1_match.group(1))
+            y1_match = re.search(y_match_str, event_pair[1])
+            y1 = float(y1_match.group(1))
+    
+                    
+            event_to_stay, event_to_shift = np.genfromtxt(event_pair[0]), np.genfromtxt(event_pair[1])
+    
+            # Assign each hit to a SiPM
+            event_to_stay_SR = []
+            for hit in event_to_stay:
+                sipm = assign_hit_to_SiPM(hit=hit, pitch=pitch, n=n_sipms)
+                if sipm:  # if the hit belongs to a SiPM
+                    event_to_stay_SR.append(sipm)
+               
+            event_to_stay_SR = np.array(event_to_stay_SR)
+    
+    
+            # Assign each hit to a SiPM
+            event_to_shift_SR = []
+            for hit in event_to_shift:
+                sipm = assign_hit_to_SiPM(hit=hit, pitch=pitch, n=n_sipms)
+                if sipm:  # if the hit belongs to a SiPM
+                    event_to_shift_SR.append(sipm)
+               
+            event_to_shift_SR = np.array(event_to_shift_SR)
+    
+            # shift "event_shift_SR"
+            m, n = np.random.randint(1,4), np.random.randint(1,4) 
+            # m , n = 2,1
+            shifted_event_SR = event_to_shift_SR + [m*pitch, n*pitch]
+    
+            # Combine the two events
+            combined_event_SR = np.concatenate((event_to_stay_SR, shifted_event_SR))
+            shifted_event_coord = np.array([x1, y1]) + [m*pitch, n*pitch]
+    
+            # get distance between stay and shifted
+            dist = (np.sqrt((x0-shifted_event_coord[0])**2+(y0-shifted_event_coord[1])**2))
+            if dist < dist_min_threshold:
+                samples_per_geometry -= 1
+                continue
+            # get midpoint of stay and shifted
+            midpoint = [(x0+shifted_event_coord[0])/2,(y0+shifted_event_coord[1])/2]
+            # print(f'distance = {dist}mm')
+            # print(f'midpoint = {midpoint}mm')
+    
+            # center combined event using midpoint
+            centered_combined_event_SR = combined_event_SR - midpoint
+    
+            # # Save combined centered event to suitlable folder according to sources distance
+            # save_dir = save_dir + f'/{int(dist)}mm'
+            # if not os.path.isdir(save_dir):
+            #     os.mkdir(save_dir)
+            # save_path = save_dir + f'/{i}.npy'
+            # np.save(save_path,centered_combined_event_SR)
+    
+    
+            # rotate combined event 
+            theta = np.arctan2(y0-shifted_event_coord[1],x0-shifted_event_coord[0])
+            # theta = np.arctan((y0-shifted_event_coord[1]) / (x0-shifted_event_coord[0]))
+            rot_matrix = np.array([[np.cos(theta),-np.sin(theta)],
+                                    [np.sin(theta),np.cos(theta)]])
+            combined_rotated_event_SR = np.matmul(centered_combined_event_SR,rot_matrix)
+    
+            # Save combined centered ROTATED event to suitlable folder according to sources distance
+            if TO_SAVE:
+                save_to_dir = save_dir + f'/{int(dist)}_mm'
+                if not os.path.isdir(save_to_dir):
+                    os.mkdir(save_to_dir)
+                save_path = save_to_dir + f'/{highest_existing_data_number+j}.npy'
+                np.save(save_path,combined_rotated_event_SR)
+                
+                       
+# In[7]
+'''
+Load twin events after shifted, centered and rotated. interpolate and deconv.
+'''
+
+
+
+
+
+
+# In[8]
+'''
+combine events, interpolate and RL
+This shows 1 sample at a time for a chosen m,n shift values for different geometries
+for each geometry:
+sample 2 events -> shift 1 of them to (randint(0,max_n),randint(0,max_n))*(x2,y2)
+-> make sensor response, save distance (example 16-17mm, 17-18mm), rotate,
+interpolate, RL and Peak to Valley (P2V)
+'''
 
 def peaks(array):
     fail = 0
@@ -855,7 +1020,7 @@ def richardson_lucy(image, psf, iterations=50, iter_thr=0.):
 def P2V(vector):
     fail, peak_idx, heights = peaks(vector)
     if fail:
-        print(r'Could not find any peaks for data piece!')
+        print(r'Could not find any peaks for event!')
         return 0
     else:
         # Combine peak indices and heights into a list of tuples
@@ -873,9 +1038,9 @@ def P2V(vector):
         # Ensure indices are in ascending order for slicing
         left_idx, right_idx = sorted([top_two_peaks[0][0], top_two_peaks[1][0]])
 
+
         # print(f'left idx = {left_idx}')
         # print(f'right idx = {right_idx}')
-
         # Find the valley height between the two strongest peaks
         valley_height = find_min_between_peaks(vector, left_idx, right_idx)
         if valley_height <= 0 and avg_peak > 0:
@@ -887,40 +1052,50 @@ def P2V(vector):
     
 
 TO_PLOT = True
-dist_min_threshold = 18 #mm
 
 # override previous bins/size settings
 bins = 250
 size = bins
-
+# seed = random.randint(0,10**9)
+seed = 322414211
+random.seed(seed)
+np.random.seed(seed)
 
 x_match_str = r"_x=(-?\d+(?:\.\d+)?(?:e-?\d+)?)mm"
 y_match_str = r"_y=(-?\d+(?:\.\d+)?(?:e-?\d+)?)mm"
 
 # for i,geo_dir in tqdm(enumerate(geometry_dirs)):
 # geo_dir = geometry_dirs[-1]
-geo_dir = ('/media/amir/Extreme Pro/SquareFiberDatabase/' +
-            'ELGap=10mm_pitch=10mm_distanceFiberHolder=-1mm_distanceAnodeHolder=10mm_holderThickness=10mm')
+
+
+# # works bad for this geometry
+# geo_dir = ('/media/amir/Extreme Pro/SquareFiberDatabase/' +
+#             'ELGap=1mm_pitch=15.6mm_distanceFiberHolder=2mm_distanceAnodeHolder=10mm_holderThickness=10mm')
 
 # geo_dir = ('/media/amir/Extreme Pro/SquareFiberDatabase/' +
-#             'ELGap=1mm_pitch=5mm_distanceFiberHolder=-1mm_distanceAnodeHolder=2.5mm_holderThickness=10mm')
+#             'ELGap=10mm_pitch=15.6mm_distanceFiberHolder=-1mm_distanceAnodeHolder=10mm_holderThickness=10mm')
 
+# geo_dir = ('/media/amir/Extreme Pro/SquareFiberDatabase/' +
+#             'ELGap=10mm_pitch=15.6mm_distanceFiberHolder=5mm_distanceAnodeHolder=10mm_holderThickness=10mm')
+
+geo_dir = str(random.sample(geometry_dirs, k=1)[0])
+
+# grab pitch value as a reference to minimum distance between sources
+match = re.search(r"_pitch=(\d+(?:\.\d+)?)mm", geo_dir)
+pitch = float(match.group(1))
+dist_min_threshold = pitch #mm
 
 # assign input and output directories
 print(geo_dir)
 working_dir = geo_dir + r'/Geant4_Kr_events'
-save_dir = geo_dir + '/combined_event_SR' 
+save_dir = geo_dir + r'/combined_event_SR' 
 if not os.path.isdir(save_dir):
     os.mkdir(save_dir)
 
 os.chdir(working_dir)
 PSF = np.load(geo_dir + '/PSF.npy')
-# PSF = smooth_PSF(PSF)
+PSF = smooth_PSF(PSF)
 
-# Search and extract geometry pitch in directory name
-pitch_match = re.search(r"_pitch=(\d+(?:\.\d+)?)mm", working_dir)
-pitch = float(pitch_match.group(1))
-# print(f'pitch={pitch}')
 event_pattern = "SiPM_hits"
 
 # for j in tqdm(range(100)):
@@ -967,10 +1142,11 @@ event_to_shift_SR = np.array(event_to_shift_SR)
 m, n = np.random.randint(1,3), np.random.randint(1,3) 
 # m , n = 2,1
 shifted_event_SR = event_to_shift_SR + [m*pitch, n*pitch]
+
 # Combine the two events
 combined_event_SR = np.concatenate((event_to_stay_SR, shifted_event_SR))
-
 shifted_event_coord = np.array([x1, y1]) + [m*pitch, n*pitch]
+
 # get distance between stay and shifted
 dist = (np.sqrt((x0-shifted_event_coord[0])**2+(y0-shifted_event_coord[1])**2))
 # if dist < dist_min_threshold:
@@ -990,11 +1166,21 @@ centered_combined_event_SR = combined_event_SR - midpoint
 # save_path = save_dir + f'/{i}.npy'
 # np.save(save_path,centered_combined_event_SR)
 
+
 # rotate combined event 
-theta = np.arctan2(shifted_event_coord[1]-y0,shifted_event_coord[0]-x0)
+theta = np.arctan2(y0-shifted_event_coord[1],x0-shifted_event_coord[0])
+# theta = np.arctan((y0-shifted_event_coord[1]) / (x0-shifted_event_coord[0]))
 rot_matrix = np.array([[np.cos(theta),-np.sin(theta)],
                         [np.sin(theta),np.cos(theta)]])
 combined_rotated_event_SR = np.matmul(centered_combined_event_SR,rot_matrix)
+
+# # Save combined centered rotated event to suitlable folder according to sources distance
+# save_dir = save_dir + f'/{int(dist)}mm'
+# if not os.path.isdir(save_dir):
+#     os.mkdir(save_dir)
+# save_path = save_dir + f'/{i}.npy'
+# np.save(save_path,combined_rotated_event_SR)
+
 
 #### interpolation ####
 
@@ -1003,6 +1189,8 @@ hist, x_edges, y_edges = np.histogram2d(combined_rotated_event_SR[:,0],
                                         combined_rotated_event_SR[:,1],
                                         range=[[-size/2, size/2], [-size/2, size/2]],
                                         bins=bins)
+
+
 
 # Compute the centers of the bins
 x_centers = (x_edges[:-1] + x_edges[1:]) / 2
@@ -1022,6 +1210,8 @@ x_grid, y_grid = np.meshgrid(x_range, y_range)
 interp_img = griddata((hist_hits_x, hist_hits_y), hist_hits_vals, (x_grid, y_grid),
               method='cubic', fill_value=0)
 
+# optional, cut interp image values below 0
+interp_img[interp_img<0] = 0
 
 # try P2V without deconv
 x_cm, y_cm = ndimage.measurements.center_of_mass(interp_img)
@@ -1032,24 +1222,43 @@ print(f'avg_P2V_interp={avg_P2V_interp}')
 
 
 # RL deconvolution
+# rel_diff_checkout, cutoff_iter, deconv = richardson_lucy(interp_img, PSF,
+#                                                   iterations=75, iter_thr=0.05)
 rel_diff_checkout, cutoff_iter, deconv = richardson_lucy(interp_img, PSF,
-                                                 iterations=75, iter_thr=0.01)
+                                                  iterations=75, iter_thr=0.01)
+
 print(f'rel_diff = {rel_diff_checkout}')
 print(f'cut off iteration = {cutoff_iter}')
 
 
 # try P2V with deconv
+# print(f'min deconv = {np.around(np.min(deconv),3)}')
 x_cm, y_cm = ndimage.measurements.center_of_mass(deconv)
 x_cm, y_cm = int(x_cm), int(y_cm)
 deconv_1d = deconv[y_cm,:]
 avg_P2V_deconv = P2V(deconv_1d)
-print(f'avg_P2V_deconv={avg_P2V_deconv}')
+print(f'avg_P2V_deconv = {avg_P2V_deconv}')
+print(f'seed = {seed}')
 
-if rel_diff_checkout >= 1 or avg_P2V_interp > avg_P2V_deconv:
-    avg_P2V = avg_P2V_interp
-else:
-    avg_P2V = avg_P2V_deconv
-print(f'chosen avg_P2V={avg_P2V}')
+# deconvolution diverges
+if rel_diff_checkout >= 1 :
+    chosen_avg_P2V = np.around(avg_P2V_interp,3)
+    print('\n\nDeconvolution process status: FAIL - diverging' +
+          f'\nInterpolation P2V outperforms, avg_P2V={chosen_avg_P2V}')
+# deconvolution converges
+if rel_diff_checkout < 1:
+    if avg_P2V_deconv >= avg_P2V_interp:
+        chosen_avg_P2V = np.around(avg_P2V_deconv,3)
+        print('\n\nDeconvolution process status: SUCCESS - converging' + 
+              f'\nDeconvolution P2V outperforms, avg_P2V={chosen_avg_P2V}')
+    if avg_P2V_deconv < avg_P2V_interp: # deconvolution converges but didn't outperform interp P2V
+        chosen_avg_P2V = np.around(avg_P2V_interp,3)
+        print('\n\nDeconvolution process status: SUCCEED - converging' + 
+              f'\nInterpolation P2V outperforms, avg_P2V={chosen_avg_P2V}')
+    if avg_P2V_deconv == 0 and avg_P2V_interp == 0:
+        chosen_avg_P2V = -1
+        print('Could not find a P2V value. Check sensor response image.')
+        
 
 
 
@@ -1080,7 +1289,7 @@ if TO_PLOT:
     ## plot deconv + deconv profile
 
     fig, ax = plt.subplots(2,2,figsize=(15,13))
-    im = ax[0,0].imshow(interp_img, extent=[-size/2, size/2, -size/2, size/2],vmin=0)
+    im = ax[0,0].imshow(interp_img, extent=[-size/2, size/2, -size/2, size/2])
     divider = make_axes_locatable(ax[0,0])
     cax = divider.append_axes("right", size="5%", pad=0.05)
     plt.colorbar(im, cax=cax)
@@ -1095,10 +1304,10 @@ if TO_PLOT:
     ax[0,1].set_title('Interpolated image profile')
     ax[0,1].grid()
     ax[0,1].legend(fontsize=10)
-    ax[0,1].set_ylim([0,None])
+    # ax[0,1].set_ylim([0,None])
     
     # deconv
-    im = ax[1,0].imshow(deconv, extent=[-size/2, size/2, -size/2, size/2],vmin=0)
+    im = ax[1,0].imshow(deconv, extent=[-size/2, size/2, -size/2, size/2])
     divider = make_axes_locatable(ax[1,0])
     cax = divider.append_axes("right", size="5%", pad=0.05)
     plt.colorbar(im, cax=cax)
@@ -1113,7 +1322,7 @@ if TO_PLOT:
     ax[1,1].set_title('RL deconvolution profile')
     ax[1,1].grid()
     ax[1,1].legend(fontsize=10)
-    ax[1,1].set_ylim([0,None])
+    # ax[1,1].set_ylim([0,None])
     geo_params = geo_dir.split('/SquareFiberDatabase/')[-1]
     fig.suptitle(f'{geo_params}\nEvent spacing = {np.around(dist,3)}[mm]',fontsize=15)
     fig.tight_layout()
