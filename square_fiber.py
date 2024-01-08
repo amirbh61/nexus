@@ -27,6 +27,7 @@ from scipy.interpolate import interp2d
 from scipy.interpolate import griddata
 from scipy.interpolate import RectBivariateSpline
 from scipy.signal import find_peaks, peak_widths
+from scipy.ndimage import rotate
 import random
 # Global settings #
 
@@ -415,11 +416,11 @@ def plot_sensor_response(event, bins, size, noise=False):
     if noise:
         sipm_assigned_event = np.random.poisson(sipm_assigned_event)
 
-    # Transpose the array to correctly align the axes
+    # # Transpose the array to correctly align the axes
     sipm_assigned_event = sipm_assigned_event.T
 
     plt.imshow(sipm_assigned_event,
-               extent=[-size/2, size/2, -size/2, size/2], vmin=0,origin='lower')
+                extent=[-size/2, size/2, -size/2, size/2], vmin=0, origin='lower')
     plt.title("Sensor Response")
     plt.xlabel('x [mm]')
     plt.ylabel('y [mm]')
@@ -460,6 +461,128 @@ def plot_PSF(PSF,size=100):
     plt.show()
     return fig
 
+
+def peaks(array):
+    fail = 0
+    hight_threshold = 0.1*max(array)
+    peak_idx, properties = find_peaks(array, height = hight_threshold)
+    # if len(peak_idx) != 2:
+    #     fail = 1
+    return fail, peak_idx, properties['peak_heights']
+
+def find_min_between_peaks(array, left, right):
+    return min(array[left:right])
+
+
+def richardson_lucy(image, psf, iterations=50, iter_thr=0.):
+    """Richardson-Lucy deconvolution (modification from scikit-image package).
+
+    The modification adds a value=0 protection, the possibility to stop iterating
+    after reaching a given threshold and the generalization to n-dim of the
+    PSF mirroring.
+
+    Parameters
+    ----------
+    image : ndarray
+       Input degraded image (can be N dimensional).
+    psf : ndarray
+       The point spread function.
+    iterations : int, optional
+       Number of iterations. This parameter plays the role of
+       regularisation.
+    iter_thr : float, optional
+       Threshold on the relative difference between iterations to stop iterating.
+
+    Returns
+    -------
+    im_deconv : ndarray
+       The deconvolved image.
+    Examples
+    --------
+    >>> from skimage import color, data, restoration
+    >>> camera = color.rgb2gray(data.camera())
+    >>> from scipy.signal import convolve2d
+    >>> psf = np.ones((5, 5)) / 25
+    >>> camera = convolve2d(camera, psf, 'same')
+    >>> camera += 0.1 * camera.std() * np.random.standard_normal(camera.shape)
+    >>> deconvolved = restoration.richardson_lucy(camera, psf, 5)
+    References
+    ----------
+    .. [1] https://en.wikipedia.org/wiki/Richardson%E2%80%93Lucy_deconvolution
+    """
+    # compute the times for direct convolution and the fft method. The fft is of
+    # complexity O(N log(N)) for each dimension and the direct method does
+    # straight arithmetic (and is O(n*k) to add n elements k times)
+    direct_time = np.prod(image.shape + psf.shape)
+    fft_time    = np.sum([n*np.log(n) for n in image.shape + psf.shape])
+
+    # see whether the fourier transform convolution method or the direct
+    # convolution method is faster (discussed in scikit-image PR #1792)
+    time_ratio = 40.032 * fft_time / direct_time
+    if time_ratio <= 1 or len(image.shape) > 2:
+        convolve_method = fftconvolve
+    else:
+        convolve_method = convolve
+
+    image      = image.astype(np.float)
+    psf        = psf.astype(np.float)
+    im_deconv  = 0.5 * np.ones(image.shape)
+    s          = slice(None, None, -1)
+    psf_mirror = psf[(s,) * psf.ndim] ### Allow for n-dim mirroring.
+    eps        = np.finfo(image.dtype).eps ### Protection against 0 value
+    ref_image  = image/image.max()
+    # lowest_value = 4.94E-324
+    lowest_value = 4.94E-20
+    
+    
+    for i in range(iterations):
+        x = convolve_method(im_deconv, psf, 'same')
+        np.place(x, x==0, eps) ### Protection against 0 value
+        relative_blur = image / x
+        im_deconv *= convolve_method(relative_blur, psf_mirror, 'same')
+        with np.errstate(divide='ignore', invalid='ignore'):
+            rel_diff = np.sum(np.divide(((im_deconv/im_deconv.max() - ref_image)**2), ref_image))
+        # if i>50:
+        #     print(f'{i},rel_diff={rel_diff}')     
+        if rel_diff < iter_thr: ### Break if a given threshold is reached.
+            break  
+        ref_image = im_deconv/im_deconv.max()     
+        ref_image[ref_image<=lowest_value] = lowest_value      
+        rel_diff_checkout = rel_diff # Store last value of rel_diff before it becomes NaN
+    return rel_diff_checkout, i, im_deconv
+
+
+def P2V(vector):
+    fail, peak_idx, heights = peaks(vector)
+    if fail:
+        print(r'Could not find any peaks for event!')
+        return 0
+    else:
+        # Combine peak indices and heights into a list of tuples
+        peaks_with_heights = list(zip(peak_idx, heights))
+     
+        # Sort by height in descending order and select the top two
+        top_two_peaks = sorted(peaks_with_heights, key=lambda x: x[1], reverse=True)[:2]
+
+        # Extract heights of the top two peaks
+        top_heights = [peak[1] for peak in top_two_peaks]
+
+        # Calculate the average height of the top two peaks
+        avg_peak = np.average(top_heights)
+
+        # Ensure indices are in ascending order for slicing
+        left_idx, right_idx = sorted([top_two_peaks[0][0], top_two_peaks[1][0]])
+
+
+        # print(f'left idx = {left_idx}')
+        # print(f'right idx = {right_idx}')
+        # Find the valley height between the two strongest peaks
+        valley_height = find_min_between_peaks(vector, left_idx, right_idx)
+        if valley_height <= 0 and avg_peak > 0:
+            return float('inf')
+
+        avg_P2V = avg_peak / valley_height
+        return avg_P2V
 
 
 # # test assign_hit_to_SiPM
@@ -761,8 +884,9 @@ Generate and save twin events dataset, after shifting, centering and rotation
 
 def find_highest_number(directory):
     '''
-    For the case more data is generated and added to existing data,
-    finds the last data sample created by finding the max data number.
+    Finds the highest data sample number in a directory where files are
+    named in the format:
+    "intnumber_rotation_angle_rad=value.npy"
 
     Parameters
     ----------
@@ -772,32 +896,38 @@ def find_highest_number(directory):
     Returns
     -------
     highest_number : int
-        the number of the last data sample created.
-        if not found , returns -1
-
+        The number of the last data sample created.
+        If not found, returns -1.
     '''
-    highest_number = -1  # Start with a default value
+    highest_number = -1
 
     for entry in os.scandir(directory):
-        if entry.is_dir():  # Check if the entry is a directory
+        if entry.is_dir():
             for file in os.scandir(entry.path):
                 if file.is_file() and file.name.endswith('.npy'):
-                    # Extracting the number from the file name
-                    number = int(file.name.split('.')[0])
-                    highest_number = max(highest_number, number)
+                    try:
+                        # Extracting the number before the first underscore
+                        number = int(file.name.split('_')[0])
+                        highest_number = max(highest_number, number)
+                    except ValueError:
+                        # Handle cases where the conversion to int might fail
+                        continue
 
     return highest_number
 
 
-TO_GENERATE = False
-TO_SAVE = False
-samples_per_geometry = 100
+TO_GENERATE = True
+TO_SAVE = True
+samples_per_geometry = 9900
 
 if TO_GENERATE:
     x_match_str = r"_x=(-?\d+(?:\.\d+)?(?:e-?\d+)?)mm"
     y_match_str = r"_y=(-?\d+(?:\.\d+)?(?:e-?\d+)?)mm"
 
     for i,geo_dir in tqdm(enumerate(geometry_dirs[0:1])):
+        geo_dir = ('/media/amir/Extreme Pro/SquareFiberDatabase/' +
+                    'ELGap=10mm_pitch=15.6mm_distanceFiberHolder=5mm_distanceAnodeHolder=10mm_holderThickness=10mm')
+
         
         # find min distance that will be of interest
         match = re.search(r"_pitch=(\d+(?:\.\d+)?)mm", geo_dir)
@@ -812,8 +942,6 @@ if TO_GENERATE:
             os.mkdir(save_dir)
 
         os.chdir(working_dir)
-        PSF = np.load(geo_dir + '/PSF.npy')
-        PSF = smooth_PSF(PSF)
 
         event_pattern = "SiPM_hits"
         event_list = [entry.name for entry in os.scandir() if entry.is_file() 
@@ -879,32 +1007,38 @@ if TO_GENERATE:
             midpoint = [(x0+shifted_event_coord[0])/2,(y0+shifted_event_coord[1])/2]
             # print(f'distance = {dist}mm')
             # print(f'midpoint = {midpoint}mm')
+            
+            theta = np.arctan2(y0-shifted_event_coord[1],x0-shifted_event_coord[0])
+            rot_matrix = np.array([[np.cos(theta),-np.sin(theta)],
+                                    [np.sin(theta),np.cos(theta)]])
     
             # center combined event using midpoint
             centered_combined_event_SR = combined_event_SR - midpoint
     
             # # Save combined centered event to suitlable folder according to sources distance
-            # save_dir = save_dir + f'/{int(dist)}mm'
-            # if not os.path.isdir(save_dir):
-            #     os.mkdir(save_dir)
-            # save_path = save_dir + f'/{i}.npy'
-            # np.save(save_path,centered_combined_event_SR)
-    
-    
-            # rotate combined event 
-            theta = np.arctan2(y0-shifted_event_coord[1],x0-shifted_event_coord[0])
-            # theta = np.arctan((y0-shifted_event_coord[1]) / (x0-shifted_event_coord[0]))
-            rot_matrix = np.array([[np.cos(theta),-np.sin(theta)],
-                                    [np.sin(theta),np.cos(theta)]])
-            combined_rotated_event_SR = np.matmul(centered_combined_event_SR,rot_matrix)
-    
-            # Save combined centered ROTATED event to suitlable folder according to sources distance
             if TO_SAVE:
                 save_to_dir = save_dir + f'/{int(dist)}_mm'
                 if not os.path.isdir(save_to_dir):
                     os.mkdir(save_to_dir)
-                save_path = save_to_dir + f'/{highest_existing_data_number+j}.npy'
-                np.save(save_path,combined_rotated_event_SR)
+                save_path = (save_to_dir + f'/{highest_existing_data_number+j}_' +
+                f'rotation_angle_rad={np.around(theta,5)}.npy')
+                np.save(save_path,centered_combined_event_SR)
+    
+    
+            # # rotate combined event 
+            # theta = np.arctan2(y0-shifted_event_coord[1],x0-shifted_event_coord[0])
+            # # theta = np.arctan((y0-shifted_event_coord[1]) / (x0-shifted_event_coord[0]))
+            # rot_matrix = np.array([[np.cos(theta),-np.sin(theta)],
+            #                         [np.sin(theta),np.cos(theta)]])
+            # combined_rotated_event_SR = np.matmul(centered_combined_event_SR,rot_matrix)
+    
+            # # Save combined centered ROTATED event to suitlable folder according to sources distance
+            # if TO_SAVE:
+            #     save_to_dir = save_dir + f'/{int(dist)}_mm'
+            #     if not os.path.isdir(save_to_dir):
+            #         os.mkdir(save_to_dir)
+            #     save_path = save_to_dir + f'/{highest_existing_data_number+j}.npy'
+            #     np.save(save_path,combined_rotated_event_SR)
                 
                        
 # In[7]
@@ -912,7 +1046,252 @@ if TO_GENERATE:
 Load twin events after shifted, centered and rotated. interpolate and deconv.
 '''
 
+def extract_theta_from_path(file_path):
+    """
+    Extracts theta value from a given file path of the form "8754_rotation_angle_rad=-2.84423.npy"
 
+    Parameters
+    ----------
+    file_path : str
+        The file path string.
+
+    Returns
+    -------
+    float
+        The extracted theta value.
+    """
+    try:
+        # Splitting by '_' and then further splitting by '='
+        parts = file_path.split('_')
+        theta_part = parts[-1]  # Get the last part which contains theta
+        theta_str = theta_part.split('=')[-1]  # Split by '=' and get the last part
+        theta_str = theta_str.replace('.npy', '')  # Remove the .npy extension
+        return float(theta_str)
+    except Exception as e:
+        print(f"Error extracting theta from path: {file_path}. Error: {e}")
+        return None
+    
+    
+def find_subdirectory_by_distance(directory, user_distance):
+    """
+    Finds the subdirectory that corresponds to the 
+    user-specified distance within a given directory.
+    
+    Parameters
+    ----------
+    directory : str
+        The directory to search in.
+    user_distance : int
+        The user-specified distance.
+    
+    Returns
+    -------
+    str or None
+        The subdirectory corresponding to the user-specified distance,
+        or None if not found.
+    """
+    for entry in os.scandir(directory):
+        if entry.is_dir():
+            match = re.search(r'(\d+)_mm', entry.name)
+            if match and int(match.group(1)) == user_distance:
+                return entry.path
+    return None
+    
+    
+TO_GENERATE = True
+
+if TO_GENERATE:
+    for i,geo_dir in tqdm(enumerate(geometry_dirs[0:1])):
+        
+        # overwrite to a specific geometry
+        geo_dir = ('/media/amir/Extreme Pro/SquareFiberDatabase/' +
+                    'ELGap=10mm_pitch=15.6mm_distanceFiberHolder=5mm_'+
+                    'distanceAnodeHolder=10mm_holderThickness=10mm')
+
+        # assign input and output directories
+        print(geo_dir)
+        working_dir = geo_dir + r'/combined_event_SR'
+
+        # os.chdir(working_dir)
+        dist_dirs = glob.glob(working_dir + '/*')
+        
+        PSF = np.load(geo_dir + '/PSF.npy')
+        PSF = smooth_PSF(PSF)
+
+        
+        # # in case we add more samples, find highest existing sample number
+        # highest_existing_data_number = find_highest_number(save_dir)
+        dist = 24
+        user_chosen_dir = find_subdirectory_by_distance(working_dir, dist)
+        
+        for j,dist_dir in tqdm(enumerate(dist_dirs[-15:-14])):
+            
+            print(f'Working on:\n{dist_dir}')
+            # match = re.search(r'/(\d+)_mm', dist_dir)
+            # if match:
+            #     dist = int(match.group(1))
+                
+            dist_dir = user_chosen_dir
+            deconv_stack = np.empty((250,250))
+            cutoff_iter_list = []
+            rel_diff_checkout_list = []
+            event_files = glob.glob(dist_dir + '/*')
+            
+            for event_file in tqdm(event_files):
+                event = np.load(event_file)
+                
+                ##### interpolation #####
+
+                # Create a 2D histogram
+                hist, x_edges, y_edges = np.histogram2d(event[:,0], event[:,1],
+                                                        range=[[-size/2, size/2],
+                                                               [-size/2, size/2]],
+                                                        bins=bins)
+
+
+
+                # Compute the centers of the bins
+                x_centers = (x_edges[:-1] + x_edges[1:]) / 2
+                y_centers = (y_edges[:-1] + y_edges[1:]) / 2
+
+                hist_hits_x_idx, hist_hits_y_idx = np.where(hist>0)
+                hist_hits_x = x_centers[hist_hits_x_idx]
+                hist_hits_y = y_centers[hist_hits_y_idx]
+                hist_hits_vals = hist[hist>0]
+
+
+                # Define the interpolation grid
+                x_range = np.linspace(-size/2, size/2, num=bins)
+                y_range = np.linspace(-size/2, size/2, num=bins)
+                x_grid, y_grid = np.meshgrid(x_range, y_range)
+
+                # Perform the interpolation
+                interp_img = griddata((hist_hits_x, hist_hits_y), hist_hits_vals,
+                                      (x_grid, y_grid), method='cubic', fill_value=0)
+
+
+                # optional, cut interp image values below 0
+                interp_img[interp_img<0] = 0
+
+                # # plot interpolated combined event
+                # plt.imshow(interp_img, extent=[-size/2, size/2, -size/2, size/2],
+                #            vmin=0, origin='lower')
+                # plt.colorbar(label='Photon hits')
+                # plt.title('Cubic Interpolation of Combined event')
+                # plt.xlabel('x [mm]')
+                # plt.ylabel('y [mm]')
+                # plt.show()
+
+
+                ##### RL deconvolution #####
+                # rel_diff_checkout, cutoff_iter, deconv = richardson_lucy(interp_img, PSF,
+                #                                                   iterations=75, iter_thr=0.05)
+                rel_diff_checkout, cutoff_iter, deconv = richardson_lucy(interp_img, PSF,
+                                                                  iterations=75, iter_thr=0.01)
+                cutoff_iter_list.append(cutoff_iter)
+                rel_diff_checkout_list.append(rel_diff_checkout)
+                
+                # # plot RL deconvolution
+                # plt.imshow(deconv, extent=[-size/2, size/2, -size/2, size/2],
+                #            vmin=0, origin='lower')
+                # plt.colorbar(label='Photon hits')
+                # plt.title('RL deconvolution')
+                # plt.xlabel('x [mm]')
+                # plt.ylabel('y [mm]')
+                # plt.show()
+
+
+                ##### ROTATE #####
+                theta = extract_theta_from_path(event_file)
+                rot_matrix = np.array([[np.cos(theta),-np.sin(theta)],
+                                        [np.sin(theta),np.cos(theta)]])
+
+                # # rotate combined event BEFORE deconv
+                # points = np.column_stack((x_grid.ravel(), y_grid.ravel())) # Flatten the grids
+
+                # rotated_points = np.dot(points, rot_matrix.T) # Rotate each point
+
+                # # Reshape rotated points back into 2D grid
+                # x_rotated = rotated_points[:, 0].reshape(x_grid.shape)
+                # y_rotated = rotated_points[:, 1].reshape(y_grid.shape)
+
+                # # Perform the interpolation on the rotated grid
+                # rotated_interp_img = griddata((hist_hits_x, hist_hits_y), hist_hits_vals,
+                #                               (x_rotated, y_rotated),
+                #                               method='cubic', fill_value=0)
+
+
+                # rotate combined event AFTER deconv
+                rotated_deconv = rotate(deconv, np.degrees(theta), reshape=False, mode='nearest')
+                deconv_stack += rotated_deconv
+
+                # # plot deconvolution stacking
+                # plt.imshow(deconv_stack, extent=[-size/2, size/2, -size/2, size/2],
+                #             vmin=0, origin='lower')
+                # plt.colorbar(label='Photon hits')
+                # plt.title('Accomulated RL deconvolution')
+                # plt.xlabel('x [mm]')
+                # plt.ylabel('y [mm]')
+                # plt.show()
+                
+            
+            avg_cutoff_iter = np.mean(cutoff_iter_list)
+            avg_rel_diff_checkout = np.mean(rel_diff_checkout_list)
+            # plot deconvolution stacking
+            plt.imshow(deconv_stack, extent=[-size/2, size/2, -size/2, size/2],
+                        vmin=0, origin='lower')
+            plt.colorbar(label='Photon hits')
+            plt.title('Deconvolution of combined event')
+            plt.xlabel('x [mm]')
+            plt.ylabel('y [mm]')
+            plt.show()
+            
+            # P2V deconv
+            # print(f'min deconv = {np.around(np.min(deconv),3)}')
+            x_cm, y_cm = ndimage.measurements.center_of_mass(deconv_stack)
+            x_cm, y_cm = int(x_cm), int(y_cm)
+            deconv_stack_1d = deconv_stack[y_cm,:]
+            P2V_deconv_stack = P2V(deconv_stack_1d)
+            print(f'P2V_deconv_stack={P2V_deconv_stack}')
+            
+            # ##### P2V #####
+            # # try P2V without deconv
+            # x_cm, y_cm = ndimage.measurements.center_of_mass(rotated_interp_img)
+            # x_cm, y_cm = int(x_cm), int(y_cm)
+            # interp_img_1d = rotated_interp_img[y_cm,:]
+            # avg_P2V_interp = P2V(interp_img_1d)
+            # # print(f'avg_P2V_interp = {avg_P2V_interp}')
+            
+            ## plot deconv + deconv profile (with rotation) ##
+            fig, (ax0, ax1) = plt.subplots(1,2,figsize=(15,7))
+            # deconv
+            im = ax0.imshow(deconv_stack, extent=[-size/2, size/2, -size/2, size/2])
+            divider = make_axes_locatable(ax0)
+            cax = divider.append_axes("right", size="5%", pad=0.05)
+            plt.colorbar(im, cax=cax)
+            ax0.set_xlabel('x [mm]')
+            ax0.set_ylabel('y [mm]')
+            ax0.set_title('Stacked RL deconvolution')
+            # deconv profile
+            legend = f'Avg P2V={np.around(P2V_deconv_stack,3)}'
+            ax1.plot(np.arange(-size/2, size/2), deconv_stack_1d,label=legend)
+            ax1.set_xlabel('x [mm]')
+            ax1.set_ylabel('photon hits')
+            ax1.set_title('Stacked RL deconvolution profile')
+            ax1.grid()
+            ax1.legend(fontsize=10)
+            # ax[1,1].set_ylim([0,None])
+            geo_params = geo_dir.split('/SquareFiberDatabase/')[-1]
+            title = (f'{geo_params}\nEvent spacing = {dist}[mm],' + 
+            f' avg RL iterations = {avg_cutoff_iter},'+
+            f' avg relative diff = {np.around(avg_rel_diff_checkout,4)}')
+            fig.suptitle(title,fontsize=15)
+            fig.tight_layout()
+            plt.show()
+            
+            
+            # store dist and P2V value here
+            
 
 
 
@@ -927,137 +1306,14 @@ sample 2 events -> shift 1 of them to (randint(0,max_n),randint(0,max_n))*(x2,y2
 interpolate, RL and Peak to Valley (P2V)
 '''
 
-def peaks(array):
-    fail = 0
-    hight_threshold = 0.1*max(array)
-    peak_idx, properties = find_peaks(array, height = hight_threshold)
-    if len(peak_idx) != 2:
-        fail = 1
-    return fail, peak_idx, properties['peak_heights']
-
-def find_min_between_peaks(array, left, right):
-    return min(array[left:right])
-
-
-def richardson_lucy(image, psf, iterations=50, iter_thr=0.):
-    """Richardson-Lucy deconvolution (modification from scikit-image package).
-
-    The modification adds a value=0 protection, the possibility to stop iterating
-    after reaching a given threshold and the generalization to n-dim of the
-    PSF mirroring.
-
-    Parameters
-    ----------
-    image : ndarray
-       Input degraded image (can be N dimensional).
-    psf : ndarray
-       The point spread function.
-    iterations : int, optional
-       Number of iterations. This parameter plays the role of
-       regularisation.
-    iter_thr : float, optional
-       Threshold on the relative difference between iterations to stop iterating.
-
-    Returns
-    -------
-    im_deconv : ndarray
-       The deconvolved image.
-    Examples
-    --------
-    >>> from skimage import color, data, restoration
-    >>> camera = color.rgb2gray(data.camera())
-    >>> from scipy.signal import convolve2d
-    >>> psf = np.ones((5, 5)) / 25
-    >>> camera = convolve2d(camera, psf, 'same')
-    >>> camera += 0.1 * camera.std() * np.random.standard_normal(camera.shape)
-    >>> deconvolved = restoration.richardson_lucy(camera, psf, 5)
-    References
-    ----------
-    .. [1] https://en.wikipedia.org/wiki/Richardson%E2%80%93Lucy_deconvolution
-    """
-    # compute the times for direct convolution and the fft method. The fft is of
-    # complexity O(N log(N)) for each dimension and the direct method does
-    # straight arithmetic (and is O(n*k) to add n elements k times)
-    direct_time = np.prod(image.shape + psf.shape)
-    fft_time    = np.sum([n*np.log(n) for n in image.shape + psf.shape])
-
-    # see whether the fourier transform convolution method or the direct
-    # convolution method is faster (discussed in scikit-image PR #1792)
-    time_ratio = 40.032 * fft_time / direct_time
-    if time_ratio <= 1 or len(image.shape) > 2:
-        convolve_method = fftconvolve
-    else:
-        convolve_method = convolve
-
-    image      = image.astype(np.float)
-    psf        = psf.astype(np.float)
-    im_deconv  = 0.5 * np.ones(image.shape)
-    s          = slice(None, None, -1)
-    psf_mirror = psf[(s,) * psf.ndim] ### Allow for n-dim mirroring.
-    eps        = np.finfo(image.dtype).eps ### Protection against 0 value
-    ref_image  = image/image.max()
-    # lowest_value = 4.94E-324
-    lowest_value = 4.94E-20
-    
-    
-    for i in range(iterations):
-        x = convolve_method(im_deconv, psf, 'same')
-        np.place(x, x==0, eps) ### Protection against 0 value
-        relative_blur = image / x
-        im_deconv *= convolve_method(relative_blur, psf_mirror, 'same')
-        with np.errstate(divide='ignore', invalid='ignore'):
-            rel_diff = np.sum(np.divide(((im_deconv/im_deconv.max() - ref_image)**2), ref_image))
-        # if i>50:
-        #     print(f'{i},rel_diff={rel_diff}')     
-        if rel_diff < iter_thr: ### Break if a given threshold is reached.
-            break  
-        ref_image = im_deconv/im_deconv.max()     
-        ref_image[ref_image<=lowest_value] = lowest_value      
-        rel_diff_checkout = rel_diff # Store last value of rel_diff before it becomes NaN
-    return rel_diff_checkout, i, im_deconv
-
-
-def P2V(vector):
-    fail, peak_idx, heights = peaks(vector)
-    if fail:
-        print(r'Could not find any peaks for event!')
-        return 0
-    else:
-        # Combine peak indices and heights into a list of tuples
-        peaks_with_heights = list(zip(peak_idx, heights))
-     
-        # Sort by height in descending order and select the top two
-        top_two_peaks = sorted(peaks_with_heights, key=lambda x: x[1], reverse=True)[:2]
-
-        # Extract heights of the top two peaks
-        top_heights = [peak[1] for peak in top_two_peaks]
-
-        # Calculate the average height of the top two peaks
-        avg_peak = np.average(top_heights)
-
-        # Ensure indices are in ascending order for slicing
-        left_idx, right_idx = sorted([top_two_peaks[0][0], top_two_peaks[1][0]])
-
-
-        # print(f'left idx = {left_idx}')
-        # print(f'right idx = {right_idx}')
-        # Find the valley height between the two strongest peaks
-        valley_height = find_min_between_peaks(vector, left_idx, right_idx)
-        if valley_height <= 0 and avg_peak > 0:
-            return float('inf')
-
-        avg_P2V = avg_peak / valley_height
-        return avg_P2V
-
-    
 
 TO_PLOT = True
 
 # override previous bins/size settings
 bins = 250
 size = bins
-# seed = random.randint(0,10**9)
-seed = 322414211
+seed = random.randint(0,10**9)
+# seed = 872349067
 random.seed(seed)
 np.random.seed(seed)
 
@@ -1075,10 +1331,10 @@ y_match_str = r"_y=(-?\d+(?:\.\d+)?(?:e-?\d+)?)mm"
 # geo_dir = ('/media/amir/Extreme Pro/SquareFiberDatabase/' +
 #             'ELGap=10mm_pitch=15.6mm_distanceFiberHolder=-1mm_distanceAnodeHolder=10mm_holderThickness=10mm')
 
-# geo_dir = ('/media/amir/Extreme Pro/SquareFiberDatabase/' +
-#             'ELGap=10mm_pitch=15.6mm_distanceFiberHolder=5mm_distanceAnodeHolder=10mm_holderThickness=10mm')
+geo_dir = ('/media/amir/Extreme Pro/SquareFiberDatabase/' +
+            'ELGap=10mm_pitch=15.6mm_distanceFiberHolder=5mm_distanceAnodeHolder=10mm_holderThickness=10mm')
 
-geo_dir = str(random.sample(geometry_dirs, k=1)[0])
+# geo_dir = str(random.sample(geometry_dirs, k=1)[0])
 
 # grab pitch value as a reference to minimum distance between sources
 match = re.search(r"_pitch=(\d+(?:\.\d+)?)mm", geo_dir)
@@ -1139,22 +1395,25 @@ for hit in event_to_shift:
 event_to_shift_SR = np.array(event_to_shift_SR)
 
 # shift "event_shift_SR"
-m, n = np.random.randint(1,3), np.random.randint(1,3) 
+m, n = np.random.randint(1,4), np.random.randint(1,4) 
 # m , n = 2,1
-shifted_event_SR = event_to_shift_SR + [m*pitch, n*pitch]
 
+shifted_event_SR = event_to_shift_SR + [m*pitch, n*pitch]
 # Combine the two events
 combined_event_SR = np.concatenate((event_to_stay_SR, shifted_event_SR))
 shifted_event_coord = np.array([x1, y1]) + [m*pitch, n*pitch]
 
 # get distance between stay and shifted
 dist = (np.sqrt((x0-shifted_event_coord[0])**2+(y0-shifted_event_coord[1])**2))
-# if dist < dist_min_threshold:
-#     continue
+
 # get midpoint of stay and shifted
 midpoint = [(x0+shifted_event_coord[0])/2,(y0+shifted_event_coord[1])/2]
 print(f'distance = {dist}mm')
 # print(f'midpoint = {midpoint}mm')
+
+theta = np.arctan2(y0-shifted_event_coord[1],x0-shifted_event_coord[0])
+rot_matrix = np.array([[np.cos(theta),-np.sin(theta)],
+                        [np.sin(theta),np.cos(theta)]])
 
 # center combined event using midpoint
 centered_combined_event_SR = combined_event_SR - midpoint
@@ -1167,26 +1426,11 @@ centered_combined_event_SR = combined_event_SR - midpoint
 # np.save(save_path,centered_combined_event_SR)
 
 
-# rotate combined event 
-theta = np.arctan2(y0-shifted_event_coord[1],x0-shifted_event_coord[0])
-# theta = np.arctan((y0-shifted_event_coord[1]) / (x0-shifted_event_coord[0]))
-rot_matrix = np.array([[np.cos(theta),-np.sin(theta)],
-                        [np.sin(theta),np.cos(theta)]])
-combined_rotated_event_SR = np.matmul(centered_combined_event_SR,rot_matrix)
+##### interpolation #####
 
-# # Save combined centered rotated event to suitlable folder according to sources distance
-# save_dir = save_dir + f'/{int(dist)}mm'
-# if not os.path.isdir(save_dir):
-#     os.mkdir(save_dir)
-# save_path = save_dir + f'/{i}.npy'
-# np.save(save_path,combined_rotated_event_SR)
-
-
-#### interpolation ####
-
-# # Create a 2D histogram
-hist, x_edges, y_edges = np.histogram2d(combined_rotated_event_SR[:,0],
-                                        combined_rotated_event_SR[:,1],
+# Create a 2D histogram
+hist, x_edges, y_edges = np.histogram2d(centered_combined_event_SR[:,0],
+                                        centered_combined_event_SR[:,1],
                                         range=[[-size/2, size/2], [-size/2, size/2]],
                                         bins=bins)
 
@@ -1206,37 +1450,63 @@ hist_hits_vals = hist[hist>0]
 x_range = np.linspace(-size/2, size/2, num=bins)
 y_range = np.linspace(-size/2, size/2, num=bins)
 x_grid, y_grid = np.meshgrid(x_range, y_range)
+
 # Perform the interpolation
-interp_img = griddata((hist_hits_x, hist_hits_y), hist_hits_vals, (x_grid, y_grid),
-              method='cubic', fill_value=0)
+interp_img = griddata((hist_hits_x, hist_hits_y), hist_hits_vals,
+                      (x_grid, y_grid), method='cubic', fill_value=0)
 
 # optional, cut interp image values below 0
 interp_img[interp_img<0] = 0
 
-# try P2V without deconv
-x_cm, y_cm = ndimage.measurements.center_of_mass(interp_img)
-x_cm, y_cm = int(x_cm), int(y_cm)
-interp_img_1d = interp_img[y_cm,:]
-avg_P2V_interp = P2V(interp_img_1d)
-print(f'avg_P2V_interp={avg_P2V_interp}')
 
 
-# RL deconvolution
+##### RL deconvolution #####
 # rel_diff_checkout, cutoff_iter, deconv = richardson_lucy(interp_img, PSF,
 #                                                   iterations=75, iter_thr=0.05)
 rel_diff_checkout, cutoff_iter, deconv = richardson_lucy(interp_img, PSF,
                                                   iterations=75, iter_thr=0.01)
 
+
+##### ROTATE #####
+
+# rotate combined event BEFORE deconv
+points = np.column_stack((x_grid.ravel(), y_grid.ravel())) # Flatten the grids
+
+rotated_points = np.dot(points, rot_matrix.T) # Rotate each point
+
+# Reshape rotated points back into 2D grid
+x_rotated = rotated_points[:, 0].reshape(x_grid.shape)
+y_rotated = rotated_points[:, 1].reshape(y_grid.shape)
+
+# Perform the interpolation on the rotated grid
+rotated_interp_img = griddata((hist_hits_x, hist_hits_y), hist_hits_vals,
+                              (x_rotated, y_rotated),
+                              method='cubic', fill_value=0)
+
+
+# rotate combined event AFTER deconv
+rotated_deconv = rotate(deconv, np.degrees(theta), reshape=False, mode='nearest')
+
+
 print(f'rel_diff = {rel_diff_checkout}')
 print(f'cut off iteration = {cutoff_iter}')
 
 
+##### P2V #####
+# try P2V without deconv
+x_cm, y_cm = ndimage.measurements.center_of_mass(rotated_interp_img)
+x_cm, y_cm = int(x_cm), int(y_cm)
+interp_img_1d = rotated_interp_img[y_cm,:]
+avg_P2V_interp = P2V(interp_img_1d)
+print(f'avg_P2V_interp = {avg_P2V_interp}')
+
+
 # try P2V with deconv
 # print(f'min deconv = {np.around(np.min(deconv),3)}')
-x_cm, y_cm = ndimage.measurements.center_of_mass(deconv)
+x_cm, y_cm = ndimage.measurements.center_of_mass(rotated_deconv)
 x_cm, y_cm = int(x_cm), int(y_cm)
-deconv_1d = deconv[y_cm,:]
-avg_P2V_deconv = P2V(deconv_1d)
+rotated_deconv_1d = rotated_deconv[y_cm,:]
+avg_P2V_deconv = P2V(rotated_deconv_1d)
 print(f'avg_P2V_deconv = {avg_P2V_deconv}')
 print(f'seed = {seed}')
 
@@ -1268,12 +1538,22 @@ if TO_PLOT:
     plot_sensor_response(event_to_shift_SR,bins,size)
     plot_sensor_response(combined_event_SR, bins, size)
     plot_sensor_response(centered_combined_event_SR, bins, size)
-    plot_sensor_response(combined_rotated_event_SR, bins, size, noise=True)
     
-    # plot interpolated combined event
-    plt.imshow(interp_img, extent=[-size/2, size/2, -size/2, size/2], vmin=0)
+    # plot interpolated combined event (no rotation)
+    # Transpose the array to correctly align the axes
+    plt.imshow(interp_img, extent=[-size/2, size/2, -size/2, size/2],
+               vmin=0, origin='lower')
     plt.colorbar(label='Photon hits')
-    plt.title('Cubic Interpolation of Combined Rotated event')
+    plt.title('Cubic Interpolation of Combined event')
+    plt.xlabel('x [mm]')
+    plt.ylabel('y [mm]')
+    plt.show()
+    
+    # plot deconvoltion of combined event (no rotation)
+    plt.imshow(deconv, extent=[-size/2, size/2, -size/2, size/2],
+               vmin=0, origin='lower')
+    plt.colorbar(label='Photon hits')
+    plt.title('Deconvolution of combined event')
     plt.xlabel('x [mm]')
     plt.ylabel('y [mm]')
     plt.show()
@@ -1286,40 +1566,39 @@ if TO_PLOT:
     plt.title('PSF')
     plt.show()
     
-    ## plot deconv + deconv profile
-
+    ## plot deconv + deconv profile (with rotation) ##
     fig, ax = plt.subplots(2,2,figsize=(15,13))
-    im = ax[0,0].imshow(interp_img, extent=[-size/2, size/2, -size/2, size/2])
+    im = ax[0,0].imshow(rotated_interp_img, extent=[-size/2, size/2, -size/2, size/2])
     divider = make_axes_locatable(ax[0,0])
     cax = divider.append_axes("right", size="5%", pad=0.05)
     plt.colorbar(im, cax=cax)
     ax[0,0].set_xlabel('x [mm]')
     ax[0,0].set_ylabel('y [mm]')
-    ax[0,0].set_title('Interpolated image')
+    ax[0,0].set_title('Rotated interpolated image')
 
     legend = f'Avg P2V={np.around(avg_P2V_interp,3)}'
     ax[0,1].plot(np.arange(-size/2, size/2), interp_img_1d,label=legend)
     ax[0,1].set_xlabel('x [mm]')
     ax[0,1].set_ylabel('photon hits')
-    ax[0,1].set_title('Interpolated image profile')
+    ax[0,1].set_title('Rotated interpolated image profile')
     ax[0,1].grid()
     ax[0,1].legend(fontsize=10)
     # ax[0,1].set_ylim([0,None])
     
     # deconv
-    im = ax[1,0].imshow(deconv, extent=[-size/2, size/2, -size/2, size/2])
+    im = ax[1,0].imshow(rotated_deconv, extent=[-size/2, size/2, -size/2, size/2])
     divider = make_axes_locatable(ax[1,0])
     cax = divider.append_axes("right", size="5%", pad=0.05)
     plt.colorbar(im, cax=cax)
     ax[1,0].set_xlabel('x [mm]')
     ax[1,0].set_ylabel('y [mm]')
-    ax[1,0].set_title('RL deconvolution')
+    ax[1,0].set_title('Rotated RL deconvolution')
     # deconv profile
     legend = f'Avg P2V={np.around(avg_P2V_deconv,3)}'
-    ax[1,1].plot(np.arange(-size/2, size/2), deconv_1d,label=legend)
+    ax[1,1].plot(np.arange(-size/2, size/2), rotated_deconv_1d,label=legend)
     ax[1,1].set_xlabel('x [mm]')
     ax[1,1].set_ylabel('photon hits')
-    ax[1,1].set_title('RL deconvolution profile')
+    ax[1,1].set_title('Rotated RL deconvolution profile')
     ax[1,1].grid()
     ax[1,1].legend(fontsize=10)
     # ax[1,1].set_ylim([0,None])
