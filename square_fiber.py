@@ -22,7 +22,7 @@ from scipy import ndimage
 import time
 from scipy.signal           import fftconvolve
 from scipy.signal           import convolve
-from invisible_cities.reco.deconv_functions     import richardson_lucy
+# from invisible_cities.reco.deconv_functions     import richardson_lucy
 from scipy.interpolate import interp2d
 from scipy.interpolate import griddata
 from scipy.interpolate import RectBivariateSpline
@@ -34,8 +34,8 @@ import random
 
 n_sipms = 25 # DO NOT CHANGE THIS VALUE
 n_sipms_per_side = (n_sipms-1)/2
-size = 100
-bins = 100
+size = 250
+bins = size
 
 
 path_to_dataset = '/media/amir/Extreme Pro/SquareFiberDatabase'
@@ -215,7 +215,7 @@ def smooth_PSF(PSF):
         circle_ij = np.where(circle==1)
         smooth_PSF[circle_ij] = np.mean(PSF[circle_ij])
     return smooth_PSF
-
+""
 
 # #original
 # def assign_hit_to_SiPM_original(hit, pitch, n):
@@ -293,8 +293,8 @@ def psf_creator(directory, create_from, to_plot=True,to_smooth=True):
     pattern = r"-?\d+.\d+"
 
     PSF_list = []
-    size = 100 # keep the same for all future histograms
-    bins = 100 # keep the same for all future histograms
+    size = 100 # value override, keep the same for all PSF histograms
+    bins = 100 # value override, keep the same for all PSF histograms
     
     # For DEBUGGING
     plot_event = False
@@ -464,10 +464,10 @@ def plot_PSF(PSF,size=100):
 
 def peaks(array):
     fail = 0
-    hight_threshold = 0.1*max(array)
+    hight_threshold = 0.1*max(array) # ignore peaks of 10% max peak
     peak_idx, properties = find_peaks(array, height = hight_threshold)
-    # if len(peak_idx) != 2:
-    #     fail = 1
+    if len(peak_idx) == 0 or len(peak_idx) == 1:
+        fail = 1 # no peaks
     return fail, peak_idx, properties['peak_heights']
 
 def find_min_between_peaks(array, left, right):
@@ -546,7 +546,7 @@ def richardson_lucy(image, psf, iterations=50, iter_thr=0.):
         #     print(f'{i},rel_diff={rel_diff}')     
         if rel_diff < iter_thr: ### Break if a given threshold is reached.
             break  
-        ref_image = im_deconv/im_deconv.max()     
+        ref_image = im_deconv/im_deconv.max()
         ref_image[ref_image<=lowest_value] = lowest_value      
         rel_diff_checkout = rel_diff # Store last value of rel_diff before it becomes NaN
     return rel_diff_checkout, i, im_deconv
@@ -556,7 +556,7 @@ def P2V(vector):
     fail, peak_idx, heights = peaks(vector)
     if fail:
         print(r'Could not find any peaks for event!')
-        return 0
+        return 1
     else:
         # Combine peak indices and heights into a list of tuples
         peaks_with_heights = list(zip(peak_idx, heights))
@@ -585,19 +585,19 @@ def P2V(vector):
         return avg_P2V
 
 
-# # test assign_hit_to_SiPM
+# # tests for function assign_hit_to_SiPM
 # test_cases = [
 #     ((x, y), pitch, n)
 #     for x in np.linspace(-10, 10, 20)
 #     for y in np.linspace(-10, 10, 20)
-#     for pitch in [1, 2, 3]
-#     for n in [25]
+#     for pitch in [5,10,15.6]
+#     for n in [n_sipms]
 # ]
 
 # # Compare the outputs of the two functions
 # for hit, pitch, n in test_cases:
 #     result_original = assign_hit_to_SiPM_original(hit, pitch, n)
-#     result_optimized = assign_hit_to_SiPM_optimized(hit, pitch, n)
+#     result_optimized = assign_hit_to_SiPM(hit, pitch, n)
 
 #     if result_original != result_optimized:
 #         print(f"Discrepancy found for hit {hit}, pitch {pitch}, n {n}:")
@@ -614,8 +614,6 @@ path_to_dataset = r'/media/amir/9C33-6BBD/NEXT_work/Geant4/nexus/' + \
                   
 # path_to_dataset = r'/media/amir/Extreme Pro/SquareFiberDatabase'
 geometry_dirs = os.listdir(path_to_dataset)
-size = 100
-bins = 100
 MC_folder = '/home/amir/Desktop/NEXT_work/Resolving_Power/Results/'
 plot_MC_PSF = True
 
@@ -882,11 +880,13 @@ if TO_PLOT:
 Generate and save twin events dataset, after shifting, centering and rotation
 '''
 
-def find_highest_number(directory):
+def find_highest_number(directory,file_format='.npy'):
     '''
     Finds the highest data sample number in a directory where files are
     named in the format:
     "intnumber_rotation_angle_rad=value.npy"
+    The idea is that if we are adding new data to existing data, then the 
+    numbering of oyr newly generated data should continue the existing numbering.
 
     Parameters
     ----------
@@ -904,7 +904,7 @@ def find_highest_number(directory):
     for entry in os.scandir(directory):
         if entry.is_dir():
             for file in os.scandir(entry.path):
-                if file.is_file() and file.name.endswith('.npy'):
+                if file.is_file() and file.name.endswith(file_format):
                     try:
                         # Extracting the number before the first underscore
                         number = int(file.name.split('_')[0])
@@ -918,16 +918,35 @@ def find_highest_number(directory):
 
 TO_GENERATE = True
 TO_SAVE = True
-samples_per_geometry = 9900
+random_shift = True
+if random_shift is True:
+    m_min = 1
+    m_max = 4 # inclusive
+    n_min = 1
+    n_max = 4 # inclusive
+if random_shift is False:
+    m,n = 1,1
+samples_per_geometry = 10000
 
 if TO_GENERATE:
     x_match_str = r"_x=(-?\d+(?:\.\d+)?(?:e-?\d+)?)mm"
     y_match_str = r"_y=(-?\d+(?:\.\d+)?(?:e-?\d+)?)mm"
 
-    for i,geo_dir in tqdm(enumerate(geometry_dirs[0:1])):
-        geo_dir = ('/media/amir/Extreme Pro/SquareFiberDatabase/' +
-                    'ELGap=10mm_pitch=15.6mm_distanceFiberHolder=5mm_distanceAnodeHolder=10mm_holderThickness=10mm')
+    for i,geo_dir in tqdm(enumerate(geometry_dirs)):
+        # # good geometry
+        # geo_dir = ('/media/amir/Extreme Pro/SquareFiberDatabase/' +
+        #             'ELGap=10mm_pitch=15.6mm_distanceFiberHolder=-1mm_distanceAnodeHolder=10mm_holderThickness=10mm')
 
+        # # bad geometry
+        # geo_dir = ('/media/amir/Extreme Pro/SquareFiberDatabase/' +
+        #             'ELGap=1mm_pitch=15.6mm_distanceFiberHolder=5mm_' +
+        #             'distanceAnodeHolder=10mm_holderThickness=10mm')
+        
+        # # worst geometry
+        # geo_dir = ('/media/amir/Extreme Pro/SquareFiberDatabase/' +
+        #             'ELGap=1mm_pitch=15.6mm_distanceFiberHolder=-1mm_' +
+        #             'distanceAnodeHolder=2.5mm_holderThickness=10mm')
+        
         
         # find min distance that will be of interest
         match = re.search(r"_pitch=(\d+(?:\.\d+)?)mm", geo_dir)
@@ -952,7 +971,7 @@ if TO_GENERATE:
         if highest_existing_data_number == -1:
             highest_existing_data_number = 0
 
-        for j in tqdm(range(samples_per_geometry+1)):
+        for j in range(samples_per_geometry+1):
             event_pair = random.sample(event_list, k=2)
     
             # grab event 0 x,y original generation coordinates
@@ -990,8 +1009,8 @@ if TO_GENERATE:
             event_to_shift_SR = np.array(event_to_shift_SR)
     
             # shift "event_shift_SR"
-            m, n = np.random.randint(1,4), np.random.randint(1,4) 
-            # m , n = 2,1
+            if random_shift:
+                m, n = np.random.randint(m_min,m_max), np.random.randint(n_min,n_max)
             shifted_event_SR = event_to_shift_SR + [m*pitch, n*pitch]
     
             # Combine the two events
@@ -1099,43 +1118,62 @@ def find_subdirectory_by_distance(directory, user_distance):
     
     
 TO_GENERATE = True
+TO_SAVE = True
+TO_PLOT_EACH_STEP = False
+TO_PLOT_P2V = False
 
 if TO_GENERATE:
     for i,geo_dir in tqdm(enumerate(geometry_dirs[0:1])):
         
-        # overwrite to a specific geometry
         geo_dir = ('/media/amir/Extreme Pro/SquareFiberDatabase/' +
-                    'ELGap=10mm_pitch=15.6mm_distanceFiberHolder=5mm_'+
-                    'distanceAnodeHolder=10mm_holderThickness=10mm')
+                    'ELGap=10mm_pitch=15.6mm_distanceFiberHolder=-1mm_distanceAnodeHolder=10mm_holderThickness=10mm')
+
+        # # overwrite to a specific geometry
+        # geo_dir = ('/media/amir/Extreme Pro/SquareFiberDatabase/' +
+        #             'ELGap=10mm_pitch=15.6mm_distanceFiberHolder=5mm_'+
+        #             'distanceAnodeHolder=10mm_holderThickness=10mm')
+        
+        # geo_dir = ('/media/amir/Extreme Pro/SquareFiberDatabase/' +
+        #             'ELGap=1mm_pitch=15.6mm_distanceFiberHolder=5mm_' +
+        #             'distanceAnodeHolder=10mm_holderThickness=10mm')
+
+        # # worst geometry
+        # geo_dir = ('/media/amir/Extreme Pro/SquareFiberDatabase/' +
+        #             'ELGap=1mm_pitch=15.6mm_distanceFiberHolder=-1mm_' +
+        #             'distanceAnodeHolder=2.5mm_holderThickness=10mm')
+        
+        
 
         # assign input and output directories
         print(geo_dir)
         working_dir = geo_dir + r'/combined_event_SR'
-
+        output_dir = geo_dir + r'/P2V'
         # os.chdir(working_dir)
         dist_dirs = glob.glob(working_dir + '/*')
         
         PSF = np.load(geo_dir + '/PSF.npy')
-        PSF = smooth_PSF(PSF)
+        # PSF = smooth_PSF(PSF)
 
         
         # # in case we add more samples, find highest existing sample number
         # highest_existing_data_number = find_highest_number(save_dir)
-        dist = 24
+        dist = 48
         user_chosen_dir = find_subdirectory_by_distance(working_dir, dist)
         
         for j,dist_dir in tqdm(enumerate(dist_dirs[-15:-14])):
             
-            print(f'Working on:\n{dist_dir}')
+            # print(f'Working on:\n{dist_dir}')
             # match = re.search(r'/(\d+)_mm', dist_dir)
             # if match:
             #     dist = int(match.group(1))
                 
             dist_dir = user_chosen_dir
-            deconv_stack = np.empty((250,250))
+            print(f'Working on:\n{dist_dir}')
+            deconv_stack = np.zeros((size,size))
             cutoff_iter_list = []
             rel_diff_checkout_list = []
-            event_files = glob.glob(dist_dir + '/*')
+            event_files = glob.glob(dist_dir + '/*.npy')
+            
             
             for event_file in tqdm(event_files):
                 event = np.load(event_file)
@@ -1147,7 +1185,6 @@ if TO_GENERATE:
                                                         range=[[-size/2, size/2],
                                                                [-size/2, size/2]],
                                                         bins=bins)
-
 
 
                 # Compute the centers of the bins
@@ -1173,33 +1210,17 @@ if TO_GENERATE:
                 # optional, cut interp image values below 0
                 interp_img[interp_img<0] = 0
 
-                # # plot interpolated combined event
-                # plt.imshow(interp_img, extent=[-size/2, size/2, -size/2, size/2],
-                #            vmin=0, origin='lower')
-                # plt.colorbar(label='Photon hits')
-                # plt.title('Cubic Interpolation of Combined event')
-                # plt.xlabel('x [mm]')
-                # plt.ylabel('y [mm]')
-                # plt.show()
-
 
                 ##### RL deconvolution #####
                 # rel_diff_checkout, cutoff_iter, deconv = richardson_lucy(interp_img, PSF,
                 #                                                   iterations=75, iter_thr=0.05)
                 rel_diff_checkout, cutoff_iter, deconv = richardson_lucy(interp_img, PSF,
                                                                   iterations=75, iter_thr=0.01)
+                
+                
                 cutoff_iter_list.append(cutoff_iter)
                 rel_diff_checkout_list.append(rel_diff_checkout)
                 
-                # # plot RL deconvolution
-                # plt.imshow(deconv, extent=[-size/2, size/2, -size/2, size/2],
-                #            vmin=0, origin='lower')
-                # plt.colorbar(label='Photon hits')
-                # plt.title('RL deconvolution')
-                # plt.xlabel('x [mm]')
-                # plt.ylabel('y [mm]')
-                # plt.show()
-
 
                 ##### ROTATE #####
                 theta = extract_theta_from_path(event_file)
@@ -1225,26 +1246,59 @@ if TO_GENERATE:
                 rotated_deconv = rotate(deconv, np.degrees(theta), reshape=False, mode='nearest')
                 deconv_stack += rotated_deconv
 
-                # # plot deconvolution stacking
-                # plt.imshow(deconv_stack, extent=[-size/2, size/2, -size/2, size/2],
-                #             vmin=0, origin='lower')
-                # plt.colorbar(label='Photon hits')
-                # plt.title('Accomulated RL deconvolution')
-                # plt.xlabel('x [mm]')
-                # plt.ylabel('y [mm]')
-                # plt.show()
+
+                
+                if TO_PLOT_EACH_STEP:
+                    
+                    # plot SR combined event
+                    plt.imshow(hist, extent=[-size/2, size/2, -size/2, size/2],
+                                vmin=0, origin='lower')
+                    plt.colorbar(label='Photon hits')
+                    plt.title('SR Combined event')
+                    plt.xlabel('x [mm]')
+                    plt.ylabel('y [mm]')
+                    plt.show()
+                    
+                    # plot interpolated combined event
+                    plt.imshow(interp_img, extent=[-size/2, size/2, -size/2, size/2],
+                                vmin=0, origin='lower')
+                    plt.colorbar(label='Photon hits')
+                    plt.title('Cubic Interpolation of Combined event')
+                    plt.xlabel('x [mm]')
+                    plt.ylabel('y [mm]')
+                    plt.show()
+                    
+                    # plot RL deconvolution
+                    plt.imshow(deconv, extent=[-size/2, size/2, -size/2, size/2],
+                                vmin=0, origin='lower')
+                    plt.colorbar(label='Photon hits')
+                    plt.title('RL deconvolution')
+                    plt.xlabel('x [mm]')
+                    plt.ylabel('y [mm]')
+                    plt.show()
+                    
+                    # plot ROTATED RL deconvolution
+                    plt.imshow(rotated_deconv, extent=[-size/2, size/2, -size/2, size/2],
+                                vmin=0, origin='lower')
+                    plt.colorbar(label='Photon hits')
+                    plt.title('Rotated RL deconvolution')
+                    plt.xlabel('x [mm]')
+                    plt.ylabel('y [mm]')
+                    plt.show()
+                    
+                    # plot deconvolution stacking
+                    plt.imshow(deconv_stack, extent=[-size/2, size/2, -size/2, size/2],
+                                vmin=0, origin='lower')
+                    plt.colorbar(label='Photon hits')
+                    plt.title('Accomulated RL deconvolution')
+                    plt.xlabel('x [mm]')
+                    plt.ylabel('y [mm]')
+                    plt.show()
                 
             
             avg_cutoff_iter = np.mean(cutoff_iter_list)
             avg_rel_diff_checkout = np.mean(rel_diff_checkout_list)
-            # plot deconvolution stacking
-            plt.imshow(deconv_stack, extent=[-size/2, size/2, -size/2, size/2],
-                        vmin=0, origin='lower')
-            plt.colorbar(label='Photon hits')
-            plt.title('Deconvolution of combined event')
-            plt.xlabel('x [mm]')
-            plt.ylabel('y [mm]')
-            plt.show()
+
             
             # P2V deconv
             # print(f'min deconv = {np.around(np.min(deconv),3)}')
@@ -1252,7 +1306,7 @@ if TO_GENERATE:
             x_cm, y_cm = int(x_cm), int(y_cm)
             deconv_stack_1d = deconv_stack[y_cm,:]
             P2V_deconv_stack = P2V(deconv_stack_1d)
-            print(f'P2V_deconv_stack={P2V_deconv_stack}')
+            print(f'\nP2V_deconv_stack = {P2V_deconv_stack}')
             
             # ##### P2V #####
             # # try P2V without deconv
@@ -1262,8 +1316,10 @@ if TO_GENERATE:
             # avg_P2V_interp = P2V(interp_img_1d)
             # # print(f'avg_P2V_interp = {avg_P2V_interp}')
             
+
+            
             ## plot deconv + deconv profile (with rotation) ##
-            fig, (ax0, ax1) = plt.subplots(1,2,figsize=(15,7))
+            fig, (ax0, ax1) = plt.subplots(1,2,figsize=(15,7),dpi=600)
             # deconv
             im = ax0.imshow(deconv_stack, extent=[-size/2, size/2, -size/2, size/2])
             divider = make_axes_locatable(ax0)
@@ -1282,18 +1338,21 @@ if TO_GENERATE:
             ax1.legend(fontsize=10)
             # ax[1,1].set_ylim([0,None])
             geo_params = geo_dir.split('/SquareFiberDatabase/')[-1]
-            title = (f'{geo_params}\nEvent spacing = {dist}[mm],' + 
-            f' avg RL iterations = {avg_cutoff_iter},'+
-            f' avg relative diff = {np.around(avg_rel_diff_checkout,4)}')
+            title = (f'{geo_params}\n\nEvent spacing={dist}mm,' + 
+                     f' samples={len(event_files)},' +
+            f' avg RL iterations={int(avg_cutoff_iter)},'  +
+            f' avg RL relative diff={np.around(avg_rel_diff_checkout,4)}')
             fig.suptitle(title,fontsize=15)
             fig.tight_layout()
-            plt.show()
+            if TO_SAVE:
+                fig.savefig(dist_dir+r'/P2V_plot', format='svg')
+                P2V_arr = [dist, P2V_deconv_stack]
+                np.savetxt(dist_dir+r'/[distance,P2V].txt', P2V_arr, delimiter=' ', fmt='%s')
+            if TO_PLOT_P2V:
+                plt.show()
+                continue
+            plt.close(fig)
             
-            
-            # store dist and P2V value here
-            
-
-
 
 
 # In[8]
@@ -1312,8 +1371,11 @@ TO_PLOT = True
 # override previous bins/size settings
 bins = 250
 size = bins
+random_shift = False
+if random_shift == False:
+    m, n = 3, 3
 seed = random.randint(0,10**9)
-# seed = 872349067
+# seed = 428883858
 random.seed(seed)
 np.random.seed(seed)
 
@@ -1326,13 +1388,14 @@ y_match_str = r"_y=(-?\d+(?:\.\d+)?(?:e-?\d+)?)mm"
 
 # # works bad for this geometry
 # geo_dir = ('/media/amir/Extreme Pro/SquareFiberDatabase/' +
-#             'ELGap=1mm_pitch=15.6mm_distanceFiberHolder=2mm_distanceAnodeHolder=10mm_holderThickness=10mm')
+#             'ELGap=1mm_pitch=5mm_distanceFiberHolder=2mm_distanceAnodeHolder=2.5mm_holderThickness=10mm')
+
+# worst geometry
+geo_dir = ('/media/amir/Extreme Pro/SquareFiberDatabase/' +
+            'ELGap=1mm_pitch=15.6mm_distanceFiberHolder=-1mm_distanceAnodeHolder=2.5mm_holderThickness=10mm')
 
 # geo_dir = ('/media/amir/Extreme Pro/SquareFiberDatabase/' +
-#             'ELGap=10mm_pitch=15.6mm_distanceFiberHolder=-1mm_distanceAnodeHolder=10mm_holderThickness=10mm')
-
-geo_dir = ('/media/amir/Extreme Pro/SquareFiberDatabase/' +
-            'ELGap=10mm_pitch=15.6mm_distanceFiberHolder=5mm_distanceAnodeHolder=10mm_holderThickness=10mm')
+#             'ELGap=10mm_pitch=5mm_distanceFiberHolder=5mm_distanceAnodeHolder=10mm_holderThickness=10mm')
 
 # geo_dir = str(random.sample(geometry_dirs, k=1)[0])
 
@@ -1350,7 +1413,7 @@ if not os.path.isdir(save_dir):
 
 os.chdir(working_dir)
 PSF = np.load(geo_dir + '/PSF.npy')
-PSF = smooth_PSF(PSF)
+# PSF = smooth_PSF(PSF)
 
 event_pattern = "SiPM_hits"
 
@@ -1395,8 +1458,9 @@ for hit in event_to_shift:
 event_to_shift_SR = np.array(event_to_shift_SR)
 
 # shift "event_shift_SR"
-m, n = np.random.randint(1,4), np.random.randint(1,4) 
-# m , n = 2,1
+if random_shift:
+    m, n = np.random.randint(1,4), np.random.randint(1,4) 
+
 
 shifted_event_SR = event_to_shift_SR + [m*pitch, n*pitch]
 # Combine the two events
@@ -1603,7 +1667,9 @@ if TO_PLOT:
     ax[1,1].legend(fontsize=10)
     # ax[1,1].set_ylim([0,None])
     geo_params = geo_dir.split('/SquareFiberDatabase/')[-1]
-    fig.suptitle(f'{geo_params}\nEvent spacing = {np.around(dist,3)}[mm]',fontsize=15)
+    title = (f'{geo_params}\nEvent spacing = {np.around(dist,3)}[mm], ' +
+             f'cutoff_iter={cutoff_iter}, rel_diff={np.around(rel_diff_checkout,4)}')
+    fig.suptitle(title,fontsize=15)
     fig.tight_layout()
     plt.show()
 
