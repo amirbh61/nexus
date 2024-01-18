@@ -1382,6 +1382,7 @@ if TO_GENERATE:
 # In[8]
 # compare smoothed vs unsmoothed PSF for 2 geometry families:
 # one with a round PSF, and one with a square PSF
+# This will generate a comparison plot for each family
 
 immersions = np.array([-1, 2, 5]) # geant4 parameters
 PSF_shape = 'ROUND' # or 'SQUARE
