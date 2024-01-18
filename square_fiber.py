@@ -1118,20 +1118,21 @@ def find_subdirectory_by_distance(directory, user_distance):
     
     
 TO_GENERATE = True
-TO_SAVE = True
+TO_SAVE = False
 TO_PLOT_EACH_STEP = False
-TO_PLOT_P2V = False
+TO_PLOT_P2V = True
 
 if TO_GENERATE:
     for i,geo_dir in tqdm(enumerate(geometry_dirs[0:1])):
         
         geo_dir = ('/media/amir/Extreme Pro/SquareFiberDatabase/' +
-                    'ELGap=10mm_pitch=15.6mm_distanceFiberHolder=-1mm_distanceAnodeHolder=10mm_holderThickness=10mm')
+                    'ELGap=10mm_pitch=15.6mm_distanceFiberHolder=5mm_' +
+                    'distanceAnodeHolder=10mm_holderThickness=10mm')
 
         # # overwrite to a specific geometry
         # geo_dir = ('/media/amir/Extreme Pro/SquareFiberDatabase/' +
-        #             'ELGap=10mm_pitch=15.6mm_distanceFiberHolder=5mm_'+
-        #             'distanceAnodeHolder=10mm_holderThickness=10mm')
+        #             'ELGap=1mm_pitch=5mm_distanceFiberHolder=-1mm_'+
+        #             'distanceAnodeHolder=2.5mm_holderThickness=10mm')
         
         # geo_dir = ('/media/amir/Extreme Pro/SquareFiberDatabase/' +
         #             'ELGap=1mm_pitch=15.6mm_distanceFiberHolder=5mm_' +
@@ -1148,16 +1149,31 @@ if TO_GENERATE:
         print(geo_dir)
         working_dir = geo_dir + r'/combined_event_SR'
         output_dir = geo_dir + r'/P2V'
-        # os.chdir(working_dir)
         dist_dirs = glob.glob(working_dir + '/*')
         
+        # grab geometry parameters for plot
+        geo_params = geo_dir.split('/SquareFiberDatabase/')[-1]
+        el_gap = float(re.search(r"ELGap=(-?\d+\.?\d*)mm",
+                                 geo_params).group(1))
+        pitch = float(re.search(r"pitch=(-?\d+\.?\d*)mm",
+                                geo_params).group(1))
+        
+        fiber_immersion = float(re.search(r"distanceFiberHolder=(-?\d+\.?\d*)mm",
+                                          geo_params).group(1))
+        anode_distance = float(re.search(r"distanceAnodeHolder=(-?\d+\.?\d*)mm",
+                                         geo_params).group(1))
+        holder_thickness = float(re.search(r"holderThickness=(-?\d+\.?\d*)mm",
+                                           geo_params).group(1))
+        
+        fiber_immersion = 5 - fiber_immersion # convert from a Geant4 parameter to a simpler one
+    
         PSF = np.load(geo_dir + '/PSF.npy')
-        # PSF = smooth_PSF(PSF)
+        PSF = smooth_PSF(PSF)
 
         
         # # in case we add more samples, find highest existing sample number
         # highest_existing_data_number = find_highest_number(save_dir)
-        dist = 48
+        dist = 22
         user_chosen_dir = find_subdirectory_by_distance(working_dir, dist)
         
         for j,dist_dir in tqdm(enumerate(dist_dirs[-15:-14])):
@@ -1306,7 +1322,7 @@ if TO_GENERATE:
             x_cm, y_cm = int(x_cm), int(y_cm)
             deconv_stack_1d = deconv_stack[y_cm,:]
             P2V_deconv_stack = P2V(deconv_stack_1d)
-            print(f'\nP2V_deconv_stack = {P2V_deconv_stack}')
+            # print(f'\nP2V_deconv_stack = {P2V_deconv_stack}')
             
             # ##### P2V #####
             # # try P2V without deconv
@@ -1329,7 +1345,7 @@ if TO_GENERATE:
             ax0.set_ylabel('y [mm]')
             ax0.set_title('Stacked RL deconvolution')
             # deconv profile
-            legend = f'Avg P2V={np.around(P2V_deconv_stack,3)}'
+            legend = f'P2V={np.around(P2V_deconv_stack,3)}'
             ax1.plot(np.arange(-size/2, size/2), deconv_stack_1d,label=legend)
             ax1.set_xlabel('x [mm]')
             ax1.set_ylabel('photon hits')
@@ -1337,11 +1353,19 @@ if TO_GENERATE:
             ax1.grid()
             ax1.legend(fontsize=10)
             # ax[1,1].set_ylim([0,None])
-            geo_params = geo_dir.split('/SquareFiberDatabase/')[-1]
-            title = (f'{geo_params}\n\nEvent spacing={dist}mm,' + 
-                     f' samples={len(event_files)},' +
-            f' avg RL iterations={int(avg_cutoff_iter)},'  +
-            f' avg RL relative diff={np.around(avg_rel_diff_checkout,4)}')
+                  
+            title = (f'EL gap={el_gap}mm, pitch={pitch}mm,' + 
+                     f' fiber immersion={fiber_immersion}mm, anode distance={anode_distance}mm,' + 
+                     f' holder thickness={holder_thickness}mm\n\nEvent spacing={dist}mm,' + 
+                    f' Avg RL iterations={int(avg_cutoff_iter)},'  +
+                    f' Avg RL relative diff={np.around(avg_rel_diff_checkout,4)}')
+            
+            # title = (f'{geo_params}\n\nEvent spacing={dist}mm,' + 
+            #          f' samples={len(event_files)},' +
+            # f' avg RL iterations={int(avg_cutoff_iter)},'  +
+            # f' avg RL relative diff={np.around(avg_rel_diff_checkout,4)}')
+            
+            
             fig.suptitle(title,fontsize=15)
             fig.tight_layout()
             if TO_SAVE:
@@ -1356,6 +1380,220 @@ if TO_GENERATE:
 
 
 # In[8]
+# compare smoothed vs unsmoothed PSF for 2 geometry families:
+# one with a round PSF, and one with a square PSF
+
+immersions = np.array([-1, 2, 5]) # geant4 parameters
+PSF_shape = 'ROUND' # or 'SQUARE
+if PSF_shape == 'ROUND':
+    # dists = np.arange(15,50,3)
+    dists = [17,20]
+if PSF_shape == 'SQUARE':
+    dists = np.arange(5,40,3)
+TO_SAVE_PLOT = True
+
+# Prepare figure for all 3 immersions
+fig, ax = plt.subplots(1, 3, figsize=(24,7), dpi=600)
+
+for i,immersion in tqdm(enumerate(immersions)):
+    # round PSF geometry (even at most immersion of fibers)
+    if PSF_shape == 'ROUND':
+        round_PSF_geo = ('/media/amir/Extreme Pro/SquareFiberDatabase/' +
+                    f'ELGap=10mm_pitch=15.6mm_distanceFiberHolder={immersion}mm_' +
+                    'distanceAnodeHolder=10mm_holderThickness=10mm')
+    
+    if PSF_shape == 'SQUARE':
+        # square PSF geometry when fibers are immersed
+        square_PSF_geo = ('/media/amir/Extreme Pro/SquareFiberDatabase/' +
+                    f'ELGap=1mm_pitch=5mm_distanceFiberHolder={immersion}mm_'+
+                    'distanceAnodeHolder=2.5mm_holderThickness=10mm')
+    
+
+    # assign input and output directories
+    geo_dir = round_PSF_geo
+    print(geo_dir)
+    working_dir = geo_dir + r'/combined_event_SR'
+    output_dir = geo_dir + r'/P2V'
+    dist_dirs = glob.glob(working_dir + '/*')
+    
+    # grab geometry parameters for plot
+    geo_params = geo_dir.split('/SquareFiberDatabase/')[-1]
+    el_gap = float(re.search(r"ELGap=(-?\d+\.?\d*)mm",
+                             geo_params).group(1))
+    pitch = float(re.search(r"pitch=(-?\d+\.?\d*)mm",
+                            geo_params).group(1))
+    
+    fiber_immersion = float(re.search(r"distanceFiberHolder=(-?\d+\.?\d*)mm",
+                                      geo_params).group(1))
+    anode_distance = float(re.search(r"distanceAnodeHolder=(-?\d+\.?\d*)mm",
+                                     geo_params).group(1))
+    holder_thickness = float(re.search(r"holderThickness=(-?\d+\.?\d*)mm",
+                                       geo_params).group(1))
+    
+    # convert from a Geant4 parameter to a more intuitive one
+    fiber_immersion = 5 - fiber_immersion 
+    
+    PSF = np.load(geo_dir + '/PSF.npy')
+    points_unsmoothed = []
+    points_smoothed = []
+    
+
+    for j,dist in tqdm(enumerate(dists)):
+        dist_dir = find_subdirectory_by_distance(working_dir, dist)
+    
+        print(f'Working on:\n{dist_dir}')
+        deconv_stack = np.zeros((size,size))
+        cutoff_iter_list = []
+        rel_diff_checkout_list = []
+        event_files = glob.glob(dist_dir + '/*.npy')
+        deconv_stack_smoothed = np.zeros((size,size))
+        deconv_stack_unsmoothed = np.zeros((size,size))
+        
+        
+        for event_file in tqdm(event_files):
+            event = np.load(event_file)
+            
+            ##### interpolation #####
+    
+            # Create a 2D histogram
+            hist, x_edges, y_edges = np.histogram2d(event[:,0], event[:,1],
+                                                    range=[[-size/2, size/2],
+                                                           [-size/2, size/2]],
+                                                    bins=bins)
+    
+    
+            # Compute the centers of the bins
+            x_centers = (x_edges[:-1] + x_edges[1:]) / 2
+            y_centers = (y_edges[:-1] + y_edges[1:]) / 2
+    
+            hist_hits_x_idx, hist_hits_y_idx = np.where(hist>0)
+            hist_hits_x = x_centers[hist_hits_x_idx]
+            hist_hits_y = y_centers[hist_hits_y_idx]
+            hist_hits_vals = hist[hist>0]
+    
+    
+            # Define the interpolation grid
+            x_range = np.linspace(-size/2, size/2, num=bins)
+            y_range = np.linspace(-size/2, size/2, num=bins)
+            x_grid, y_grid = np.meshgrid(x_range, y_range)
+    
+            # Perform the interpolation
+            interp_img = griddata((hist_hits_x, hist_hits_y), hist_hits_vals,
+                                  (x_grid, y_grid), method='cubic', fill_value=0)
+    
+    
+            # optional, cut interp image values below 0
+            interp_img[interp_img<0] = 0
+    
+    
+            ##### RL deconvolution UNSMOOTHED #####
+            _, _, deconv_unsmoothed = richardson_lucy(interp_img, PSF,
+                                                      iterations=75, iter_thr=0.01)
+            
+        
+            ##### ROTATE #####
+            theta = extract_theta_from_path(event_file)
+            rot_matrix = np.array([[np.cos(theta),-np.sin(theta)],
+                                    [np.sin(theta),np.cos(theta)]])
+    
+            # rotate combined event AFTER deconv
+            rotated_deconv_unsmoothed = rotate(deconv_unsmoothed, np.degrees(theta), reshape=False, mode='nearest')
+            deconv_stack_unsmoothed += rotated_deconv_unsmoothed
+            
+       
+            
+            ##### RL deconvolution SMOOTHED #####
+            _, _, deconv_smoothed = richardson_lucy(interp_img,smooth_PSF(PSF),
+                                                    iterations=75, iter_thr=0.01)
+            
+            
+            ##### ROTATE #####
+            theta = extract_theta_from_path(event_file)
+            rot_matrix = np.array([[np.cos(theta),-np.sin(theta)],
+                                    [np.sin(theta),np.cos(theta)]])
+    
+            # rotate combined event AFTER deconv
+            rotated_deconv_smoothed = rotate(deconv_smoothed, np.degrees(theta), reshape=False, mode='nearest')
+            deconv_stack_smoothed += rotated_deconv_smoothed
+    
+                
+    
+        # P2V deconv unsmoothed
+        x_cm, y_cm = ndimage.measurements.center_of_mass(deconv_stack_unsmoothed)
+        x_cm, y_cm = int(x_cm), int(y_cm)
+        deconv_stack_1d_unsmoothed = deconv_stack_unsmoothed[y_cm,:]
+        P2V_deconv_stack_unsmoothed = P2V(deconv_stack_1d_unsmoothed)
+        
+        point_unsmoothed = [dist, P2V_deconv_stack_unsmoothed]
+        points_unsmoothed.append(point_unsmoothed)
+        
+        
+        # P2V deconv smoothed
+        x_cm, y_cm = ndimage.measurements.center_of_mass(deconv_stack_smoothed)
+        x_cm, y_cm = int(x_cm), int(y_cm)
+        deconv_stack_1d_smoothed = deconv_stack_smoothed[y_cm,:]
+        P2V_deconv_stack_smoothed = P2V(deconv_stack_1d_smoothed)
+        
+        point_smoothed = [dist, P2V_deconv_stack_smoothed]
+        points_smoothed.append(point_smoothed)
+            
+        
+    points_unsmoothed = np.vstack(points_unsmoothed)
+    points_smoothed = np.vstack(points_smoothed)
+
+    # plot P2V vs dist for differebt fiber immersions
+    ax[i].plot(points_unsmoothed[:,0], points_unsmoothed[:,1],
+            '--r^', label="unsmoothed PSF")
+    ax[i].plot(points_smoothed[:,0], points_smoothed[:,1],
+            '--g*', label="smoothed PSF")
+    ax[i].set_xlabel("distance [mm]")
+    ax[i].set_ylabel("P2V")
+    ax[i].grid()
+    ax[i].legend(loc='lower right',fontsize=10)
+    ax[i].set_title(f'Fiber immersion={fiber_immersion}mm')
+ 
+    
+title = (f'EL gap={el_gap}mm, pitch={pitch}mm, anode distance={anode_distance}mm,' +
+          f' holder thickness={holder_thickness}mm, PSF shape={PSF_shape}') 
+fig.suptitle(title, fontsize=12)
+if TO_SAVE_PLOT:
+    save_path = (r'/media/amir/Extreme Pro/miscellaneous/smoothed_vs_unsmoothed_PSF' + 
+                 f'/{PSF_shape}_PSF')
+    fig.savefig(save_path, format='svg')
+plt.show()
+        
+
+
+# In[10]
+
+immersions = np.array([0, 3, 6])
+dists = [20,25]
+# dists = np.arange(15,50,3) # round
+# dists = np.arange(5,40,3) # square
+# immersions = 5 - immersions
+
+fig, ax = plt.subplots(1, 3, figsize=(24,7), dpi=600)
+for i,immersion in tqdm(enumerate(immersions)):
+    x = np.linspace(10,80,30)
+    y = np.linspace(1,1000,30)
+    
+    ax[i].plot(x, y,
+            '--r^', label="unsmoothed PSF")
+    ax[i].plot(points_smoothed[:,0], points_smoothed[:,1],
+            '--g*', label="smoothed PSF")
+    ax[i].set_xlabel("distance [mm]")
+    ax[i].set_ylabel("P2V")
+    ax[i].grid()
+    ax[i].legend(loc='lower right',fontsize=10)
+    
+    title = (f'EL gap={el_gap}mm, pitch={pitch}mm, anode distance={anode_distance}mm,' +
+              ' holder thickness={holder_thickness}mm') 
+    ax[i].set_title(f'Fiber immersion={immersion}mm')
+
+fig.suptitle(title, fontsize=12)    
+plt.show()
+
+# In[9]
 '''
 combine events, interpolate and RL
 This shows 1 sample at a time for a chosen m,n shift values for different geometries
