@@ -555,7 +555,7 @@ def richardson_lucy(image, psf, iterations=50, iter_thr=0.):
 def P2V(vector):
     fail, peak_idx, heights = peaks(vector)
     if fail:
-        print(r'Could not find any peaks for event!')
+        # print(r'Could not find any peaks for event!')
         return 1
     else:
         # Combine peak indices and heights into a list of tuples
@@ -583,6 +583,58 @@ def P2V(vector):
 
         avg_P2V = avg_peak / valley_height
         return avg_P2V
+    
+    
+def find_subdirectory_by_distance(directory, user_distance):
+    """
+    Finds the subdirectory that corresponds to the 
+    user-specified distance within a given directory.
+    
+    Parameters
+    ----------
+    directory : str
+        The directory to search in.
+    user_distance : int
+        The user-specified distance.
+    
+    Returns
+    -------
+    str or None
+        The subdirectory corresponding to the user-specified distance,
+        or None if not found.
+    """
+    for entry in os.scandir(directory):
+        if entry.is_dir():
+            match = re.search(r'(\d+)_mm', entry.name)
+            if match and int(match.group(1)) == user_distance:
+                return entry.path
+    return None
+
+
+def extract_theta_from_path(file_path):
+    """
+    Extracts theta value from a given file path of the form "8754_rotation_angle_rad=-2.84423.npy"
+
+    Parameters
+    ----------
+    file_path : str
+        The file path string.
+
+    Returns
+    -------
+    float
+        The extracted theta value.
+    """
+    try:
+        # Splitting by '_' and then further splitting by '='
+        parts = file_path.split('_')
+        theta_part = parts[-1]  # Get the last part which contains theta
+        theta_str = theta_part.split('=')[-1]  # Split by '=' and get the last part
+        theta_str = theta_str.replace('.npy', '')  # Remove the .npy extension
+        return float(theta_str)
+    except Exception as e:
+        print(f"Error extracting theta from path: {file_path}. Error: {e}")
+        return None
 
 
 # # tests for function assign_hit_to_SiPM
@@ -920,13 +972,13 @@ TO_GENERATE = True
 TO_SAVE = True
 random_shift = True
 if random_shift is True:
-    m_min = 1
-    m_max = 4 # inclusive
-    n_min = 1
-    n_max = 4 # inclusive
+    m_min = 0
+    m_max = 4 # exclusive - up to, not including
+    n_min = 0
+    n_max = 4 # exclusive - up to, not including
 if random_shift is False:
     m,n = 1,1
-samples_per_geometry = 10000
+samples_per_geometry = 2000
 
 if TO_GENERATE:
     x_match_str = r"_x=(-?\d+(?:\.\d+)?(?:e-?\d+)?)mm"
@@ -1019,9 +1071,13 @@ if TO_GENERATE:
     
             # get distance between stay and shifted
             dist = (np.sqrt((x0-shifted_event_coord[0])**2+(y0-shifted_event_coord[1])**2))
-            if dist < dist_min_threshold:
-                samples_per_geometry -= 1
-                continue
+            
+            # take specific distances only
+            # if dist < dist_min_threshold:
+                # continue
+            # if dist >= dist_min_threshold:
+            #     continue
+            
             # get midpoint of stay and shifted
             midpoint = [(x0+shifted_event_coord[0])/2,(y0+shifted_event_coord[1])/2]
             # print(f'distance = {dist}mm')
@@ -1062,72 +1118,23 @@ if TO_GENERATE:
                        
 # In[7]
 '''
-Load twin events after shifted, centered and rotated. interpolate and deconv.
+Load twin events after shifted and centered.
+interpolate, deconv, rotate and P2V.
+Load_twin_events_interpolate_deconv_rotate_and_P2V.py
 '''
 
-def extract_theta_from_path(file_path):
-    """
-    Extracts theta value from a given file path of the form "8754_rotation_angle_rad=-2.84423.npy"
-
-    Parameters
-    ----------
-    file_path : str
-        The file path string.
-
-    Returns
-    -------
-    float
-        The extracted theta value.
-    """
-    try:
-        # Splitting by '_' and then further splitting by '='
-        parts = file_path.split('_')
-        theta_part = parts[-1]  # Get the last part which contains theta
-        theta_str = theta_part.split('=')[-1]  # Split by '=' and get the last part
-        theta_str = theta_str.replace('.npy', '')  # Remove the .npy extension
-        return float(theta_str)
-    except Exception as e:
-        print(f"Error extracting theta from path: {file_path}. Error: {e}")
-        return None
-    
-    
-def find_subdirectory_by_distance(directory, user_distance):
-    """
-    Finds the subdirectory that corresponds to the 
-    user-specified distance within a given directory.
-    
-    Parameters
-    ----------
-    directory : str
-        The directory to search in.
-    user_distance : int
-        The user-specified distance.
-    
-    Returns
-    -------
-    str or None
-        The subdirectory corresponding to the user-specified distance,
-        or None if not found.
-    """
-    for entry in os.scandir(directory):
-        if entry.is_dir():
-            match = re.search(r'(\d+)_mm', entry.name)
-            if match and int(match.group(1)) == user_distance:
-                return entry.path
-    return None
-    
-    
 TO_GENERATE = True
-TO_SAVE = False
+TO_SAVE = True
 TO_PLOT_EACH_STEP = False
-TO_PLOT_P2V = True
+TO_PLOT_P2V = False
+TO_SMOOTH_PSF = False
 
 if TO_GENERATE:
-    for i,geo_dir in tqdm(enumerate(geometry_dirs[0:1])):
+    for geo_dir in tqdm(geometry_dirs):
         
-        geo_dir = ('/media/amir/Extreme Pro/SquareFiberDatabase/' +
-                    'ELGap=10mm_pitch=15.6mm_distanceFiberHolder=5mm_' +
-                    'distanceAnodeHolder=10mm_holderThickness=10mm')
+        # geo_dir = ('/media/amir/Extreme Pro/SquareFiberDatabase/' +
+        #             'ELGap=10mm_pitch=15.6mm_distanceFiberHolder=5mm_' +
+        #             'distanceAnodeHolder=10mm_holderThickness=10mm')
 
         # # overwrite to a specific geometry
         # geo_dir = ('/media/amir/Extreme Pro/SquareFiberDatabase/' +
@@ -1144,12 +1151,6 @@ if TO_GENERATE:
         #             'distanceAnodeHolder=2.5mm_holderThickness=10mm')
         
         
-
-        # assign input and output directories
-        print(geo_dir)
-        working_dir = geo_dir + r'/combined_event_SR'
-        output_dir = geo_dir + r'/P2V'
-        dist_dirs = glob.glob(working_dir + '/*')
         
         # grab geometry parameters for plot
         geo_params = geo_dir.split('/SquareFiberDatabase/')[-1]
@@ -1167,31 +1168,37 @@ if TO_GENERATE:
         
         fiber_immersion = 5 - fiber_immersion # convert from a Geant4 parameter to a simpler one
     
+        # assign directories
+        print(geo_dir)
+        working_dir = geo_dir + r'/combined_event_SR'
+        
+        dist_dirs = glob.glob(working_dir + '/*')
+        
         PSF = np.load(geo_dir + '/PSF.npy')
-        PSF = smooth_PSF(PSF)
+        if TO_SMOOTH_PSF:
+            PSF = smooth_PSF(PSF)
 
+        # option to choose a single distance and see P2V
+        # dist = 22
+        # user_chosen_dir = find_subdirectory_by_distance(working_dir, dist)
         
-        # # in case we add more samples, find highest existing sample number
-        # highest_existing_data_number = find_highest_number(save_dir)
-        dist = 22
-        user_chosen_dir = find_subdirectory_by_distance(working_dir, dist)
-        
-        for j,dist_dir in tqdm(enumerate(dist_dirs[-15:-14])):
+        for dist_dir in tqdm(dist_dirs):
+            print(dist_dir)
             
             # print(f'Working on:\n{dist_dir}')
-            # match = re.search(r'/(\d+)_mm', dist_dir)
-            # if match:
-            #     dist = int(match.group(1))
+            match = re.search(r'/(\d+)_mm', dist_dir)
+            if match:
+                dist = int(match.group(1))
                 
-            dist_dir = user_chosen_dir
-            print(f'Working on:\n{dist_dir}')
+            # dist_dir = user_chosen_dir
+            # print(f'Working on:\n{dist_dir}')
             deconv_stack = np.zeros((size,size))
             cutoff_iter_list = []
             rel_diff_checkout_list = []
             event_files = glob.glob(dist_dir + '/*.npy')
             
             
-            for event_file in tqdm(event_files):
+            for event_file in event_files:
                 event = np.load(event_file)
                 
                 ##### interpolation #####
@@ -1199,7 +1206,7 @@ if TO_GENERATE:
                 # Create a 2D histogram
                 hist, x_edges, y_edges = np.histogram2d(event[:,0], event[:,1],
                                                         range=[[-size/2, size/2],
-                                                               [-size/2, size/2]],
+                                                                [-size/2, size/2]],
                                                         bins=bins)
 
 
@@ -1228,8 +1235,6 @@ if TO_GENERATE:
 
 
                 ##### RL deconvolution #####
-                # rel_diff_checkout, cutoff_iter, deconv = richardson_lucy(interp_img, PSF,
-                #                                                   iterations=75, iter_thr=0.05)
                 rel_diff_checkout, cutoff_iter, deconv = richardson_lucy(interp_img, PSF,
                                                                   iterations=75, iter_thr=0.01)
                 
@@ -1355,8 +1360,8 @@ if TO_GENERATE:
             # ax[1,1].set_ylim([0,None])
                   
             title = (f'EL gap={el_gap}mm, pitch={pitch}mm,' + 
-                     f' fiber immersion={fiber_immersion}mm, anode distance={anode_distance}mm,' + 
-                     f' holder thickness={holder_thickness}mm\n\nEvent spacing={dist}mm,' + 
+                      f' fiber immersion={fiber_immersion}mm, anode distance={anode_distance}mm,' + 
+                      f' holder thickness={holder_thickness}mm\n\nEvent spacing={dist}mm,' + 
                     f' Avg RL iterations={int(avg_cutoff_iter)},'  +
                     f' Avg RL relative diff={np.around(avg_rel_diff_checkout,4)}')
             
@@ -1385,13 +1390,13 @@ if TO_GENERATE:
 # This will generate a comparison plot for each family
 
 immersions = np.array([-1, 2, 5]) # geant4 parameters
-PSF_shape = 'ROUND' # or 'SQUARE
+PSF_shape = 'SQUARE' # or 'SQUARE
 if PSF_shape == 'ROUND':
-    # dists = np.arange(15,50,3)
-    dists = [17,20]
+    dists = np.arange(15,34,2)
+    # dists = [17,20]
 if PSF_shape == 'SQUARE':
-    dists = np.arange(5,40,3)
-TO_SAVE_PLOT = True
+    dists = np.arange(5,12)
+SAVE_PLOT = False
 
 # Prepare figure for all 3 immersions
 fig, ax = plt.subplots(1, 3, figsize=(24,7), dpi=600)
@@ -1402,16 +1407,16 @@ for i,immersion in tqdm(enumerate(immersions)):
         round_PSF_geo = ('/media/amir/Extreme Pro/SquareFiberDatabase/' +
                     f'ELGap=10mm_pitch=15.6mm_distanceFiberHolder={immersion}mm_' +
                     'distanceAnodeHolder=10mm_holderThickness=10mm')
-    
+        geo_dir = round_PSF_geo
+        
     if PSF_shape == 'SQUARE':
         # square PSF geometry when fibers are immersed
         square_PSF_geo = ('/media/amir/Extreme Pro/SquareFiberDatabase/' +
                     f'ELGap=1mm_pitch=5mm_distanceFiberHolder={immersion}mm_'+
                     'distanceAnodeHolder=2.5mm_holderThickness=10mm')
-    
+        geo_dir = square_PSF_geo
 
-    # assign input and output directories
-    geo_dir = round_PSF_geo
+
     print(geo_dir)
     working_dir = geo_dir + r'/combined_event_SR'
     output_dir = geo_dir + r'/P2V'
@@ -1442,16 +1447,13 @@ for i,immersion in tqdm(enumerate(immersions)):
     for j,dist in tqdm(enumerate(dists)):
         dist_dir = find_subdirectory_by_distance(working_dir, dist)
     
-        print(f'Working on:\n{dist_dir}')
-        deconv_stack = np.zeros((size,size))
-        cutoff_iter_list = []
-        rel_diff_checkout_list = []
+        # print(f'Working on:\n{dist_dir}')
         event_files = glob.glob(dist_dir + '/*.npy')
         deconv_stack_smoothed = np.zeros((size,size))
         deconv_stack_unsmoothed = np.zeros((size,size))
         
         
-        for event_file in tqdm(event_files):
+        for event_file in event_files:
             event = np.load(event_file)
             
             ##### interpolation #####
@@ -1557,7 +1559,7 @@ for i,immersion in tqdm(enumerate(immersions)):
 title = (f'EL gap={el_gap}mm, pitch={pitch}mm, anode distance={anode_distance}mm,' +
           f' holder thickness={holder_thickness}mm, PSF shape={PSF_shape}') 
 fig.suptitle(title, fontsize=12)
-if TO_SAVE_PLOT:
+if SAVE_PLOT:
     save_path = (r'/media/amir/Extreme Pro/miscellaneous/smoothed_vs_unsmoothed_PSF' + 
                  f'/{PSF_shape}_PSF')
     fig.savefig(save_path, format='svg')
@@ -1612,7 +1614,7 @@ bins = 250
 size = bins
 random_shift = False
 if random_shift == False:
-    m, n = 3, 3
+    m, n = 1, 2
 seed = random.randint(0,10**9)
 # seed = 428883858
 random.seed(seed)
@@ -1629,12 +1631,12 @@ y_match_str = r"_y=(-?\d+(?:\.\d+)?(?:e-?\d+)?)mm"
 # geo_dir = ('/media/amir/Extreme Pro/SquareFiberDatabase/' +
 #             'ELGap=1mm_pitch=5mm_distanceFiberHolder=2mm_distanceAnodeHolder=2.5mm_holderThickness=10mm')
 
-# worst geometry
-geo_dir = ('/media/amir/Extreme Pro/SquareFiberDatabase/' +
-            'ELGap=1mm_pitch=15.6mm_distanceFiberHolder=-1mm_distanceAnodeHolder=2.5mm_holderThickness=10mm')
-
+# # worst geometry
 # geo_dir = ('/media/amir/Extreme Pro/SquareFiberDatabase/' +
-#             'ELGap=10mm_pitch=5mm_distanceFiberHolder=5mm_distanceAnodeHolder=10mm_holderThickness=10mm')
+#             'ELGap=1mm_pitch=15.6mm_distanceFiberHolder=-1mm_distanceAnodeHolder=2.5mm_holderThickness=10mm')
+
+geo_dir = ('/media/amir/Extreme Pro/SquareFiberDatabase/' +
+            'ELGap=1mm_pitch=5mm_distanceFiberHolder=-1mm_distanceAnodeHolder=2.5mm_holderThickness=10mm')
 
 # geo_dir = str(random.sample(geometry_dirs, k=1)[0])
 
