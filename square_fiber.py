@@ -27,8 +27,10 @@ from scipy.interpolate import interp2d
 from scipy.interpolate import griddata
 from scipy.interpolate import RectBivariateSpline
 from scipy.signal import find_peaks, peak_widths
+from scipy.signal import butter, filtfilt, welch
 from scipy.ndimage import rotate
 import random
+
 # Global settings #
 
 
@@ -1119,9 +1121,36 @@ if TO_GENERATE:
 # In[7]
 '''
 Load twin events after shifted and centered.
-interpolate, deconv, rotate and P2V.
+interpolate, deconv, rotate, smooth signal and P2V.
 Load_twin_events_interpolate_deconv_rotate_and_P2V.py
 '''
+
+# Design a Butterworth low-pass filter
+def butter_lowpass_filter(signal, fs, cutoff, order=5):
+    nyq = 0.5 * fs
+    normal_cutoff = cutoff / nyq
+    b, a = butter(order, normal_cutoff, btype='low', analog=False)
+    filtered_data = filtfilt(b, a, signal)
+    return filtered_data
+
+
+def frequency_analyzer(signal, spatial_sampling_rate, spatial_cutoff_frequency):
+    # analyze the frequency content of y and set a cutoff frequency dynamically
+    # Power Spectral Density (PSD)
+    f, Pxx = welch(signal, fs=spatial_sampling_rate, nperseg=250)
+    # Set cutoff frequency at the frequency that captures 95% of the power
+    cumulative_power = np.cumsum(Pxx) / np.sum(Pxx)
+    cutoff_index = np.where(cumulative_power >= 0.95)[0][0]
+    dynamic_spatial_cutoff_frequency = f[cutoff_index]/0.5
+    return dynamic_spatial_cutoff_frequency
+
+
+def extract_dir_number(dir_name):
+    match = re.search(r"(\d+)_mm", dir_name)
+    if match:
+        return int(match.group(1))
+    return 0  # Default to 0 if no number found
+
 
 TO_GENERATE = True
 TO_SAVE = True
@@ -1142,8 +1171,8 @@ if TO_GENERATE:
         #             'distanceAnodeHolder=2.5mm_holderThickness=10mm')
         
         # geo_dir = ('/media/amir/Extreme Pro/SquareFiberDatabase/' +
-        #             'ELGap=1mm_pitch=15.6mm_distanceFiberHolder=5mm_' +
-        #             'distanceAnodeHolder=10mm_holderThickness=10mm')
+        #             'ELGap=1mm_pitch=5mm_distanceFiberHolder=-1mm_' +
+        #             'distanceAnodeHolder=2.5mm_holderThickness=10mm')
 
         # # worst geometry
         # geo_dir = ('/media/amir/Extreme Pro/SquareFiberDatabase/' +
@@ -1173,17 +1202,18 @@ if TO_GENERATE:
         working_dir = geo_dir + r'/combined_event_SR'
         
         dist_dirs = glob.glob(working_dir + '/*')
+        dist_dirs = sorted(dist_dirs, key=extract_dir_number)
         
         PSF = np.load(geo_dir + '/PSF.npy')
         if TO_SMOOTH_PSF:
             PSF = smooth_PSF(PSF)
 
-        # option to choose a single distance and see P2V
-        # dist = 22
+        # # option to choose a single distance and see P2V
+        # dist = 30
         # user_chosen_dir = find_subdirectory_by_distance(working_dir, dist)
         
-        for dist_dir in tqdm(dist_dirs):
-            print(dist_dir)
+        for dist_dir in dist_dirs:
+            # print(dist_dir)
             
             # print(f'Working on:\n{dist_dir}')
             match = re.search(r'/(\d+)_mm', dist_dir)
@@ -1322,12 +1352,30 @@ if TO_GENERATE:
 
             
             # P2V deconv
-            # print(f'min deconv = {np.around(np.min(deconv),3)}')
             x_cm, y_cm = ndimage.measurements.center_of_mass(deconv_stack)
             x_cm, y_cm = int(x_cm), int(y_cm)
             deconv_stack_1d = deconv_stack[y_cm,:]
-            P2V_deconv_stack = P2V(deconv_stack_1d)
-            # print(f'\nP2V_deconv_stack = {P2V_deconv_stack}')
+            
+            
+            
+            ### Smooth the sliced 1d signal ###
+            
+            # # Filter parameters
+            spatial_sampling_rate = 1
+            spatial_cutoff_frequency = (spatial_sampling_rate/2)/5  # 1/5 of nyquist frequency
+            
+            # analyze 1d signal
+            dynamic_spatial_cutoff_frequency = frequency_analyzer(deconv_stack_1d,
+                                                                  spatial_sampling_rate,
+                                                                  spatial_cutoff_frequency)
+
+            # Apply Low Pass Filter on signal
+            LPF_signal = butter_lowpass_filter(deconv_stack_1d,
+                                               spatial_sampling_rate,
+                                               dynamic_spatial_cutoff_frequency)
+            
+            # Calculate P2V
+            P2V_deconv_stack_1d = P2V(LPF_signal)
             
             # ##### P2V #####
             # # try P2V without deconv
@@ -1337,7 +1385,6 @@ if TO_GENERATE:
             # avg_P2V_interp = P2V(interp_img_1d)
             # # print(f'avg_P2V_interp = {avg_P2V_interp}')
             
-
             
             ## plot deconv + deconv profile (with rotation) ##
             fig, (ax0, ax1) = plt.subplots(1,2,figsize=(15,7),dpi=600)
@@ -1350,14 +1397,17 @@ if TO_GENERATE:
             ax0.set_ylabel('y [mm]')
             ax0.set_title('Stacked RL deconvolution')
             # deconv profile
-            legend = f'P2V={np.around(P2V_deconv_stack,3)}'
-            ax1.plot(np.arange(-size/2, size/2), deconv_stack_1d,label=legend)
+            legend = f'P2V = {np.around(P2V_deconv_stack_1d,3)}'
+            ax1.plot(np.arange(-size/2, size/2), deconv_stack_1d,
+                     label='original signal',color='red')
+            ax1.plot(np.arange(-size/2, size/2), LPF_signal,
+                     label='LPF signal', color='blue')
+            ax1.plot([], [], ' ', label=legend)  # ' ' creates an invisible line
             ax1.set_xlabel('x [mm]')
             ax1.set_ylabel('photon hits')
             ax1.set_title('Stacked RL deconvolution profile')
             ax1.grid()
             ax1.legend(fontsize=10)
-            # ax[1,1].set_ylim([0,None])
                   
             title = (f'EL gap={el_gap}mm, pitch={pitch}mm,' + 
                       f' fiber immersion={fiber_immersion}mm, anode distance={anode_distance}mm,' + 
@@ -1365,26 +1415,201 @@ if TO_GENERATE:
                     f' Avg RL iterations={int(avg_cutoff_iter)},'  +
                     f' Avg RL relative diff={np.around(avg_rel_diff_checkout,4)}')
             
-            # title = (f'{geo_params}\n\nEvent spacing={dist}mm,' + 
-            #          f' samples={len(event_files)},' +
-            # f' avg RL iterations={int(avg_cutoff_iter)},'  +
-            # f' avg RL relative diff={np.around(avg_rel_diff_checkout,4)}')
-            
-            
+
             fig.suptitle(title,fontsize=15)
             fig.tight_layout()
             if TO_SAVE:
                 fig.savefig(dist_dir+r'/P2V_plot', format='svg')
-                P2V_arr = [dist, P2V_deconv_stack]
+                P2V_arr = [dist, P2V_deconv_stack_1d]
                 np.savetxt(dist_dir+r'/[distance,P2V].txt', P2V_arr, delimiter=' ', fmt='%s')
             if TO_PLOT_P2V:
                 plt.show()
                 continue
             plt.close(fig)
             
+            
+            
+            # In[7.5]
+## Low Pass Filter to get accurate P2V ##
+
+import numpy as np
+import matplotlib.pyplot as plt
+from scipy.signal import butter, filtfilt, welch
+
+# Design a Butterworth low-pass filter
+def butter_lowpass_filter(signal, fs, cutoff, order=5):
+    nyq = 0.5 * fs
+    normal_cutoff = cutoff / nyq
+    b, a = butter(order, normal_cutoff, btype='low', analog=False)
+    filtered_data = filtfilt(b, a, signal)
+    return filtered_data
+
+
+
+def frequency_analyzer(signal, spatial_sampling_rate, spatial_cutoff_frequency):
+    # analyze the frequency content of y and set a cutoff frequency dynamically
+    # Power Spectral Density (PSD)
+    f, Pxx = welch(signal, fs=spatial_sampling_rate, nperseg=250)
+    # Set cutoff frequency at the frequency that captures 95% of the power
+    cumulative_power = np.cumsum(Pxx) / np.sum(Pxx)
+    cutoff_index = np.where(cumulative_power >= 0.95)[0][0]
+    dynamic_spatial_cutoff_frequency = f[cutoff_index]/0.5
+    return dynamic_spatial_cutoff_frequency
+
+
+# Generate sample data
+np.random.seed(0)  # For reproducibility
+x = np.arange(-size/2, size/2)
+y = deconv_stack_1d
+
+
+# # Filter parameters
+spatial_sampling_rate = 1
+spatial_cutoff_frequency = (spatial_sampling_rate/2)/5  # 1/5 of nyquist frequency
+
+
+dynamic_spatial_cutoff_frequency = frequency_analyzer(y, spatial_sampling_rate,
+                                                      spatial_cutoff_frequency)
+
+# Apply the dynamically adjusted filter
+filtered_signal = butter_lowpass_filter(y, spatial_sampling_rate,                               
+                                        dynamic_spatial_cutoff_frequency)
+
+
+# Plotting the results
+plt.figure(figsize=(10, 6))
+plt.plot(x, y, label='Original Signal', color='red', linestyle='dashed')
+plt.plot(x, filtered_signal, label='Filtered Signal', color='darkblue')
+plt.legend()
+plt.title('Low-Pass Filtering of Noisy Data')
+plt.xlabel('X')
+plt.ylabel('Y')
+plt.show()
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 # In[8]
+### GRAPHS ###
+
+
+import matplotlib.cm as cm
+# Number of unique colors needed
+num_colors = 54
+
+# Create a colormap
+# 'viridis', 'plasma', 'inferno', 'magma', 'cividis' are good choices for distinct colors
+# You can also use 'tab20', 'tab20b', or 'tab20c' for categorical colors
+cmap = cm.get_cmap('hsv', num_colors)
+
+# Generate colors from the colormap
+colors = [cmap(i) for i in range(num_colors)]
+random.shuffle(colors)
+markers = ['^', '*', 's', 'o', 'x', '+', 'D']
+
+# Parameter choices to slice to
+fiber_immersion_choice = [6]
+pitch_choice = [10,15.6]
+el_gap_choice = [1,10]
+anode_distance_choice = [2.5,10]
+holder_thickness_choice = [10]
+count = 0
+
+fig, ax = plt.subplots(figsize=(10,7), dpi = 600)
+
+for i, geo_dir in tqdm(enumerate(geometry_dirs)):
+    
+    working_dir = geo_dir + r'/combined_event_SR'
+    geo_params = geo_dir.split('/SquareFiberDatabase/')[-1]
+    
+    
+    el_gap = float(re.search(r"ELGap=(-?\d+\.?\d*)mm",
+                             geo_params).group(1))
+    pitch = float(re.search(r"pitch=(-?\d+\.?\d*)mm",
+                            geo_params).group(1))
+    anode_distance = float(re.search(r"distanceAnodeHolder=(-?\d+\.?\d*)mm",
+                                     geo_params).group(1))
+    holder_thickness = float(re.search(r"holderThickness=(-?\d+\.?\d*)mm",
+                                       geo_params).group(1))
+    fiber_immersion = float(re.search(r"distanceFiberHolder=(-?\d+\.?\d*)mm",
+                                      geo_params).group(1))
+    fiber_immersion = 5 - fiber_immersion
+    
+    
+    if (el_gap not in el_gap_choice or
+        pitch not in pitch_choice or
+        anode_distance not in anode_distance_choice or
+        fiber_immersion not in fiber_immersion_choice or
+        holder_thickness not in holder_thickness_choice):
+        # print(f'el_gap={el_gap},pitch={pitch},anode_distance={anode_distance},'+
+        #        f'fiber_immersion={fiber_immersion},holderthickness={holder_thickness}')
+        continue
+    
+    dir_data = glob.glob(working_dir + '/*/*.txt')
+    dists = []
+    P2Vs = []
+    for data in dir_data:
+        dist, P2V = np.loadtxt(data)
+        if P2V > 100 or P2V == float('inf'):
+            P2V = 100
+        dists.append(dist)
+        P2Vs.append(P2V)
+        
+    # # zip and sort in ascending order
+    # combined = list(zip(dists, P2Vs))
+    # combined.sort(key=lambda x: x[0])
+    # sorted_dists, sorted_P2Vs = zip(*combined)
+        
+
+    ax.scatter(dists, P2Vs, color=colors[i], 
+                marker=random.choice(markers),alpha=0.5, label=geo_params)
+    # ax.plot(sorted_dists, sorted_P2Vs, color=colors[i], ls='-', 
+    #            marker=random.choice(markers),alpha=0.5, label=geo_params)
+    count += 1
+
+plt.axhline(y=1,color='red',alpha=0.7)
+plt.xticks(np.arange(0,40),rotation=45, size=10)
+plt.xlabel('Distance [mm]')
+plt.ylabel('P2V')
+plt.ylim([-1,10])
+plt.xlim([0,40])
+plt.grid()
+plt.legend(loc='upper left', bbox_to_anchor=(1, 1),
+           title='Datasets', fontsize='small', ncol=1)
+# fig.suptitle(f'Fiber immersion = {immersion_choice}mm')
+plt.show()
+
+print(f'total geometries: {count}')
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+# In[9]
 # compare smoothed vs unsmoothed PSF for 2 geometry families:
 # one with a round PSF, and one with a square PSF
 # This will generate a comparison plot for each family

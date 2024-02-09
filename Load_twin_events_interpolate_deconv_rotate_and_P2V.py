@@ -27,8 +27,10 @@ from scipy.interpolate import interp2d
 from scipy.interpolate import griddata
 from scipy.interpolate import RectBivariateSpline
 from scipy.signal import find_peaks, peak_widths
+from scipy.signal import butter, filtfilt, welch
 from scipy.ndimage import rotate
 import random
+
 # Global settings #
 
 
@@ -516,9 +518,36 @@ def extract_theta_from_path(file_path):
 # In[7]
 '''
 Load twin events after shifted and centered.
-interpolate, deconv, rotate and P2V.
+interpolate, deconv, rotate, smooth signal and P2V.
 Load_twin_events_interpolate_deconv_rotate_and_P2V.py
 '''
+
+# Design a Butterworth low-pass filter
+def butter_lowpass_filter(signal, fs, cutoff, order=5):
+    nyq = 0.5 * fs
+    normal_cutoff = cutoff / nyq
+    b, a = butter(order, normal_cutoff, btype='low', analog=False)
+    filtered_data = filtfilt(b, a, signal)
+    return filtered_data
+
+
+def frequency_analyzer(signal, spatial_sampling_rate, spatial_cutoff_frequency):
+    # analyze the frequency content of y and set a cutoff frequency dynamically
+    # Power Spectral Density (PSD)
+    f, Pxx = welch(signal, fs=spatial_sampling_rate, nperseg=250)
+    # Set cutoff frequency at the frequency that captures 95% of the power
+    cumulative_power = np.cumsum(Pxx) / np.sum(Pxx)
+    cutoff_index = np.where(cumulative_power >= 0.95)[0][0]
+    dynamic_spatial_cutoff_frequency = f[cutoff_index]/0.5
+    return dynamic_spatial_cutoff_frequency
+
+
+def extract_dir_number(dir_name):
+    match = re.search(r"(\d+)_mm", dir_name)
+    if match:
+        return int(match.group(1))
+    return 0  # Default to 0 if no number found
+
 
 TO_GENERATE = True
 TO_SAVE = True
@@ -528,7 +557,7 @@ TO_SMOOTH_PSF = False
 
 if TO_GENERATE:
     for geo_dir in tqdm(geometry_dirs):
-
+               
         # grab geometry parameters for plot
         geo_params = geo_dir.split('/SquareFiberDatabase/')[-1]
         el_gap = float(re.search(r"ELGap=(-?\d+\.?\d*)mm",
@@ -545,34 +574,23 @@ if TO_GENERATE:
         
         fiber_immersion = 5 - fiber_immersion # convert from a Geant4 parameter to a simpler one
     
-        # assign input and output directories
+        # assign directories
         print(geo_dir)
         working_dir = geo_dir + r'/combined_event_SR'
         
-        # dist_dirs = glob.glob(working_dir + '/*')
+        dist_dirs = glob.glob(working_dir + '/*')
+        dist_dirs = sorted(dist_dirs, key=extract_dir_number)
         
-        ### This is only for completing the dataset, TO DELETE LATER ###
-        # Set ranges for different pitch values
-        if pitch == 5:
-            valid_dirs = [f"{i}_mm" for i in range(1, 5)]
-        elif pitch == 10:
-            valid_dirs = [f"{i}_mm" for i in range(1, 10)]
-        elif pitch == 15.6:
-            valid_dirs = [f"{i}_mm" for i in range(1, 15)]
-        
-        # Build the full paths
-        dist_dirs = [os.path.join(working_dir, d) for d in valid_dirs if os.path.isdir(os.path.join(working_dir, d))]
-    
         PSF = np.load(geo_dir + '/PSF.npy')
         if TO_SMOOTH_PSF:
             PSF = smooth_PSF(PSF)
 
-        # option to choose a single distance and see P2V
-        # dist = 22
+        # # option to choose a single distance and see P2V
+        # dist = 30
         # user_chosen_dir = find_subdirectory_by_distance(working_dir, dist)
         
         for dist_dir in tqdm(dist_dirs):
-            print(dist_dir)
+            # print(dist_dir)
             
             # print(f'Working on:\n{dist_dir}')
             match = re.search(r'/(\d+)_mm', dist_dir)
@@ -711,12 +729,30 @@ if TO_GENERATE:
 
             
             # P2V deconv
-            # print(f'min deconv = {np.around(np.min(deconv),3)}')
             x_cm, y_cm = ndimage.measurements.center_of_mass(deconv_stack)
             x_cm, y_cm = int(x_cm), int(y_cm)
             deconv_stack_1d = deconv_stack[y_cm,:]
-            P2V_deconv_stack = P2V(deconv_stack_1d)
-            # print(f'\nP2V_deconv_stack = {P2V_deconv_stack}')
+            
+            
+            
+            ### Smooth the sliced 1d signal ###
+            
+            # # Filter parameters
+            spatial_sampling_rate = 1
+            spatial_cutoff_frequency = (spatial_sampling_rate/2)/5  # 1/5 of nyquist frequency
+            
+            # analyze 1d signal
+            dynamic_spatial_cutoff_frequency = frequency_analyzer(deconv_stack_1d,
+                                                                  spatial_sampling_rate,
+                                                                  spatial_cutoff_frequency)
+
+            # Apply Low Pass Filter on signal
+            LPF_signal = butter_lowpass_filter(deconv_stack_1d,
+                                               spatial_sampling_rate,
+                                               dynamic_spatial_cutoff_frequency)
+            
+            # Calculate P2V
+            P2V_deconv_stack_1d = P2V(LPF_signal)
             
             # ##### P2V #####
             # # try P2V without deconv
@@ -726,7 +762,6 @@ if TO_GENERATE:
             # avg_P2V_interp = P2V(interp_img_1d)
             # # print(f'avg_P2V_interp = {avg_P2V_interp}')
             
-
             
             ## plot deconv + deconv profile (with rotation) ##
             fig, (ax0, ax1) = plt.subplots(1,2,figsize=(15,7),dpi=600)
@@ -739,14 +774,17 @@ if TO_GENERATE:
             ax0.set_ylabel('y [mm]')
             ax0.set_title('Stacked RL deconvolution')
             # deconv profile
-            legend = f'P2V={np.around(P2V_deconv_stack,3)}'
-            ax1.plot(np.arange(-size/2, size/2), deconv_stack_1d,label=legend)
+            legend = f'P2V = {np.around(P2V_deconv_stack_1d,3)}'
+            ax1.plot(np.arange(-size/2, size/2), deconv_stack_1d,
+                     label='original signal',color='red')
+            ax1.plot(np.arange(-size/2, size/2), LPF_signal,
+                     label='LPF signal', color='blue')
+            ax1.plot([], [], ' ', label=legend)  # ' ' creates an invisible line
             ax1.set_xlabel('x [mm]')
             ax1.set_ylabel('photon hits')
             ax1.set_title('Stacked RL deconvolution profile')
             ax1.grid()
             ax1.legend(fontsize=10)
-            # ax[1,1].set_ylim([0,None])
                   
             title = (f'EL gap={el_gap}mm, pitch={pitch}mm,' + 
                       f' fiber immersion={fiber_immersion}mm, anode distance={anode_distance}mm,' + 
@@ -754,22 +792,14 @@ if TO_GENERATE:
                     f' Avg RL iterations={int(avg_cutoff_iter)},'  +
                     f' Avg RL relative diff={np.around(avg_rel_diff_checkout,4)}')
             
-            # title = (f'{geo_params}\n\nEvent spacing={dist}mm,' + 
-            #          f' samples={len(event_files)},' +
-            # f' avg RL iterations={int(avg_cutoff_iter)},'  +
-            # f' avg RL relative diff={np.around(avg_rel_diff_checkout,4)}')
-            
-            
+
             fig.suptitle(title,fontsize=15)
             fig.tight_layout()
             if TO_SAVE:
                 fig.savefig(dist_dir+r'/P2V_plot', format='svg')
-                P2V_arr = [dist, P2V_deconv_stack]
+                P2V_arr = [dist, P2V_deconv_stack_1d]
                 np.savetxt(dist_dir+r'/[distance,P2V].txt', P2V_arr, delimiter=' ', fmt='%s')
             if TO_PLOT_P2V:
                 plt.show()
                 continue
             plt.close(fig)
-                 
-                 
-
