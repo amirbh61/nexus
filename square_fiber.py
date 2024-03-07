@@ -41,6 +41,7 @@ bins = size
 
 
 path_to_dataset = '/media/amir/Extreme Pro/SquareFiberDatabase'
+# path_to_dataset = '/media/amir/Extreme Pro/SquareFiberDatabaseExpansion'
 
 # List full paths of the Geant4_PSF_events folders inside SquareFiberDatabase
 geometry_dirs = [os.path.join(path_to_dataset, d) for d in os.listdir(path_to_dataset)
@@ -193,7 +194,9 @@ plt.show()
 
 
 # In[1]
-# Create PSFs
+'''
+FUNCTIONS
+'''
 
 def smooth_PSF(PSF):
     '''
@@ -217,7 +220,7 @@ def smooth_PSF(PSF):
         circle_ij = np.where(circle==1)
         smooth_PSF[circle_ij] = np.mean(PSF[circle_ij])
     return smooth_PSF
-""
+
 
 # #original
 # def assign_hit_to_SiPM_original(hit, pitch, n):
@@ -464,14 +467,6 @@ def plot_PSF(PSF,size=100):
     return fig
 
 
-def peaks(array):
-    fail = 0
-    hight_threshold = 0.1*max(array) # ignore peaks of 10% max peak
-    peak_idx, properties = find_peaks(array, height = hight_threshold)
-    if len(peak_idx) == 0 or len(peak_idx) == 1:
-        fail = 1 # no peaks
-    return fail, peak_idx, properties['peak_heights']
-
 def find_min_between_peaks(array, left, right):
     return min(array[left:right])
 
@@ -555,36 +550,45 @@ def richardson_lucy(image, psf, iterations=50, iter_thr=0.):
 
 
 def P2V(vector):
-    fail, peak_idx, heights = peaks(vector)
-    if fail:
-        # print(r'Could not find any peaks for event!')
+    # Define a height threshold as 10% of the maximum value in the vector
+    height_threshold = 0.1 * np.max(vector)
+    
+    # Use scipy.signal.find_peaks with the height threshold
+    peak_idx, properties = find_peaks(vector, height=height_threshold)
+    
+    # Check if there are less than 2 peaks, indicating failure to find valid peaks
+    if len(peak_idx) < 2:
+        # print(r'Could not find two valid peaks for event!')
         return 1
     else:
+        # Extract peak heights
+        heights = properties['peak_heights']
+        
         # Combine peak indices and heights into a list of tuples
         peaks_with_heights = list(zip(peak_idx, heights))
-     
+        
         # Sort by height in descending order and select the top two
         top_two_peaks = sorted(peaks_with_heights, key=lambda x: x[1], reverse=True)[:2]
-
+        
         # Extract heights of the top two peaks
         top_heights = [peak[1] for peak in top_two_peaks]
-
+        
         # Calculate the average height of the top two peaks
         avg_peak = np.average(top_heights)
-
+        
         # Ensure indices are in ascending order for slicing
         left_idx, right_idx = sorted([top_two_peaks[0][0], top_two_peaks[1][0]])
-
-
-        # print(f'left idx = {left_idx}')
-        # print(f'right idx = {right_idx}')
-        # Find the valley height between the two strongest peaks
-        valley_height = find_min_between_peaks(vector, left_idx, right_idx)
+        
+        # Find the minimum value (valley) between the two strongest peaks
+        valley_height = np.min(vector[left_idx:right_idx + 1])
+        
         if valley_height <= 0 and avg_peak > 0:
             return float('inf')
-
+        
+        # Calculate and return the average peak to valley ratio
         avg_P2V = avg_peak / valley_height
         return avg_P2V
+
     
     
 def find_subdirectory_by_distance(directory, user_distance):
@@ -637,6 +641,14 @@ def extract_theta_from_path(file_path):
     except Exception as e:
         print(f"Error extracting theta from path: {file_path}. Error: {e}")
         return None
+    
+    
+def extract_dir_number(dist_dir):
+    # Adjusted regex to match the number at the end of the path before "_mm"
+    match = re.search(r'/(\d+(?:\.\d+)?)_mm$', dist_dir)
+    if match:
+        return float(match.group(1))
+    return 0  # Default to 0 if no number found
 
 
 # # tests for function assign_hit_to_SiPM
@@ -661,8 +673,10 @@ def extract_theta_from_path(file_path):
 # print("Test completed.")
 
 # In[2]
+'''
+ Generate PSF and save
+'''
 
-# Generate PSF and save
 path_to_dataset = r'/media/amir/9C33-6BBD/NEXT_work/Geant4/nexus/' + \
                    r'small_cluster_hitpoints_dataset/SquareFiberMacrosAndOutputsCloseEL10KSources'
                   
@@ -970,23 +984,23 @@ def find_highest_number(directory,file_format='.npy'):
     return highest_number
 
 
-TO_GENERATE = True
-TO_SAVE = True
+TO_GENERATE = False
+TO_SAVE = False
 random_shift = True
 if random_shift is True:
     m_min = 0
-    m_max = 4 # exclusive - up to, not including
+    m_max = 2 # exclusive - up to, not including
     n_min = 0
-    n_max = 4 # exclusive - up to, not including
+    n_max = 2 # exclusive - up to, not including
 if random_shift is False:
     m,n = 1,1
-samples_per_geometry = 2000
+samples_per_geometry = 10000
 
 if TO_GENERATE:
     x_match_str = r"_x=(-?\d+(?:\.\d+)?(?:e-?\d+)?)mm"
     y_match_str = r"_y=(-?\d+(?:\.\d+)?(?:e-?\d+)?)mm"
 
-    for i,geo_dir in tqdm(enumerate(geometry_dirs)):
+    for i,geo_dir in tqdm(enumerate(geometry_dirs[0:2])):
         # # good geometry
         # geo_dir = ('/media/amir/Extreme Pro/SquareFiberDatabase/' +
         #             'ELGap=10mm_pitch=15.6mm_distanceFiberHolder=-1mm_distanceAnodeHolder=10mm_holderThickness=10mm')
@@ -1005,7 +1019,8 @@ if TO_GENERATE:
         # find min distance that will be of interest
         match = re.search(r"_pitch=(\d+(?:\.\d+)?)mm", geo_dir)
         pitch = float(match.group(1))
-        dist_min_threshold = pitch # mm
+        dist_min_threshold = int(0.5*pitch) # mm
+        dist_max_threshold = int(2*pitch) # mm
 
         # assign input and output directories
         print(geo_dir)
@@ -1025,7 +1040,11 @@ if TO_GENERATE:
         if highest_existing_data_number == -1:
             highest_existing_data_number = 0
 
-        for j in range(samples_per_geometry+1):
+
+        j = 0
+        dists = []
+        while j < samples_per_geometry:
+            # print(j)
             event_pair = random.sample(event_list, k=2)
     
             # grab event 0 x,y original generation coordinates
@@ -1073,17 +1092,14 @@ if TO_GENERATE:
     
             # get distance between stay and shifted
             dist = (np.sqrt((x0-shifted_event_coord[0])**2+(y0-shifted_event_coord[1])**2))
+
+            # take specific distances in ROI
+            if dist < dist_min_threshold or dist > dist_max_threshold:
+                continue
             
-            # take specific distances only
-            # if dist < dist_min_threshold:
-                # continue
-            # if dist >= dist_min_threshold:
-            #     continue
-            
+            dists.append(dist)
             # get midpoint of stay and shifted
             midpoint = [(x0+shifted_event_coord[0])/2,(y0+shifted_event_coord[1])/2]
-            # print(f'distance = {dist}mm')
-            # print(f'midpoint = {midpoint}mm')
             
             theta = np.arctan2(y0-shifted_event_coord[1],x0-shifted_event_coord[0])
             rot_matrix = np.array([[np.cos(theta),-np.sin(theta)],
@@ -1094,66 +1110,51 @@ if TO_GENERATE:
     
             # # Save combined centered event to suitlable folder according to sources distance
             if TO_SAVE:
-                save_path = save_dir + f'/{int(dist)}_mm'
+                # save to dirs with spacing 0.5 mm
+                spacing = 0.5
+                if int(dist) <= dist < int(dist) + spacing:
+                    save_path = save_dir + f'/{int(dist)}_mm'
+                if int(dist) + spacing <= dist < np.ceil(dist):
+                    save_path = save_dir + f'/{int(dist) + spacing}_mm'
+                                       
                 if not os.path.isdir(save_path):
                     os.mkdir(save_path)
                 save_path = (save_path + f'/{highest_existing_data_number+j}_' +
                 f'rotation_angle_rad={np.around(theta,5)}.npy')
                 np.save(save_path,centered_combined_event_SR)
-    
-    
-            # # rotate combined event 
-            # theta = np.arctan2(y0-shifted_event_coord[1],x0-shifted_event_coord[0])
-            # # theta = np.arctan((y0-shifted_event_coord[1]) / (x0-shifted_event_coord[0]))
-            # rot_matrix = np.array([[np.cos(theta),-np.sin(theta)],
-            #                         [np.sin(theta),np.cos(theta)]])
-            # combined_rotated_event_SR = np.matmul(centered_combined_event_SR,rot_matrix)
-    
-            # # Save combined centered ROTATED event to suitlable folder according to sources distance
-            # if TO_SAVE:
-            #     save_path = save_dir + f'/{int(dist)}_mm'
-            #     if not os.path.isdir(save_path):
-            #         os.mkdir(save_path)
-            #     save_path = save_path + f'/{highest_existing_data_number+j}.npy'
-            #     np.save(save_path,combined_rotated_event_SR)
                 
-                       
+                #also, useful to save dists vector
+                np.save(geo_dir+r'/dists.npy', dists) 
+    
+            j += 1
+            
 # In[7]
 '''
 Load twin events after shifted and centered.
 interpolate, deconv, rotate and save.
 '''
-
-def extract_dir_number(dir_name):
-    match = re.search(r"(\d+)_mm", dir_name)
-    if match:
-        return int(match.group(1))
-    return 0  # Default to 0 if no number found
-
-
-TO_GENERATE = True
-TO_SAVE = True
+TO_GENERATE = False
+TO_SAVE = False
 TO_PLOT_EACH_STEP = False
 TO_PLOT_DECONVE_STACK = True
 
-# TO_PLOT_P2V = False
 TO_SMOOTH_PSF = False
 
 if TO_GENERATE:
-    for geo_dir in geometry_dirs[0]:
+    for geo_dir in tqdm(geometry_dirs[0]):
         
-        # geo_dir = ('/media/amir/Extreme Pro/SquareFiberDatabase/' +
-        #             'ELGap=10mm_pitch=15.6mm_distanceFiberHolder=5mm_' +
-        #             'distanceAnodeHolder=10mm_holderThickness=10mm')
+        geo_dir = ('/media/amir/Extreme Pro/SquareFiberDatabase/' +
+                    'ELGap=10mm_pitch=15.6mm_distanceFiberHolder=5mm_' +
+                    'distanceAnodeHolder=10mm_holderThickness=10mm')
 
         # # overwrite to a specific geometry
         # geo_dir = ('/media/amir/Extreme Pro/SquareFiberDatabase/' +
         #             'ELGap=1mm_pitch=5mm_distanceFiberHolder=-1mm_'+
         #             'distanceAnodeHolder=2.5mm_holderThickness=10mm')
         
-        geo_dir = ('/media/amir/Extreme Pro/SquareFiberDatabase/' +
-                    'ELGap=1mm_pitch=15.6mm_distanceFiberHolder=2mm_' +
-                    'distanceAnodeHolder=2.5mm_holderThickness=10mm')
+        # geo_dir = ('/media/amir/Extreme Pro/SquareFiberDatabase/' +
+        #             'ELGap=1mm_pitch=5mm_distanceFiberHolder=2mm_' +
+        #             'distanceAnodeHolder=5mm_holderThickness=10mm')
 
         # # worst geometry
         # geo_dir = ('/media/amir/Extreme Pro/SquareFiberDatabase/' +
@@ -1178,7 +1179,7 @@ if TO_GENERATE:
         fiber_immersion = 5 - fiber_immersion # convert from a Geant4 parameter to a simpler one
     
         # assign directories
-        print(geo_dir)
+        # print(geo_dir)
         working_dir = geo_dir + r'/combined_event_SR'
         save_dir = geo_dir + r'/deconv'
         if not os.path.isdir(save_dir):
@@ -1192,18 +1193,18 @@ if TO_GENERATE:
         if TO_SMOOTH_PSF:
             PSF = smooth_PSF(PSF)
 
-        # # option to choose a single distance and see P2V
+        # # option to choose a single distance
         # dist = 30
         # user_chosen_dir = find_subdirectory_by_distance(working_dir, dist)
         
-        for dist_dir in dist_dirs[15:20]:
-            print(dist_dir)
+        for dist_dir in tqdm(dist_dirs):
+            # print(dist_dir)
             
             # print(f'Working on:\n{dist_dir}')
-            match = re.search(r'/(\d+)_mm', dist_dir)
+            # match = re.search(r'/(\d+)_mm', dist_dir)
+            match = re.search(r'/(\d+(?:\.\d+)?)_mm$', dist_dir)
             if match:
-                dist = int(match.group(1))
-                dist
+                dist = float(match.group(1))
             # dist_dir = user_chosen_dir
             # print(f'Working on:\n{dist_dir}')
             deconv_stack = np.zeros((size,size))
@@ -1334,7 +1335,7 @@ if TO_GENERATE:
                     
                 title = (f'EL gap={el_gap}mm, pitch={pitch}mm,' + 
                           f' fiber immersion={fiber_immersion}mm,\nanode distance={anode_distance}mm,' + 
-                          f'holder thickness={holder_thickness}mm\n\nEvent spacing={dist}mm,' + 
+                          f' holder thickness={holder_thickness}mm\n\nEvent spacing={dist}mm,' + 
                         f' Avg RL iterations={int(avg_cutoff_iter)},'  +
                         f' Avg RL relative diff={np.around(avg_rel_diff_checkout,4)}')
             
@@ -1342,7 +1343,12 @@ if TO_GENERATE:
                 fig.tight_layout()
                 
                 # save files and deconv image plot in correct folder #
-                save_path = save_dir + f'/{int(dist)}_mm'
+                spacing = 0.5
+                if int(dist) <= dist < int(dist) + spacing:
+                    save_path = save_dir + f'/{int(dist)}_mm'
+                if int(dist) + spacing <= dist < np.ceil(dist):
+                    save_path = save_dir + f'/{int(dist) + spacing}_mm'
+                
                 if not os.path.isdir(save_path):
                     os.mkdir(save_path)
                 np.save(save_path+'/deconv.npy',deconv_stack)
@@ -1358,24 +1364,25 @@ if TO_GENERATE:
           
 # In[8]
 '''
-Load deconv stack matrix for each dist dir and P2V (w/wo signal smoothing)
+Load deconv stack matrix for each dist dir and calculate P2V
+(w/wo signal smoothing)
 '''
 
-# # Design a Butterworth low-pass filter
-# def butter_lowpass_filter(signal, fs, cutoff, order=5):
-#     nyq = 0.5 * fs
-#     normal_cutoff = cutoff / nyq
-#     b, a = butter(order, normal_cutoff, btype='low', analog=False)
-#     filtered_data = filtfilt(b, a, signal)
-#     return filtered_data
+# Design a Butterworth low-pass filter
+def butter_lowpass_filter(signal, fs, cutoff, order=5):
+    nyq = 0.5 * fs
+    normal_cutoff = cutoff / nyq
+    b, a = butter(order, normal_cutoff, btype='low', analog=False)
+    filtered_data = filtfilt(b, a, signal)
+    return filtered_data
 
 
-# def frequency_analyzer(signal, spatial_sampling_rate):
-#     f, Pxx = welch(signal, fs=spatial_sampling_rate, nperseg=250)
-#     cumulative_power = np.cumsum(Pxx) / np.sum(Pxx)
-#     cutoff_index = np.where(cumulative_power >= 0.95)[0][0]
-#     dynamic_spatial_cutoff_frequency = f[cutoff_index]  # Correctly identified cutoff frequency
-#     return dynamic_spatial_cutoff_frequency
+def frequency_analyzer(signal, spatial_sampling_rate):
+    f, Pxx = welch(signal, fs=spatial_sampling_rate, nperseg=250)
+    cumulative_power = np.cumsum(Pxx) / np.sum(Pxx)
+    cutoff_index = np.where(cumulative_power >= 0.8)[0][0]
+    dynamic_spatial_cutoff_frequency = f[cutoff_index]  # Correctly identified cutoff frequency
+    return dynamic_spatial_cutoff_frequency
 
 from scipy.optimize import curve_fit
 
@@ -1387,16 +1394,25 @@ def double_gaussian(x, A1, A2, mu1, mu2, sigma):
 
 
 TO_GENERATE = True
-TO_SAVE = True
-TO_SMOOTH_SIGNAL = True
-TO_PLOT_P2V = True
+TO_SAVE = False
+TO_PLOT_P2V = False
+TO_SMOOTH_SIGNAL = False
+if TO_SMOOTH_SIGNAL: # If True, only one option must be True - the other, False.
+    DOUBLE_GAUSSIAN_FIT = True # currently, the most promising approach !
+    PSD_AND_BUTTERWORTH = False 
+
+
 
 if TO_GENERATE:
-    for geo_dir in geometry_dirs[0]:
+    for geo_dir in tqdm(geometry_dirs):
         
-        geo_dir = ('/media/amir/Extreme Pro/SquareFiberDatabase/' +
-                    'ELGap=1mm_pitch=15.6mm_distanceFiberHolder=2mm_' +
-                    'distanceAnodeHolder=2.5mm_holderThickness=10mm')
+        # geo_dir = ('/media/amir/Extreme Pro/SquareFiberDatabase/' +
+        #             'ELGap=10mm_pitch=15.6mm_distanceFiberHolder=2mm_' +
+        #             'distanceAnodeHolder=2.5mm_holderThickness=10mm')
+        
+        # geo_dir = ('/media/amir/Extreme Pro/SquareFiberDatabase/' +
+        #             'ELGap=1mm_pitch=5mm_distanceFiberHolder=2mm_' +
+        #             'distanceAnodeHolder=5mm_holderThickness=10mm')
 
         # grab geometry parameters for plot
         geo_params = geo_dir.split('/SquareFiberDatabase/')[-1]
@@ -1415,7 +1431,7 @@ if TO_GENERATE:
         fiber_immersion = 5 - fiber_immersion # convert from a Geant4 parameter to a simpler one
     
         # assign directories
-        print(geo_dir)
+        # print(geo_dir)
         working_dir = geo_dir + r'/deconv'
         save_dir = geo_dir + r'/P2V'
         if not os.path.isdir(save_dir):
@@ -1425,16 +1441,16 @@ if TO_GENERATE:
         dist_dirs = sorted(dist_dirs, key=extract_dir_number)
 
         # # option to choose a single distance and see P2V
-        # dist = 30
+        # dist = 24
         # user_chosen_dir = find_subdirectory_by_distance(working_dir, dist)
         
-        for dist_dir in dist_dirs[3:]:
+        for dist_dir in dist_dirs:
             print(dist_dir)
             
             # print(f'Working on:\n{dist_dir}')
-            match = re.search(r'/(\d+)_mm', dist_dir)
+            match = re.search(r'/(\d+(?:\.\d+)?)_mm$', dist_dir)
             if match:
-                dist = int(match.group(1))
+                dist = float(match.group(1))
                 
             # dist_dir = user_chosen_dir
             # print(f'Working on:\n{dist_dir}')
@@ -1453,50 +1469,63 @@ if TO_GENERATE:
             
             if TO_SMOOTH_SIGNAL:
                 
-                # Method 1 - use custom 2 gaussian fit function #
-                left_lim, right_lim, pitch = -pitch/2, pitch/2, pitch
-                x = np.arange(-size/2, size/2)
-                y = deconv_stack_1d
-                # one_side_dist = 2*pitch
-                # x = np.arange(-one_side_dist, one_side_dist)
-                # center_y = int(len(deconv_stack_1d)/2)
-                # y = deconv_stack_1d[center_y-int(np.round(one_side_dist)):center_y+int(np.round(one_side_dist))]
+                if DOUBLE_GAUSSIAN_FIT:
+                    
+                    # Method 1 - use custom 2 gaussianinitial_guesses fit function #
+                    x = np.arange(-size/2, size/2)
+                    y = deconv_stack_1d
+                    
+                    # # look at zoomed region near peaks
+                    # one_side_dist = 5*pitch
+                    # x = np.arange(-one_side_dist, one_side_dist)
+                    # center_y = int(len(deconv_stack_1d)/2)
+                    # y = deconv_stack_1d[center_y-int(np.round(one_side_dist)):
+                    #                     center_y+int(np.round(one_side_dist))]
+                    
+                    # # try to extrach sigma using FWHM
+                    # # problem: when peaks are combind gives FWHM of combined peak
+                    # peak_idx, _ = find_peaks(y, height=max(y))
+                    # fwhm = np.max(peak_widths(y, peak_idx, rel_height=0.5)[0])
+                    # sigma = fwhm/2.4# (STD)
+                    
+                    
+                    mu = dist/2
+                    sigma = pitch/2
+                    # Initial guesses for the parameters: [A1, A2, mu1, mu2, sigma]
+                    initial_guesses = [max(y), max(y), -mu, mu, sigma]
+        
+                    # Fit the model to the data
+                    params, covariance = curve_fit(double_gaussian, x, y,
+                                                   p0=initial_guesses, maxfev=10000)
+        
+                    # Extract fitted parameters
+                    A1_fitted, A2_fitted, mu1_fitted, mu2_fitted, sigma_fitted = params
+        
+                    # Generate fitted curve
+                    fitted_signal = double_gaussian(x, A1_fitted, A2_fitted, mu1_fitted, mu2_fitted, sigma_fitted)
     
-                # Initial guesses for the parameters: [A1, A2, mu1, mu2, sigma]
-                initial_guesses = [max(deconv_stack_1d), max(deconv_stack_1d), -pitch/2, pitch/2, 0.5*pitch]
-    
-                # Fit the model to the data
-                params, covariance = curve_fit(double_gaussian, x, y, p0=initial_guesses)
-    
-                # Extract fitted parameters
-                A1_fitted, A2_fitted, mu1_fitted, mu2_fitted, sigma_fitted = params
-    
-                # Generate fitted curve
-                y_fitted = double_gaussian(x, A1_fitted, A2_fitted, mu1_fitted, mu2_fitted, sigma_fitted)
-
-                # Calculate P2V
-                P2V_deconv_stack_1d = P2V(y_fitted)
-                
-                
-                
-                # Method 2 - use butter filter + Power Spectrum Density (PSD) #
-                # # # Filter parameters
-                # spatial_sampling_rate = 1
-                # spatial_cutoff_frequency = (spatial_sampling_rate/2)/5  # 1/5 of nyquist frequency
-                
-                # # analyze 1d signal
-                # dynamic_spatial_cutoff_frequency = frequency_analyzer(deconv_stack_1d,
-                #                                                       spatial_sampling_rate)
-                
-                # # Apply Low Pass Filter on signal
-                # LPF_signal = butter_lowpass_filter(deconv_stack_1d,
-                #                                    spatial_sampling_rate,
-                #                                    dynamic_spatial_cutoff_frequency)
-                
-                # # Calculate P2V
-                # P2V_deconv_stack_1d = P2V(LPF_signal)
-                
-                
+                    # Calculate P2V
+                    P2V_deconv_stack_1d = P2V(fitted_signal)
+                    
+                        
+                if PSD_AND_BUTTERWORTH:
+                    
+                    # Method 2 - use butter filter + Power Spectrum Density (PSD) #
+                    # Filter parameters
+                    spatial_sampling_rate = 1
+                    spatial_cutoff_frequency = (spatial_sampling_rate/2)/5  # 1/5 of nyquist frequency
+                    
+                    # analyze 1d signal
+                    dynamic_spatial_cutoff_frequency = frequency_analyzer(deconv_stack_1d,
+                                                                          spatial_sampling_rate)
+                    
+                    # Apply Low Pass Filter on signal
+                    fitted_signal = butter_lowpass_filter(deconv_stack_1d,
+                                                        spatial_sampling_rate,
+                                                        dynamic_spatial_cutoff_frequency)
+                    
+                    # Calculate P2V
+                    P2V_deconv_stack_1d = P2V(fitted_signal)
             else:
                 # No smoothing #
                 P2V_deconv_stack_1d = P2V(deconv_stack_1d)
@@ -1515,10 +1544,11 @@ if TO_GENERATE:
             ax0.set_title('Stacked RL deconvolution')
             # deconv profile
             legend = f'P2V = {np.around(P2V_deconv_stack_1d,3)}'
-            ax1.plot(np.arange(-size/2, size/2), deconv_stack_1d,
+            ax1.plot(np.arange(-size/2,size/2), deconv_stack_1d,
                       label='original signal',color='red')
-            ax1.plot(np.arange(-size/2, size/2), y_fitted,
-                      label='LPF signal', color='blue')
+            if TO_SMOOTH_SIGNAL:
+                ax1.plot(np.arange(-size/2,size/2), fitted_signal,
+                          label='fitted signal', color='blue')
             ax1.plot([], [], ' ', label=legend)  # ' ' creates an invisible line
             ax1.set_xlabel('x [mm]')
             ax1.set_ylabel('photon hits')
@@ -1537,7 +1567,13 @@ if TO_GENERATE:
             fig.tight_layout()
             if TO_SAVE:
                 # save files and deconv image plot in correct folder #
-                save_path = save_dir + f'/{int(dist)}_mm'
+                spacing = 0.5
+                if int(dist) <= dist < int(dist) + spacing:
+                    save_path = save_dir + f'/{int(dist)}_mm'
+                if int(dist) + spacing <= dist < np.ceil(dist):
+                    save_path = save_dir + f'/{int(dist) + spacing}_mm'
+                # save_path = save_dir + f'/{int(dist)}_mm'
+                
                 if not os.path.isdir(save_path):
                     os.mkdir(save_path)
                 fig.savefig(save_path+r'/P2V_plot', format='svg')
@@ -1629,12 +1665,19 @@ random.shuffle(colors)
 markers = ['^', '*', 's', 'o', 'x', '+', 'D']
 
 # Parameter choices to slice to
-fiber_immersion_choice = [6]
+fiber_immersion_choice = [0,3]
 pitch_choice = [15.6]
-el_gap_choice = [1,10]
-anode_distance_choice = [2.5]
+el_gap_choice = [10]
+anode_distance_choice = [2.5,5,7.5,10,12.5,15,17.5,20]
 holder_thickness_choice = [10]
 count = 0
+
+# best
+# fiber_immersion_choice = [3]
+# pitch_choice = [15.6]
+# el_gap_choice = [10]
+# anode_distance_choice = [10]
+# holder_thickness_choice = [10]
 
 fig, ax = plt.subplots(figsize=(10,7), dpi = 600)
 
@@ -1684,16 +1727,18 @@ for i, geo_dir in tqdm(enumerate(geometry_dirs)):
 
     # ax.scatter(dists, P2Vs, color=colors[i], 
     #             marker=random.choice(markers),alpha=0.5, label=geo_params)
+    label = (f'EL gap={el_gap}mm,pitch={pitch}mm,fiber immersion={fiber_immersion}mm,' +
+             f'anode distance={anode_distance}mm,holder thickness={holder_thickness}mm')
     ax.plot(sorted_dists, sorted_P2Vs, color=colors[i], ls='-', 
-                marker=random.choice(markers),alpha=0.5, label=geo_params)
+                marker=random.choice(markers),alpha=0.5, label=label)
     count += 1
     
-xlim = 50
+xlim = 30
 plt.axhline(y=1,color='red',alpha=0.7)
 plt.xticks(np.arange(0,xlim),rotation=45, size=10)
 plt.xlabel('Distance [mm]')
 plt.ylabel('P2V')
-plt.ylim([-1,25])
+plt.ylim([-1,5])
 plt.xlim([0,xlim])
 plt.grid()
 plt.legend(loc='upper left', bbox_to_anchor=(1, 1),

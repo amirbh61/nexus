@@ -22,24 +22,24 @@ import itertools
 # generate new geant4 macros for all geometries and all possible runs
 
 # Geometry parameters
-geometry_params = {
-     'ELGap': ['1', '10'],
-     'pitch': ['5', '10', '15.6'],
-     'distanceFiberHolder': ['-1', '2', '5'],
-     'distanceAnodeHolder': ['2.5', '5', '10'],
-     'holderThickness': ['10'],
-     'TPBThickness': ['2.2'] # microns
-}
+# geometry_params = {
+#      'ELGap': ['1', '10'],
+#      'pitch': ['5', '10', '15.6'],
+#      'distanceFiberHolder': ['-1', '2', '5'],
+#      'distanceAnodeHolder': ['2.5', '5', '10'],
+#      'holderThickness': ['10'],
+#      'TPBThickness': ['2.2'] # microns
+# }
 
-# # Geometry parameters - CLUSTER small test database, DELETE LATER
-#geometry_params = {
-#     'ELGap': ['1','10'],
-#     'pitch': ['10'],
-#     'distanceFiberHolder': ['2'],
-#     'distanceAnodeHolder': ['10'],
-#     'holderThickness': ['10'],
-#     'TPBThickness': ['2.2']  # microns
-#}
+ # Geometry parameters - Exansion to NEXT database for studying optimal anode distance at varying fiber depths
+geometry_params = {
+     'ELGap': ['10'],
+     'pitch': ['15.6'],
+     'distanceFiberHolder': ['-1','2'],
+     'distanceAnodeHolder': ['7.5'],
+     'holderThickness': ['10'],
+     'TPBThickness': ['2.2']  # microns
+}
 
 # # Run parameters
 # run_params = {
@@ -56,13 +56,17 @@ run_params = {
     'z': ['0'],
 }
 
+### IMPORTANT : BOTH MODES ARE NEEDED FOR EACH GEOMETRY !! ###
 # Chose mode of source generation
-fixed_intervals = True # edges are included !
+
+# The Kr events
+fixed_intervals = False # edges are included !
 if fixed_intervals:
     unit_cell_source_spacing = 0.2 # mm, spacing between sources in different runs
     sub_dir = r'Geant4_Kr_events'
-    
-random_events_xy = False
+
+# The PSF events
+random_events_xy = True
 if random_events_xy:
     num_samples = 10000
     sub_dir = 'Geant4_PSF_events'
@@ -73,7 +77,7 @@ seed = 10000
 
 original_config_macro_path = r'/gpfs0/arazi/users/amirbenh/Resolving_Power/nexus/macros/SquareOpticalFiberCluster.config.mac'
 original_init_macro_path = r'/gpfs0/arazi/users/amirbenh/Resolving_Power/nexus/macros/SquareOpticalFiberCluster.init.mac'
-output_macro_Mfolder = r'/gpfs0/arazi/users/amirbenh/Resolving_Power/nexus/SquareFiberDatabase/'
+output_macro_Mfolder = r'/gpfs0/arazi/users/amirbenh/Resolving_Power/nexus/SquareFiberDatabaseExpansion2/'
 
 if not os.path.isdir(output_macro_Mfolder):
     os.mkdir(output_macro_Mfolder)
@@ -224,7 +228,5 @@ for i, combination in enumerate(geometry_combinations):
 
 
     print(f'Finished creating ALL geometry macros for path:\n{output_macro_geom_folder}')
-
-
 
 

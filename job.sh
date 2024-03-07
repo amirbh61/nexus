@@ -12,6 +12,15 @@ target_path="${geometry_folder}/${sub_dir}"
 # Loop over all .init.mac files in the geometry folder
 for macro in $(find "$target_path" -name "*.init.mac")
 do
-  ./build/nexus -b -n 925000 "${macro}"
-  echo "$macro" >> macros_sent_to_cluster.txt
+
+  if [ "$sub_dir" == "Geant4_Kr_events" ]; then
+    ./build/nexus -b -n 925000 "${macro}" # for Kr events
+    echo "$macro" >> macros_sent_to_cluster.txt
+  fi
+
+  if [ "$sub_dir" == "Geant4_PSF_events" ]; then
+    ./build/nexus -b -n 10000 "${macro}" # for PSF events
+    echo "$macro" >> macros_sent_to_cluster.txt
+  fi
+
 done
