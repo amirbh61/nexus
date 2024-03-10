@@ -78,40 +78,6 @@ def smooth_PSF(PSF):
     return smooth_PSF
 
 
-# #original
-# def assign_hit_to_SiPM_original(hit, pitch, n):
-#     """
-#     Assign a hit to a SiPM based on its coordinates.
-    
-#     Args:
-#     - hit (tuple): The (x, y) coordinates of the hit.
-#     - pitch (float): The spacing between SiPMs.
-#     - n (int): The number of SiPMs on one side of the square grid.
-    
-#     Returns:
-#     - (int, int): The assigned SiPM coordinates.
-#     """
-    
-#     half_grid_length = (n-1) * pitch / 2
-
-#     x, y = hit
-
-#     # First, check the central SiPM
-#     for i in [0, -pitch, pitch]:
-#         for j in [0, -pitch, pitch]:
-#             if -pitch/2 <= x - i < pitch/2 and -pitch/2 <= y - j < pitch/2:
-#                 return (i, j)
-
-#     # If not found in the central SiPM, search the rest of the grid
-#     for i in np.linspace(-half_grid_length, half_grid_length, n):
-#         for j in np.linspace(-half_grid_length, half_grid_length, n):
-#             if abs(i) > pitch or abs(j) > pitch:  # Skip the previously checked SiPMs
-#                 if i - pitch/2 <= x < i + pitch/2 and j - pitch/2 <= y < j + pitch/2:
-#                     return (i, j)
-    
-#     # Return None if hit doesn't belong to any SiPM
-#     return None
-
 
 def assign_hit_to_SiPM(hit, pitch, n):
     half_grid_length = (n-1) * pitch / 2
@@ -130,8 +96,7 @@ def assign_hit_to_SiPM(hit, pitch, n):
 
 
 
-
-def psf_creator(directory, create_from, to_plot=True,to_smooth=True):
+def psf_creator(directory, create_from, to_plot=False,to_smooth=False):
     '''
     Gives a picture of the SiPM (sensor wall) response to an event involving 
     the emission of light in the EL gap.
@@ -143,16 +108,16 @@ def psf_creator(directory, create_from, to_plot=True,to_smooth=True):
     Returns:
         PSF: ndarray, the Point Spread Function
     '''
-    
+    if create_from == 'SiPM':
+        sub_dir = '/Geant4_Kr_events'
+    if create_from == 'TPB':
+        sub_dir = '/Geant4_PSF_events'
+        
     os.chdir(directory)
-    working_dir = r'Working on directory:'+f'\n{os.getcwd()}'
-    print(working_dir)
+    print(r'Working on directory:'+f'\n{os.getcwd()}')
     
-    files = glob.glob(f'{create_from}*')
+    files = glob.glob(directory + sub_dir + f'/{create_from}*')
     
-    # pattern to extract x,y values of each event from file name
-    pattern = r"-?\d+.\d+"
-
     PSF_list = []
     size = 100 # value override, keep the same for all PSF histograms
     bins = 100 # value override, keep the same for all PSF histograms
@@ -165,11 +130,11 @@ def psf_creator(directory, create_from, to_plot=True,to_smooth=True):
     
     
     # Search for the pitch value pattern
-    match = re.search(r"_pitch=(\d+(?:\.\d+)?)mm", working_dir)
+    match = re.search(r"_pitch=(\d+(?:\.\d+)?)mm", directory)
     pitch = float(match.group(1))
 
     ### assign each hit to its corresponding SiPM ###
-    for filename in tqdm(files):
+    for filename in files:
 
         # Check if file is empty and skip if it is
         if os.path.getsize(filename) == 0:
@@ -190,10 +155,15 @@ def psf_creator(directory, create_from, to_plot=True,to_smooth=True):
             hitmap = hitmap[:, 0:2]
 
         
+        # pattern to extract x,y values of each event from file name
+        x_pattern = r"x=(-?\d+(?:\.\d+)?(?:e[+-]?\d+)?)mm"
+        y_pattern = r"y=(-?\d+(?:\.\d+)?(?:e[+-]?\d+)?)mm"
+        
         # Store x,y values of event
-        matches = re.findall(pattern, filename)
-        x_event = float(matches[0])
-        y_event = float(matches[1])
+        x_match = re.findall(x_pattern, filename)
+        x_event = float(x_match[0])
+        y_match = re.findall(y_pattern, filename)
+        y_event = float(y_match[0])
         
         if plot_event:
             single_event, x_hist, y_hist = np.histogram2d(hitmap[:,0], hitmap[:,1],
@@ -268,6 +238,8 @@ def psf_creator(directory, create_from, to_plot=True,to_smooth=True):
         _ = plot_PSF(PSF=PSF,size=size)
         
     return PSF
+
+
 
 
 def plot_sensor_response(event, bins, size, noise=False):
@@ -510,46 +482,6 @@ def extract_dir_number(dist_dir):
 
 
 
-# In[4]
-# Generate all PSFs (of geant4 TPB hits) from SquareFiberDataset
-print('Generating PSFs')
-TO_GENERATE = True
-TO_SAVE = True
-TO_PLOT = False
-
-if TO_GENERATE:
-    for dir in geometry_dirs:
-        PSF_TPB = psf_creator(dir,create_from="TPB",to_plot=TO_PLOT,to_smooth=False)
-        os.chdir(dir)
-        os.chdir('..')
-        
-        if TO_SAVE:
-            save_PSF = r'PSF.npy'
-            np.save(save_PSF,PSF_TPB)
-            
-            
-            
-# In[5]
-# plot and save all TPB PSFs from SquareFiberDataset in their respective folders
-print('Generating PSF plots and saving them')
-TO_SAVE = True
-TO_PLOT = False
-
-if TO_PLOT:
-    for dir in tqdm(geometry_dirs):
-        os.chdir(dir)
-        working_dir = r'Working on directory:'+f'\n{os.getcwd()}'
-        print(working_dir)
-        PSF = np.load(r'PSF.npy')
-        fig = plot_PSF(PSF=PSF)
-        
-        if TO_SAVE:
-            save_path = r'PSF_plot.jpg'
-            fig.savefig(save_path)  
-        plt.close(fig)              
-
-
-
 
 # In[6]
 '''
@@ -591,6 +523,33 @@ def find_highest_number(directory,file_format='.npy'):
 
     return highest_number
     
+    
+
+
+def count_npy_files(directory):
+    '''
+    Counts all .npy files in the specified directory and its subdirectories.
+
+    Parameters
+    ----------
+    directory : str
+        The directory to search in.
+
+    Returns
+    -------
+    int
+        The number of .npy files found.
+    '''
+    npy_file_count = 0
+
+    # Walk through all directories and files in the specified directory
+    for root, dirs, files in os.walk(directory):
+        for file in files:
+            if file.endswith('.npy'):
+                npy_file_count += 1
+
+    return npy_file_count
+    
 
 
 print('Generating twin events')
@@ -604,13 +563,14 @@ if random_shift is True:
     n_max = 2 # exclusive - up to, not including
 if random_shift is False:
     m,n = 1,1
+    
 samples_per_geometry = 10000
 
 if TO_GENERATE:
     x_match_str = r"_x=(-?\d+(?:\.\d+)?(?:e-?\d+)?)mm"
     y_match_str = r"_y=(-?\d+(?:\.\d+)?(?:e-?\d+)?)mm"
 
-    for i,geo_dir in tqdm(enumerate(geometry_dirs)):
+    for geo_dir in tqdm(geometry_dirs):
 
                 
         # find min distance that will be of interest
@@ -620,7 +580,7 @@ if TO_GENERATE:
         dist_max_threshold = int(2*pitch) # mm
 
         # assign input and output directories
-        print(geo_dir)
+        print(geo_dir,end='\n')
         working_dir = geo_dir + r'/Geant4_Kr_events'
         save_dir = geo_dir + r'/combined_event_SR' 
         if not os.path.isdir(save_dir):
@@ -632,10 +592,10 @@ if TO_GENERATE:
         event_list = [entry.name for entry in os.scandir() if entry.is_file() 
                       and entry.name.startswith(event_pattern)]
         
-        # in case we add more samples, find highest existing sample number
-        highest_existing_data_number = find_highest_number(save_dir)
-        if highest_existing_data_number == -1:
-            highest_existing_data_number = 0
+#        # in case we add more samples, find highest existing sample number
+#        highest_existing_data_number = find_highest_number(save_dir)
+#        if highest_existing_data_number == -1:
+#            highest_existing_data_number = 0
 
 
         j = 0
@@ -716,14 +676,18 @@ if TO_GENERATE:
                                        
                 if not os.path.isdir(save_path):
                     os.mkdir(save_path)
-                save_path = (save_path + f'/{highest_existing_data_number+j}_' +
+                save_path = (save_path + f'/{j}_' +
                 f'rotation_angle_rad={np.around(theta,5)}.npy')
                 np.save(save_path,centered_combined_event_SR)
                 
                 #also, useful to save dists vector
-                np.save(geo_dir+r'/dists.npy', dists) 
+                np.save(geo_dir+r'/dists.npy', dists)
+                
     
             j += 1
+        
+        print(f'Created {count_npy_files(save_dir)} events')
+            
             
             
             
@@ -736,7 +700,7 @@ print('Generating deconvs')
 TO_GENERATE = True
 TO_SAVE = True
 TO_PLOT_EACH_STEP = False
-TO_PLOT_DECONVE_STACK = True
+TO_PLOT_DECONVE_STACK = False
 
 TO_SMOOTH_PSF = False
 

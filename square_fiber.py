@@ -29,6 +29,7 @@ from scipy.interpolate import RectBivariateSpline
 from scipy.signal import find_peaks, peak_widths
 from scipy.signal import butter, filtfilt, welch
 from scipy.ndimage import rotate
+from scipy.optimize import curve_fit
 import random
 
 # Global settings #
@@ -275,7 +276,7 @@ def assign_hit_to_SiPM(hit, pitch, n):
 
 
 
-def psf_creator(directory, create_from, to_plot=True,to_smooth=True):
+def psf_creator(directory, create_from, to_plot=False,to_smooth=False):
     '''
     Gives a picture of the SiPM (sensor wall) response to an event involving 
     the emission of light in the EL gap.
@@ -287,16 +288,16 @@ def psf_creator(directory, create_from, to_plot=True,to_smooth=True):
     Returns:
         PSF: ndarray, the Point Spread Function
     '''
-    
+    if create_from == 'SiPM':
+        sub_dir = '/Geant4_Kr_events'
+    if create_from == 'TPB':
+        sub_dir = '/Geant4_PSF_events'
+        
     os.chdir(directory)
-    working_dir = r'Working on directory:'+f'\n{os.getcwd()}'
-    print(working_dir)
+    print(r'Working on directory:'+f'\n{os.getcwd()}')
     
-    files = glob.glob(f'{create_from}*')
+    files = glob.glob(directory + sub_dir + f'/{create_from}*')
     
-    # pattern to extract x,y values of each event from file name
-    pattern = r"-?\d+.\d+"
-
     PSF_list = []
     size = 100 # value override, keep the same for all PSF histograms
     bins = 100 # value override, keep the same for all PSF histograms
@@ -309,11 +310,11 @@ def psf_creator(directory, create_from, to_plot=True,to_smooth=True):
     
     
     # Search for the pitch value pattern
-    match = re.search(r"_pitch=(\d+(?:\.\d+)?)mm", working_dir)
+    match = re.search(r"_pitch=(\d+(?:\.\d+)?)mm", directory)
     pitch = float(match.group(1))
 
     ### assign each hit to its corresponding SiPM ###
-    for filename in tqdm(files):
+    for filename in files:
 
         # Check if file is empty and skip if it is
         if os.path.getsize(filename) == 0:
@@ -334,10 +335,15 @@ def psf_creator(directory, create_from, to_plot=True,to_smooth=True):
             hitmap = hitmap[:, 0:2]
 
         
+        # pattern to extract x,y values of each event from file name
+        x_pattern = r"x=(-?\d+(?:\.\d+)?(?:e[+-]?\d+)?)mm"
+        y_pattern = r"y=(-?\d+(?:\.\d+)?(?:e[+-]?\d+)?)mm"
+        
         # Store x,y values of event
-        matches = re.findall(pattern, filename)
-        x_event = float(matches[0])
-        y_event = float(matches[1])
+        x_match = re.findall(x_pattern, filename)
+        x_event = float(x_match[0])
+        y_match = re.findall(y_pattern, filename)
+        y_event = float(y_match[0])
         
         if plot_event:
             single_event, x_hist, y_hist = np.histogram2d(hitmap[:,0], hitmap[:,1],
@@ -911,38 +917,37 @@ for dir in geometry_dirs:
 # In[4]
 # Generate all PSFs (of geant4 TPB hits) from SquareFiberDataset
 
-TO_GENERATE = False
-TO_PLOT = False
-TO_SAVE = False
+TO_GENERATE = True
+TO_PLOT = True
+TO_SAVE = True
 
 if TO_GENERATE:
-    for dir in geometry_dirs:
-        PSF_TPB = psf_creator(dir,create_from="TPB",to_plot=TO_PLOT,to_smooth=False)
-        os.chdir(dir)
-        os.chdir('..')
+    for directory in tqdm(geometry_dirs):
+        PSF_TPB = psf_creator(directory,create_from="TPB",
+                              to_plot=TO_PLOT,to_smooth=False)
+        os.chdir(directory)
+        # os.chdir('..')
         
         if TO_SAVE:
-            save_PSF = r'PSF.npy'
+            save_PSF = directory + '/PSF.npy'
             np.save(save_PSF,PSF_TPB)
             
 # In[5]
 # plot and save all TPB PSFs from SquareFiberDataset in their respective folders
-TO_PLOT = False
-TO_SAVE = False
-
-if TO_PLOT:
-    for dir in tqdm(geometry_dirs):
-        os.chdir(dir)
-        working_dir = r'Working on directory:'+f'\n{os.getcwd()}'
-        print(working_dir)
+TO_GENERATE = True
+TO_SAVE = True
+print('Generating PSF plots')
+if TO_GENERATE:
+    for directory in tqdm(geometry_dirs):
+        os.chdir(directory)
+        print(r'Working on directory:'+f'\n{os.getcwd()}')
         PSF = np.load(r'PSF.npy')
         fig = plot_PSF(PSF=PSF)
         
         if TO_SAVE:
-            save_path = r'PSF_plot.jpg'
+            save_path = directory + r'/PSF_plot.jpg'
             fig.savefig(save_path)  
-        plt.close(fig)  
-        
+            plt.close(fig)
 # In[6]
 '''
 Generate and save twin events dataset, after shifting, centering and rotation
@@ -984,8 +989,34 @@ def find_highest_number(directory,file_format='.npy'):
     return highest_number
 
 
-TO_GENERATE = False
-TO_SAVE = False
+def count_npy_files(directory):
+    '''
+    Counts all .npy files in the specified directory and its subdirectories.
+
+    Parameters
+    ----------
+    directory : str
+        The directory to search in.
+
+    Returns
+    -------
+    int
+        The number of .npy files found.
+    '''
+    npy_file_count = 0
+
+    # Walk through all directories and files in the specified directory
+    for root, dirs, files in os.walk(directory):
+        for file in files:
+            if file.endswith('.npy'):
+                npy_file_count += 1
+
+    return npy_file_count
+
+
+
+TO_GENERATE = True
+TO_SAVE = True
 random_shift = True
 if random_shift is True:
     m_min = 0
@@ -1000,7 +1031,7 @@ if TO_GENERATE:
     x_match_str = r"_x=(-?\d+(?:\.\d+)?(?:e-?\d+)?)mm"
     y_match_str = r"_y=(-?\d+(?:\.\d+)?(?:e-?\d+)?)mm"
 
-    for i,geo_dir in tqdm(enumerate(geometry_dirs[0:2])):
+    for geo_dir in tqdm(geometry_dirs):
         # # good geometry
         # geo_dir = ('/media/amir/Extreme Pro/SquareFiberDatabase/' +
         #             'ELGap=10mm_pitch=15.6mm_distanceFiberHolder=-1mm_distanceAnodeHolder=10mm_holderThickness=10mm')
@@ -1035,10 +1066,10 @@ if TO_GENERATE:
         event_list = [entry.name for entry in os.scandir() if entry.is_file() 
                       and entry.name.startswith(event_pattern)]
         
-        # in case we add more samples, find highest existing sample number
-        highest_existing_data_number = find_highest_number(save_dir)
-        if highest_existing_data_number == -1:
-            highest_existing_data_number = 0
+        # # in case we add more samples, find highest existing sample number
+        # highest_existing_data_number = find_highest_number(save_dir)
+        # if highest_existing_data_number == -1:
+        #     highest_existing_data_number = 0
 
 
         j = 0
@@ -1119,7 +1150,7 @@ if TO_GENERATE:
                                        
                 if not os.path.isdir(save_path):
                     os.mkdir(save_path)
-                save_path = (save_path + f'/{highest_existing_data_number+j}_' +
+                save_path = (save_path + f'/{j}_' +
                 f'rotation_angle_rad={np.around(theta,5)}.npy')
                 np.save(save_path,centered_combined_event_SR)
                 
@@ -1128,24 +1159,26 @@ if TO_GENERATE:
     
             j += 1
             
+        print(f'Created {count_npy_files(save_dir)} events')
+            
 # In[7]
 '''
 Load twin events after shifted and centered.
 interpolate, deconv, rotate and save.
 '''
-TO_GENERATE = False
-TO_SAVE = False
+TO_GENERATE = True
+TO_SAVE = True
 TO_PLOT_EACH_STEP = False
 TO_PLOT_DECONVE_STACK = True
 
 TO_SMOOTH_PSF = False
 
 if TO_GENERATE:
-    for geo_dir in tqdm(geometry_dirs[0]):
+    for geo_dir in tqdm(geometry_dirs):
         
-        geo_dir = ('/media/amir/Extreme Pro/SquareFiberDatabase/' +
-                    'ELGap=10mm_pitch=15.6mm_distanceFiberHolder=5mm_' +
-                    'distanceAnodeHolder=10mm_holderThickness=10mm')
+        # geo_dir = ('/media/amir/Extreme Pro/SquareFiberDatabase/' +
+        #             'ELGap=10mm_pitch=15.6mm_distanceFiberHolder=5mm_' +
+        #             'distanceAnodeHolder=10mm_holderThickness=10mm')
 
         # # overwrite to a specific geometry
         # geo_dir = ('/media/amir/Extreme Pro/SquareFiberDatabase/' +
@@ -1384,7 +1417,6 @@ def frequency_analyzer(signal, spatial_sampling_rate):
     dynamic_spatial_cutoff_frequency = f[cutoff_index]  # Correctly identified cutoff frequency
     return dynamic_spatial_cutoff_frequency
 
-from scipy.optimize import curve_fit
 
 # Define the model function for two Gaussians
 def double_gaussian(x, A1, A2, mu1, mu2, sigma):
@@ -1647,12 +1679,12 @@ plt.show()
 
 
 # In[9]
-### GRAPHS ###
+### GRAPHS - compare P2Vs of different geometries ###
 
 
 import matplotlib.cm as cm
 # Number of unique colors needed
-num_colors = 54
+num_colors = len(geometry_dirs)
 
 # Create a colormap
 # 'viridis', 'plasma', 'inferno', 'magma', 'cividis' are good choices for distinct colors
@@ -1665,12 +1697,15 @@ random.shuffle(colors)
 markers = ['^', '*', 's', 'o', 'x', '+', 'D']
 
 # Parameter choices to slice to
-fiber_immersion_choice = [0,3]
+fiber_immersion_choice = [3]
 pitch_choice = [15.6]
 el_gap_choice = [10]
 anode_distance_choice = [2.5,5,7.5,10,12.5,15,17.5,20]
 holder_thickness_choice = [10]
 count = 0
+SHOW_ORIGINAL_SPACING = False
+SHOW_AVG_SPACING = True
+POLYNOMIAL_FIT = True
 
 # best
 # fiber_immersion_choice = [3]
@@ -1712,25 +1747,75 @@ for i, geo_dir in tqdm(enumerate(geometry_dirs)):
     dir_data = glob.glob(working_dir + '/*/*.txt')
     dists = []
     P2Vs = []
-    for data in dir_data:
-        dist, P2V = np.loadtxt(data)
-        if P2V > 100 or P2V == float('inf'):
-            P2V = 100
-        dists.append(dist)
-        P2Vs.append(P2V)
+    
+    if SHOW_ORIGINAL_SPACING:
+        for data in dir_data:
+            dist, P2V = np.loadtxt(data)
+            if P2V > 100 or P2V == float('inf'):
+                P2V = 100
+            dists.append(dist)
+            P2Vs.append(P2V)
+            
+        # zip and sort in ascending order
+        combined = list(zip(dists, P2Vs))
+        combined.sort(key=lambda x: x[0])
+        sorted_dists, sorted_P2Vs = zip(*combined)
+            
+            
+    if SHOW_AVG_SPACING:
+        averaged_dists = []
+        averaged_P2Vs = []
+        for j in range(0, len(dir_data), 2):  # Step through dir_data two at a time
+            data_pairs = dir_data[j:j+2]  # Get the current pair of data files
+            dists = []
+            P2Vs = []
+            for data in data_pairs:
+                dist, P2V = np.loadtxt(data)
+                if P2V > 100 or P2V == float('inf'):
+                    P2V = 100
+                dists.append(dist)
+                P2Vs.append(P2V)
+                # print(f'data_pair dist={dist}, P2V={P2V}')
+            
+            # Only proceed if we have a pair, to avoid index out of range errors
+            if len(dists) == 2 and len(P2Vs) == 2:
+                averaged_dist = sum(dists) / 2
+                averaged_P2V = sum(P2Vs) / 2
+                # print(f'averaged_dist={averaged_dist}, averaged_P2V={averaged_P2V}',end='\n\n')
+                averaged_dists.append(averaged_dist)
+                averaged_P2Vs.append(averaged_P2V)
         
-    # zip and sort in ascending order
-    combined = list(zip(dists, P2Vs))
-    combined.sort(key=lambda x: x[0])
-    sorted_dists, sorted_P2Vs = zip(*combined)
+        # zip and sort in ascending order
+        combined = list(zip(averaged_dists, averaged_P2Vs))
+        combined.sort(key=lambda x: x[0])
+        sorted_dists, sorted_P2Vs = zip(*combined)
         
 
     # ax.scatter(dists, P2Vs, color=colors[i], 
     #             marker=random.choice(markers),alpha=0.5, label=geo_params)
     label = (f'EL gap={el_gap}mm,pitch={pitch}mm,fiber immersion={fiber_immersion}mm,' +
              f'anode distance={anode_distance}mm,holder thickness={holder_thickness}mm')
-    ax.plot(sorted_dists, sorted_P2Vs, color=colors[i], ls='-', 
-                marker=random.choice(markers),alpha=0.5, label=label)
+    
+    if POLYNOMIAL_FIT:
+        # Fit the data to a 2nd degree polynomial
+        coefficients = np.polyfit(sorted_dists, sorted_P2Vs, 2)
+        
+        # Generate a polynomial function from the coefficients
+        polynomial = np.poly1d(coefficients)
+        
+        # Generate x values for the polynomial curve (e.g., for plotting)
+        sorted_dists_fit = np.linspace(sorted_dists[0], sorted_dists[-1], 100)
+        
+        # Generate y values for the polynomial curve
+        sorted_P2V_fit = polynomial(sorted_dists_fit)
+        
+        ax.plot(sorted_dists_fit, sorted_P2V_fit, color=colors[i], ls='-', 
+                    alpha=0.5, label=label)
+        
+    else:
+        ax.plot(sorted_dists, sorted_P2Vs, color=colors[i], ls='-', 
+                    marker=random.choice(markers),alpha=0.5, label=label)
+        
     count += 1
     
 xlim = 30
@@ -1751,14 +1836,7 @@ print(f'total geometries: {count}')
 
 
 
-
-
-
-
-
-
-
-
+## Find optimal anode distance ##
 
 
 
