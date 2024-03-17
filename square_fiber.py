@@ -49,98 +49,6 @@ geometry_dirs = [os.path.join(path_to_dataset, d) for d in os.listdir(path_to_da
                  if os.path.isdir(os.path.join(path_to_dataset, d))]
 
 
-# In[0]
-# load square fiber
-import tables as tb
-from invisible_cities.io.dst_io import df_writer
-from invisible_cities.reco.tbl_functions import filters
-
-
-def shrink_replace_data_file(filename_in,filename_out):
-    
-    # Ensure that the directory containing the output file exists
-    os.makedirs(os.path.dirname(filename_out), exist_ok=True)
-    
-    # Read the DataFrame from the HDF5 file
-    with pd.HDFStore(filename_in, mode="r") as store:
-        df = store.select("/DEBUG/steps")
-        
-    # Truncate string columns to a maximum length of 256 bytes
-    max_str_len = 1024
-    for col in df.select_dtypes(include="object"):
-        df[col] = df[col].str.slice(0, max_str_len)
-    
-    # Write the DataFrame to a CSV file
-    df.to_csv(filename_out, index=False)
-    
-    # Optional: Write the DataFrame to a new HDF5 file with compression
-    with tb.open_file("output_file.h5", mode="w", filters=filters("ZLIB4")) as file:
-        df_writer(file, df, "DEBUG", "steps")
-        file.root.DEBUG.steps.colinstances["event_id"].create_index()
-        
-    # Check file generated is not empty and remove initial LARGE data file
-    if os.path.isfile(filename_out) and os.path.getsize(filename_out) > 0:
-        print(f"File {filename_out} generated successfully.")
-        # os.remove(filename_in)
-        # print(f"File {filename_in} deleted successfully.")
-       
-    return filename_out
-
-
-# Set the input and output file paths
-# filename_in  = '/media/amir/9C33-6BBD/NEXT_work/Geant4/nexus/SquareFiber_big_run.next.h5'
-filename_out = "/media/amir/9C33-6BBD/NEXT_work/Geant4/nexus/results_gonzalo_code_big_run.csv"
-
-
-
-
-# filename_out = shrink_replace_data_file(filename_in,filename_out)
-df = pd.read_csv(filename_out)
-
-
-# hits = df.loc[df['final_volume'].str.contains("SiPM_")]
-#make sure each row is really a new particle
-if df.event_id.duplicated().sum() == 0:
-    print("No duplicates in data frame!", end="\n")
-unique_primary_photons = df['event_id'].nunique()
-print(f'Unique primary photons in dataframe = {unique_primary_photons}/{len(df)}')
-
-max_daughters = df.groupby('event_id')['particle_id'].nunique().max()
-print(f'max daughters found = {max_daughters-1}')
-
-
-# In[0.1]
-### Figure for Paula about TPB ###
-# make plot of number of primaries vs max number of secondaries
-import matplotlib.pyplot as plt
-n_daugters = np.arange(2,max_daughters,1)
-
-daughters_df = []
-for i in range(2,max_daughters):
-    daughters_df.append(df[df['particle_id'] == i])
-
-counts = [daughters_df[i]["event_id"].nunique() for i in range(len(daughters_df))]
-                                  
-plt.plot(n_daugters-np.ones(len(n_daugters)),np.divide(counts,unique_primary_photons),'-*k')
-plt.xticks(n_daugters-np.ones(len(n_daugters)))
-plt.xlabel("Max number of secondary photons")
-plt.ylabel("Fraction of primary photons")
-plt.title("Breakdown of primary vs max secondary photons")
-
-grouped = df.groupby('event_id')["particle_id"].max()
-did_WLS_number = sum(grouped > 1)
-did_not_WLS_number = sum(grouped == 1)
-
-
-did_not_WLS_Fraction = did_not_WLS_number/unique_primary_photons
-legend = f'Fraction that did not produce secondaries={round(did_not_WLS_Fraction,3)}'
-plt.text(2.5, 0.42, legend, bbox=dict(facecolor='blue', alpha=0.5))
-plt.grid()
-plt.show()
-
-print(f'recorded WLS efficiency = {round(did_WLS_number/unique_primary_photons,3)}')
-
-
 # In[0.2]
 ### Figure for Lior , with TPB ###
 # TPB, plot of the absorbed WLS blue photons in sipm vs fiber coating reflectivity
@@ -344,11 +252,13 @@ def psf_creator(directory, create_from, to_plot=False,to_smooth=False):
         x_event = float(x_match[0])
         y_match = re.findall(y_pattern, filename)
         y_event = float(y_match[0])
+        # print(f'x,y=({x_event},{y_event})')
         
         if plot_event:
             single_event, x_hist, y_hist = np.histogram2d(hitmap[:,0], hitmap[:,1],
                                                   range=[[-size/2,size/2],[-size/2,size/2]],
                                                   bins=bins)
+            single_event = single_event.T
             plt.imshow(single_event,extent=[-size/2, size/2, -size/2, size/2])
             plt.title("Single Geant4 event")
             plt.xlabel('x [mm]');
@@ -378,7 +288,8 @@ def psf_creator(directory, create_from, to_plot=False,to_smooth=False):
         if plot_shifted_event:
             shifted_event, x_hist, y_hist = np.histogram2d(shifted_hitmap[:,0], shifted_hitmap[:,1],
                                                   range=[[-size/2,size/2],[-size/2,size/2]],
-                                                  bins=bins)     
+                                                  bins=bins)
+            shifted_event = shifted_event.T
             plt.imshow(shifted_event,extent=[-size/2, size/2, -size/2, size/2])
             plt.title("Shifted Geant4 event, after assigned to SiPMs")
             plt.xlabel('x [mm]');
@@ -394,6 +305,7 @@ def psf_creator(directory, create_from, to_plot=False,to_smooth=False):
             PSF, x_hist, y_hist = np.histogram2d(PSF[:,0], PSF[:,1],
                                                   range=[[-size/2,size/2],[-size/2,size/2]],
                                                   bins=bins)
+            PSF = PSF.T
             plt.imshow(PSF,extent=[-size/2, size/2, -size/2, size/2])
             plt.title("Accumulated Geant4 events, after assigned to SiPMs and shifted")
             plt.xlabel('x [mm]');
@@ -420,7 +332,7 @@ def psf_creator(directory, create_from, to_plot=False,to_smooth=False):
     return PSF
 
 
-def plot_sensor_response(event, bins, size, noise=False):
+def plot_sensor_response(event, title, bins, size, noise=False):
     sipm_assigned_event, x_hist, y_hist = np.histogram2d(event[:,0], event[:,1],
                                                          range=[[-size/2, size/2], [-size/2, size/2]],
                                                          bins=bins)  
@@ -432,7 +344,8 @@ def plot_sensor_response(event, bins, size, noise=False):
 
     plt.imshow(sipm_assigned_event,
                 extent=[-size/2, size/2, -size/2, size/2], vmin=0, origin='lower')
-    plt.title("Sensor Response")
+    if title!="":
+        plt.title(title)
     plt.xlabel('x [mm]')
     plt.ylabel('y [mm]')
     plt.colorbar(label='Photon hits')
@@ -600,13 +513,14 @@ def P2V(vector):
 def find_subdirectory_by_distance(directory, user_distance):
     """
     Finds the subdirectory that corresponds to the 
-    user-specified distance within a given directory.
+    user-specified distance within a given directory, supporting both
+    integer and floating-point distances.
     
     Parameters
     ----------
     directory : str
         The directory to search in.
-    user_distance : int
+    user_distance : float
         The user-specified distance.
     
     Returns
@@ -615,10 +529,14 @@ def find_subdirectory_by_distance(directory, user_distance):
         The subdirectory corresponding to the user-specified distance,
         or None if not found.
     """
+    # Convert user_distance to a float for comparison
+    user_distance = float(user_distance)
+    
     for entry in os.scandir(directory):
         if entry.is_dir():
-            match = re.search(r'(\d+)_mm', entry.name)
-            if match and int(match.group(1)) == user_distance:
+            # Updated regex to capture both integer and floating-point numbers
+            match = re.search(r'(\d+(?:\.\d+)?)_mm', entry.name)
+            if match and abs(float(match.group(1)) - user_distance) < 1e-6:
                 return entry.path
     return None
 
@@ -878,7 +796,7 @@ for dir in geometry_dirs:
 # ax0.set_title('PSF image')
 # divider = make_axes_locatable(ax0)
 # cax = divider.append_axes("right", size="5%", pad=0.05)
-# plt.colorbar(im, cax=cax)
+# plt.colorbar(im, cax=cax)False
 
 # y = PSF[int(size/2),:]
 # peaks, _ = find_peaks(y)
@@ -919,10 +837,13 @@ for dir in geometry_dirs:
 
 TO_GENERATE = True
 TO_PLOT = True
-TO_SAVE = True
+TO_SAVE = False
 
 if TO_GENERATE:
-    for directory in tqdm(geometry_dirs):
+    for directory in tqdm(geometry_dirs[0]):
+        directory = ('/media/amir/Extreme Pro/SquareFiberDatabase/' +
+                    'ELGap=10mm_pitch=15.6mm_distanceFiberHolder=2mm_' +
+                    'distanceAnodeHolder=10mm_holderThickness=10mm')
         PSF_TPB = psf_creator(directory,create_from="TPB",
                               to_plot=TO_PLOT,to_smooth=False)
         os.chdir(directory)
@@ -935,7 +856,7 @@ if TO_GENERATE:
 # In[5]
 # plot and save all TPB PSFs from SquareFiberDataset in their respective folders
 TO_GENERATE = True
-TO_SAVE = True
+TO_SAVE = False
 print('Generating PSF plots')
 if TO_GENERATE:
     for directory in tqdm(geometry_dirs):
@@ -1016,30 +937,29 @@ def count_npy_files(directory):
 
 
 TO_GENERATE = True
-TO_SAVE = True
-random_shift = True
+TO_PLOT = True
+TO_SAVE = False
+FORCE_DISTANCE_RANGE = False
+random_shift = False
 if random_shift is True:
     m_min = 0
     m_max = 2 # exclusive - up to, not including
     n_min = 0
     n_max = 2 # exclusive - up to, not including
 if random_shift is False:
-    m,n = 1,1
+    m,n = 3,3
 samples_per_geometry = 10000
 
 if TO_GENERATE:
     x_match_str = r"_x=(-?\d+(?:\.\d+)?(?:e-?\d+)?)mm"
     y_match_str = r"_y=(-?\d+(?:\.\d+)?(?:e-?\d+)?)mm"
 
-    for geo_dir in tqdm(geometry_dirs):
-        # # good geometry
-        # geo_dir = ('/media/amir/Extreme Pro/SquareFiberDatabase/' +
-        #             'ELGap=10mm_pitch=15.6mm_distanceFiberHolder=-1mm_distanceAnodeHolder=10mm_holderThickness=10mm')
-
-        # # bad geometry
-        # geo_dir = ('/media/amir/Extreme Pro/SquareFiberDatabase/' +
-        #             'ELGap=1mm_pitch=15.6mm_distanceFiberHolder=5mm_' +
-        #             'distanceAnodeHolder=10mm_holderThickness=10mm')
+    for geo_dir in tqdm(geometry_dirs[0]):
+        
+        # bad geometry
+        geo_dir = ('/media/amir/Extreme Pro/SquareFiberDatabase/' +
+                    'ELGap=1mm_pitch=5mm_distanceFiberHolder=5mm_' +
+                    'distanceAnodeHolder=10mm_holderThickness=10mm')
         
         # # worst geometry
         # geo_dir = ('/media/amir/Extreme Pro/SquareFiberDatabase/' +
@@ -1050,8 +970,9 @@ if TO_GENERATE:
         # find min distance that will be of interest
         match = re.search(r"_pitch=(\d+(?:\.\d+)?)mm", geo_dir)
         pitch = float(match.group(1))
-        dist_min_threshold = int(0.5*pitch) # mm
-        dist_max_threshold = int(2*pitch) # mm
+        if FORCE_DISTANCE_RANGE:
+            dist_min_threshold = int(0.5*pitch) # mm
+            dist_max_threshold = int(2*pitch) # mm
 
         # assign input and output directories
         print(geo_dir)
@@ -1125,7 +1046,8 @@ if TO_GENERATE:
             dist = (np.sqrt((x0-shifted_event_coord[0])**2+(y0-shifted_event_coord[1])**2))
 
             # take specific distances in ROI
-            if dist < dist_min_threshold or dist > dist_max_threshold:
+            
+            if FORCE_DISTANCE_RANGE and dist_min_threshold < dist < dist_max_threshold:
                 continue
             
             dists.append(dist)
@@ -1159,6 +1081,17 @@ if TO_GENERATE:
     
             j += 1
             
+            if TO_PLOT:
+                # plot sensor responses
+                title = "Staying event"
+                plot_sensor_response(event_to_stay_SR, title, bins, size=100)
+                title = "Shifted event"
+                plot_sensor_response(event_to_shift_SR, title, bins, size=100)
+                title = "Combined event"
+                plot_sensor_response(combined_event_SR, title, bins, size=100)
+                title = "Centered combined event"
+                plot_sensor_response(centered_combined_event_SR, title, bins, size=100)
+            
         print(f'Created {count_npy_files(save_dir)} events')
             
 # In[7]
@@ -1167,18 +1100,18 @@ Load twin events after shifted and centered.
 interpolate, deconv, rotate and save.
 '''
 TO_GENERATE = True
-TO_SAVE = True
-TO_PLOT_EACH_STEP = False
+TO_SAVE = False
+TO_PLOT_EACH_STEP = True
 TO_PLOT_DECONVE_STACK = True
 
 TO_SMOOTH_PSF = False
 
 if TO_GENERATE:
-    for geo_dir in tqdm(geometry_dirs):
+    for geo_dir in tqdm(geometry_dirs[0]):
         
-        # geo_dir = ('/media/amir/Extreme Pro/SquareFiberDatabase/' +
-        #             'ELGap=10mm_pitch=15.6mm_distanceFiberHolder=5mm_' +
-        #             'distanceAnodeHolder=10mm_holderThickness=10mm')
+        geo_dir = ('/media/amir/Extreme Pro/SquareFiberDatabase/' +
+                    'ELGap=10mm_pitch=15.6mm_distanceFiberHolder=2mm_' +
+                    'distanceAnodeHolder=10mm_holderThickness=10mm')
 
         # # overwrite to a specific geometry
         # geo_dir = ('/media/amir/Extreme Pro/SquareFiberDatabase/' +
@@ -1227,8 +1160,8 @@ if TO_GENERATE:
             PSF = smooth_PSF(PSF)
 
         # # option to choose a single distance
-        # dist = 30
-        # user_chosen_dir = find_subdirectory_by_distance(working_dir, dist)
+        dist = 25
+        user_chosen_dir = find_subdirectory_by_distance(working_dir, dist)
         
         for dist_dir in tqdm(dist_dirs):
             # print(dist_dir)
@@ -1238,8 +1171,8 @@ if TO_GENERATE:
             match = re.search(r'/(\d+(?:\.\d+)?)_mm$', dist_dir)
             if match:
                 dist = float(match.group(1))
-            # dist_dir = user_chosen_dir
-            # print(f'Working on:\n{dist_dir}')
+            dist_dir = user_chosen_dir
+            print(f'Working on:\n{dist_dir}')
             deconv_stack = np.zeros((size,size))
             cutoff_iter_list = []
             rel_diff_checkout_list = []
@@ -1306,7 +1239,7 @@ if TO_GENERATE:
                 if TO_PLOT_EACH_STEP:
                     
                     # plot SR combined event
-                    plt.imshow(hist, extent=[-size/2, size/2, -size/2, size/2],
+                    plt.imshow(hist.T, extent=[-size/2, size/2, -size/2, size/2],
                                 vmin=0, origin='lower')
                     plt.colorbar(label='Photon hits')
                     plt.title('SR Combined event')
@@ -1678,8 +1611,14 @@ plt.show()
 
 
 
-# In[9]
+# In[9.0]
 ### GRAPHS - compare P2Vs of different geometries ###
+
+def sort_ascending_dists_P2Vs(dists, P2Vs):
+    combined = list(zip(dists, P2Vs))
+    combined.sort(key=lambda x: x[0])
+    sorted_dists, sorted_P2Vs = zip(*combined)
+    return sorted_dists, sorted_P2Vs
 
 
 import matplotlib.cm as cm
@@ -1697,17 +1636,17 @@ random.shuffle(colors)
 markers = ['^', '*', 's', 'o', 'x', '+', 'D']
 
 # Parameter choices to slice to
-fiber_immersion_choice = [3]
+fiber_immersion_choice = [3,6]
 pitch_choice = [15.6]
 el_gap_choice = [10]
-anode_distance_choice = [2.5,5,7.5,10,12.5,15,17.5,20]
+anode_distance_choice = [10]
 holder_thickness_choice = [10]
 count = 0
-SHOW_ORIGINAL_SPACING = False
-SHOW_AVG_SPACING = True
-POLYNOMIAL_FIT = True
+SHOW_ORIGINAL_SPACING = True
+POLYNOMIAL_FIT = False
 
-# best
+
+# # best
 # fiber_immersion_choice = [3]
 # pitch_choice = [15.6]
 # el_gap_choice = [10]
@@ -1740,14 +1679,14 @@ for i, geo_dir in tqdm(enumerate(geometry_dirs)):
         anode_distance not in anode_distance_choice or
         fiber_immersion not in fiber_immersion_choice or
         holder_thickness not in holder_thickness_choice):
-        # print(f'el_gap={el_gap},pitch={pitch},anode_distance={anode_distance},'+
-        #        f'fiber_immersion={fiber_immersion},holderthickness={holder_thickness}')
+        # print(i)
         continue
+    
     
     dir_data = glob.glob(working_dir + '/*/*.txt')
     dists = []
     P2Vs = []
-    
+        
     if SHOW_ORIGINAL_SPACING:
         for data in dir_data:
             dist, P2V = np.loadtxt(data)
@@ -1757,12 +1696,11 @@ for i, geo_dir in tqdm(enumerate(geometry_dirs)):
             P2Vs.append(P2V)
             
         # zip and sort in ascending order
-        combined = list(zip(dists, P2Vs))
-        combined.sort(key=lambda x: x[0])
-        sorted_dists, sorted_P2Vs = zip(*combined)
+        sorted_dists, sorted_P2Vs = sort_ascending_dists_P2Vs(dists,P2Vs)
+
             
             
-    if SHOW_AVG_SPACING:
+    else:
         averaged_dists = []
         averaged_P2Vs = []
         for j in range(0, len(dir_data), 2):  # Step through dir_data two at a time
@@ -1786,13 +1724,10 @@ for i, geo_dir in tqdm(enumerate(geometry_dirs)):
                 averaged_P2Vs.append(averaged_P2V)
         
         # zip and sort in ascending order
-        combined = list(zip(averaged_dists, averaged_P2Vs))
-        combined.sort(key=lambda x: x[0])
-        sorted_dists, sorted_P2Vs = zip(*combined)
+        sorted_dists, sorted_P2Vs = sort_ascending_dists_P2Vs(averaged_dists,
+                                                              averaged_P2Vs)
         
 
-    # ax.scatter(dists, P2Vs, color=colors[i], 
-    #             marker=random.choice(markers),alpha=0.5, label=geo_params)
     label = (f'EL gap={el_gap}mm,pitch={pitch}mm,fiber immersion={fiber_immersion}mm,' +
              f'anode distance={anode_distance}mm,holder thickness={holder_thickness}mm')
     
@@ -1817,7 +1752,7 @@ for i, geo_dir in tqdm(enumerate(geometry_dirs)):
                     marker=random.choice(markers),alpha=0.5, label=label)
         
     count += 1
-    
+        
 xlim = 30
 plt.axhline(y=1,color='red',alpha=0.7)
 plt.xticks(np.arange(0,xlim),rotation=45, size=10)
@@ -1831,16 +1766,471 @@ plt.legend(loc='upper left', bbox_to_anchor=(1, 1),
 # fig.suptitle(f'Fiber immersion = {immersion_choice}mm')
 plt.show()
 
-print(f'total geometries: {count}')
+print(f'total geometries used: {count}')
 
 
+# In[9.1]
+### GRAPHS - Find optimal anode distance ###  
+
+# Parameter choices to slice to - DO NOT CHANGE FOR CURRENT DATASET!
+fiber_immersion_choice = [3,6]
+pitch_choice = [15.6]
+el_gap_choice = [10]
+anode_distance_choice = [2.5,5,7.5,10,12.5,15,17.5,20]
+holder_thickness_choice = [10]
+dists = np.arange(16,31,0.5)
 
 
-## Find optimal anode distance ##
+for dist in tqdm(dists):
+    
+    anode_distance_immersion_3, anode_distance_immersion_6 = [], []
+    P2Vs_immersion_3, P2Vs_immersion_6 = [], [] 
+    fig, ax = plt.subplots(figsize=(10,7), dpi = 600)
+    
+    for i, geo_dir in tqdm(enumerate(geometry_dirs)):
+        
+        working_dir = geo_dir + r'/P2V'
+        geo_params = geo_dir.split('/SquareFiberDatabase/')[-1]
+        
+        el_gap = float(re.search(r"ELGap=(-?\d+\.?\d*)mm",
+                                 geo_params).group(1))
+        pitch = float(re.search(r"pitch=(-?\d+\.?\d*)mm",
+                                geo_params).group(1))
+        anode_distance = float(re.search(r"distanceAnodeHolder=(-?\d+\.?\d*)mm",
+                                         geo_params).group(1))
+        holder_thickness = float(re.search(r"holderThickness=(-?\d+\.?\d*)mm",
+                                           geo_params).group(1))
+        fiber_immersion = float(re.search(r"distanceFiberHolder=(-?\d+\.?\d*)mm",
+                                          geo_params).group(1))
+        fiber_immersion = 5 - fiber_immersion
+        
+        
+        if (el_gap not in el_gap_choice or
+            pitch not in pitch_choice or
+            anode_distance not in anode_distance_choice or
+            fiber_immersion not in fiber_immersion_choice or
+            holder_thickness not in holder_thickness_choice):
+            continue
+        
+        user_chosen_dir = find_subdirectory_by_distance(working_dir, dist)
+        dir_data = glob.glob(user_chosen_dir + '/*.txt')[-1]
+        _, P2V = np.loadtxt(dir_data)
+    
+            
+        if fiber_immersion==fiber_immersion_choice[0]:
+            anode_distance_immersion_3.append(anode_distance)
+            P2Vs_immersion_3.append(P2V)
+    
+            
+        if fiber_immersion==fiber_immersion_choice[1]:
+            anode_distance_immersion_6.append(anode_distance)
+            P2Vs_immersion_6.append(P2V)
+    
+                
+    # zip and sort in ascending order
+    sorted_dists_3, sorted_P2Vs_3 = sort_ascending_dists_P2Vs(anode_distance_immersion_3,
+                                                          P2Vs_immersion_3)
+    sorted_dists_6, sorted_P2Vs_6 = sort_ascending_dists_P2Vs(anode_distance_immersion_6,
+                                                          P2Vs_immersion_6)
+    
+    
+    ax.plot(sorted_dists_3, sorted_P2Vs_3, color='green', ls='-',linewidth=3, 
+                marker='^', markersize=10, alpha=0.8,
+                label=f"immersion={fiber_immersion_choice[0]}mm")           
+    ax.plot(sorted_dists_6, sorted_P2Vs_6, color='red', ls='-', linewidth=3, 
+                marker='*',markersize=10, alpha=0.8,
+                label=f"immersion={fiber_immersion_choice[1]}mm") 
+    # xlim = 30
+    plt.axhline(y=1,color='red',alpha=0.8)
+    plt.xlabel('Anode distance [mm]')
+    plt.ylabel('P2V')
+    plt.grid()
+    plt.legend(loc='upper left',fontsize=10)
+    title = (f'Comparison of fiber immmersions for source spacing of {dist}mm' + 
+             f'\nEL gap={el_gap_choice[-1]}mm,' +
+             f' pitch={pitch_choice[-1]}mm,' +
+             f' holder thickness={holder_thickness_choice[-1]}mm')
+    fig.suptitle(title)
+    plt.show()
 
 
+# In[9.2]
+### GRAPHS - Find optimal pitch ###  
+
+# Parameter choices to slice to - DO NOT CHANGE FOR CURRENT DATASET!
+fiber_immersion_choice = [0]
+pitch_choice = [5,10,15.6]
+el_gap_choice = [10]
+anode_distance_choice = [10]
+holder_thickness_choice = [10]
+
+color = iter(['red', 'green', 'blue'])
+marker = iter(['^', '*', 's'])
+SHOW_ORIGINAL_SPACING = True
+if SHOW_ORIGINAL_SPACING is False:
+    custom_spacing = 2
+POLYNOMIAL_FIT = False
+
+fig, ax = plt.subplots(figsize=(10,7), dpi = 600)
+
+for i, geo_dir in tqdm(enumerate(geometry_dirs)):
+    
+    working_dir = geo_dir + r'/P2V'
+    geo_params = geo_dir.split('/SquareFiberDatabase/')[-1]
+    
+    
+    el_gap = float(re.search(r"ELGap=(-?\d+\.?\d*)mm",
+                             geo_params).group(1))
+    pitch = float(re.search(r"pitch=(-?\d+\.?\d*)mm",
+                            geo_params).group(1))
+    anode_distance = float(re.search(r"distanceAnodeHolder=(-?\d+\.?\d*)mm",
+                                     geo_params).group(1))
+    holder_thickness = float(re.search(r"holderThickness=(-?\d+\.?\d*)mm",
+                                       geo_params).group(1))
+    fiber_immersion = float(re.search(r"distanceFiberHolder=(-?\d+\.?\d*)mm",
+                                      geo_params).group(1))
+    fiber_immersion = 5 - fiber_immersion
+    
+    
+    if (el_gap not in el_gap_choice or
+        pitch not in pitch_choice or
+        anode_distance not in anode_distance_choice or
+        fiber_immersion not in fiber_immersion_choice or
+        holder_thickness not in holder_thickness_choice):
+        # print(i)
+        continue
+    
+    
+    dir_data = glob.glob(working_dir + '/*/*.txt')
+    dists = []
+    P2Vs = []
+        
+    if SHOW_ORIGINAL_SPACING:
+        for data in dir_data:
+            dist, P2V = np.loadtxt(data)
+            if P2V > 100 or P2V == float('inf'):
+                P2V = 100
+            dists.append(dist)
+            P2Vs.append(P2V)
+            
+        # zip and sort in ascending order
+        sorted_dists, sorted_P2Vs = sort_ascending_dists_P2Vs(dists,P2Vs)
+       
+    else:
+        averaged_dists = []
+        averaged_P2Vs = []
+        for j in range(0, len(dir_data), custom_spacing):  # Step through dir_data two at a time
+            data_pairs = dir_data[j:j+custom_spacing]  # Get the current pair of data files
+            dists = []
+            P2Vs = []
+            for data in data_pairs:
+                dist, P2V = np.loadtxt(data)
+                if P2V > 100 or P2V == float('inf'):
+                    P2V = 100
+                dists.append(dist)
+                P2Vs.append(P2V)
+                # print(f'data_pair dist={dist}, P2V={P2V}')
+            
+            # Only proceed if we have a pair, to avoid index out of range errors
+            if len(dists) == custom_spacing and len(P2Vs) == custom_spacing:
+                averaged_dist = sum(dists) / custom_spacing
+                averaged_P2V = sum(P2Vs) / custom_spacing
+                # print(f'averaged_dist={averaged_dist}, averaged_P2V={averaged_P2V}',end='\n\n')
+                averaged_dists.append(averaged_dist)
+                averaged_P2Vs.append(averaged_P2V)
+        
+        # zip and sort in ascending order
+        sorted_dists, sorted_P2Vs = sort_ascending_dists_P2Vs(averaged_dists,
+                                                              averaged_P2Vs)
+        
+    if POLYNOMIAL_FIT:
+        # Fit the data to a 2nd degree polynomial
+        coefficients = np.polyfit(sorted_dists, sorted_P2Vs, 2)
+        
+        # Generate a polynomial function from the coefficients
+        polynomial = np.poly1d(coefficients)
+        
+        # Generate x values for the polynomial curve (e.g., for plotting)
+        sorted_dists_fit = np.linspace(sorted_dists[0], sorted_dists[-1], 100)
+        
+        # Generate y values for the polynomial curve
+        sorted_P2V_fit = polynomial(sorted_dists_fit)
+        
+        ax.plot(sorted_dists_fit, sorted_P2V_fit, color=next(color), ls='-', 
+                    alpha=0.5, label=f'pitch={pitch}mm',linewidth=3, markersize=10)
+        
+    else:
+        ax.plot(sorted_dists, sorted_P2Vs, color=next(color), ls='-', 
+                    marker=next(marker),alpha=0.5, label=f'pitch={pitch}mm',
+                    linewidth=3, markersize=10)
+        
+    count += 1
+    
+title = ('Separation for different pitch values vs sources distance' + 
+         f'\nEL gap={el_gap_choice[-1]}mm,' +
+         f' fiber immersion={fiber_immersion_choice[-1]}mm,' +
+         f' anode distance={anode_distance_choice[-1]}mm,'+ 
+         f' holder thickness={holder_thickness_choice[-1]}mm')
+plt.xlabel('Distance [mm]')
+plt.ylabel('P2V')
+plt.grid()
+plt.xlim([5,25])
+plt.legend(loc='upper left',fontsize=10)
+fig.suptitle(title,size=12)
+plt.show()
+print(f'total geometries used: {count}')
 
 
+# In[9.3]
+### GRAPHS - Find optimal EL gap ###  
+
+# Parameter choices to slice to - DO NOT CHANGE FOR CURRENT DATASET!
+fiber_immersion_choice = [3]
+pitch_choice = [15.6]
+el_gap_choice = [1,10]
+anode_distance_choice = [10]
+holder_thickness_choice = [10]
+
+color = iter(['red', 'green'])
+marker = iter(['^', '*'])
+SHOW_ORIGINAL_SPACING = False
+if SHOW_ORIGINAL_SPACING is False:
+    custom_spacing = 3
+POLYNOMIAL_FIT = False
+
+fig, ax = plt.subplots(figsize=(10,7), dpi = 600)
+
+for i, geo_dir in tqdm(enumerate(geometry_dirs)):
+    
+    working_dir = geo_dir + r'/P2V'
+    geo_params = geo_dir.split('/SquareFiberDatabase/')[-1]
+    
+    
+    el_gap = float(re.search(r"ELGap=(-?\d+\.?\d*)mm",
+                             geo_params).group(1))
+    pitch = float(re.search(r"pitch=(-?\d+\.?\d*)mm",
+                            geo_params).group(1))
+    anode_distance = float(re.search(r"distanceAnodeHolder=(-?\d+\.?\d*)mm",
+                                     geo_params).group(1))
+    holder_thickness = float(re.search(r"holderThickness=(-?\d+\.?\d*)mm",
+                                       geo_params).group(1))
+    fiber_immersion = float(re.search(r"distanceFiberHolder=(-?\d+\.?\d*)mm",
+                                      geo_params).group(1))
+    fiber_immersion = 5 - fiber_immersion
+    
+    
+    if (el_gap not in el_gap_choice or
+        pitch not in pitch_choice or
+        anode_distance not in anode_distance_choice or
+        fiber_immersion not in fiber_immersion_choice or
+        holder_thickness not in holder_thickness_choice):
+        # print(i)
+        continue
+    
+    
+    dir_data = glob.glob(working_dir + '/*/*.txt')
+    dists = []
+    P2Vs = []
+        
+    if SHOW_ORIGINAL_SPACING:
+        for data in dir_data:
+            dist, P2V = np.loadtxt(data)
+            if P2V > 100 or P2V == float('inf'):
+                P2V = 100
+            dists.append(dist)
+            P2Vs.append(P2V)
+            
+        # zip and sort in ascending order
+        sorted_dists, sorted_P2Vs = sort_ascending_dists_P2Vs(dists,P2Vs)
+       
+    else:
+        averaged_dists = []
+        averaged_P2Vs = []
+        for j in range(0, len(dir_data), custom_spacing):  # Step through dir_data two at a time
+            data_pairs = dir_data[j:j+custom_spacing]  # Get the current pair of data files
+            dists = []
+            P2Vs = []
+            for data in data_pairs:
+                dist, P2V = np.loadtxt(data)
+                if P2V > 100 or P2V == float('inf'):
+                    P2V = 100
+                dists.append(dist)
+                P2Vs.append(P2V)
+                # print(f'data_pair dist={dist}, P2V={P2V}')
+            
+            # Only proceed if we have a pair, to avoid index out of range errors
+            if len(dists) == custom_spacing and len(P2Vs) == custom_spacing:
+                averaged_dist = sum(dists) / custom_spacing
+                averaged_P2V = sum(P2Vs) / custom_spacing
+                # print(f'averaged_dist={averaged_dist}, averaged_P2V={averaged_P2V}',end='\n\n')
+                averaged_dists.append(averaged_dist)
+                averaged_P2Vs.append(averaged_P2V)
+        
+        # zip and sort in ascending order
+        sorted_dists, sorted_P2Vs = sort_ascending_dists_P2Vs(averaged_dists,
+                                                              averaged_P2Vs)
+        
+    if POLYNOMIAL_FIT:
+        # Fit the data to a 2nd degree polynomial
+        coefficients = np.polyfit(sorted_dists, sorted_P2Vs, 2)
+        
+        # Generate a polynomial function from the coefficients
+        polynomial = np.poly1d(coefficients)
+        
+        # Generate x values for the polynomial curve (e.g., for plotting)
+        sorted_dists_fit = np.linspace(sorted_dists[0], sorted_dists[-1], 100)
+        
+        # Generate y values for the polynomial curve
+        sorted_P2V_fit = polynomial(sorted_dists_fit)
+        ax.plot(sorted_dists_fit, sorted_P2V_fit, color=next(color), ls='-', 
+                    marker=next(marker), alpha=0.5, label=f'EL gap={el_gap}mm',
+                    linewidth=3, markersize=10)
+        
+    else:
+        ax.plot(sorted_dists, sorted_P2Vs, color=next(color), ls='-', 
+                    marker=next(marker),alpha=0.5, label=f'EL gap={el_gap}mm',
+                    linewidth=3, markersize=10)
+        
+    count += 1
+    
+title = ('P2V of different EL gaps vs sources distance' + 
+         f'\npitch={pitch_choice[-1]}mm,' +
+         f' fiber immersion={fiber_immersion_choice[-1]}mm,' +
+         f' anode distance={anode_distance_choice[-1]}mm,'+ 
+         f' holder thickness={holder_thickness_choice[-1]}mm')
+plt.xlabel('Distance [mm]')
+plt.ylabel('P2V')
+plt.grid()
+plt.legend(loc='upper left',fontsize=15)
+fig.suptitle(title,size=15)
+plt.show()
+print(f'total geometries used: {count}')
+
+# In[9.3]
+### GRAPHS - Find optimal immersion ###  
+
+# Parameter choices to slice to - DO NOT CHANGE FOR CURRENT DATASET!
+fiber_immersion_choice = [0,3,6]
+pitch_choice = [15.6]
+el_gap_choice = [10]
+anode_distance_choice = [10]
+holder_thickness_choice = [10]
+
+color = iter(['red', 'green', 'blue'])
+marker = iter(['^', '*', 's'])
+SHOW_ORIGINAL_SPACING = False
+if SHOW_ORIGINAL_SPACING is False:
+    custom_spacing = 2
+POLYNOMIAL_FIT = False
+
+fig, ax = plt.subplots(figsize=(10,7), dpi = 600)
+
+for i, geo_dir in tqdm(enumerate(geometry_dirs)):
+    
+    working_dir = geo_dir + r'/P2V'
+    geo_params = geo_dir.split('/SquareFiberDatabase/')[-1]
+    
+    
+    el_gap = float(re.search(r"ELGap=(-?\d+\.?\d*)mm",
+                             geo_params).group(1))
+    pitch = float(re.search(r"pitch=(-?\d+\.?\d*)mm",
+                            geo_params).group(1))
+    anode_distance = float(re.search(r"distanceAnodeHolder=(-?\d+\.?\d*)mm",
+                                     geo_params).group(1))
+    holder_thickness = float(re.search(r"holderThickness=(-?\d+\.?\d*)mm",
+                                       geo_params).group(1))
+    fiber_immersion = float(re.search(r"distanceFiberHolder=(-?\d+\.?\d*)mm",
+                                      geo_params).group(1))
+    fiber_immersion = 5 - fiber_immersion
+    
+    
+    if (el_gap not in el_gap_choice or
+        pitch not in pitch_choice or
+        anode_distance not in anode_distance_choice or
+        fiber_immersion not in fiber_immersion_choice or
+        holder_thickness not in holder_thickness_choice):
+        # print(i)
+        continue
+    
+    
+    dir_data = glob.glob(working_dir + '/*/*.txt')
+    dists = []
+    P2Vs = []
+        
+    if SHOW_ORIGINAL_SPACING:
+        for data in dir_data:
+            dist, P2V = np.loadtxt(data)
+            if P2V > 100 or P2V == float('inf'):
+                P2V = 100
+            dists.append(dist)
+            P2Vs.append(P2V)
+            
+        # zip and sort in ascending order
+        sorted_dists, sorted_P2Vs = sort_ascending_dists_P2Vs(dists,P2Vs)
+       
+    else:
+        averaged_dists = []
+        averaged_P2Vs = []
+        for j in range(0, len(dir_data), custom_spacing):  # Step through dir_data two at a time
+            data_pairs = dir_data[j:j+custom_spacing]  # Get the current pair of data files
+            dists = []
+            P2Vs = []
+            for data in data_pairs:
+                dist, P2V = np.loadtxt(data)
+                if P2V > 100 or P2V == float('inf'):
+                    P2V = 100
+                dists.append(dist)
+                P2Vs.append(P2V)
+                print(f'data_pair dist={dist}, P2V={P2V}')
+            
+            # Only proceed if we have a pair, to avoid index out of range errors
+            if len(dists) == custom_spacing and len(P2Vs) == custom_spacing:
+                averaged_dist = sum(dists) / custom_spacing
+                averaged_P2V = sum(P2Vs) / custom_spacing
+                print(f'averaged_dist={averaged_dist}, averaged_P2V={averaged_P2V}',end='\n\n')
+                averaged_dists.append(averaged_dist)
+                averaged_P2Vs.append(averaged_P2V)
+        
+        # zip and sort in ascending order
+        sorted_dists, sorted_P2Vs = sort_ascending_dists_P2Vs(averaged_dists,
+                                                              averaged_P2Vs)
+        
+    if POLYNOMIAL_FIT:
+        # Fit the data to a 2nd degree polynomial
+        coefficients = np.polyfit(sorted_dists, sorted_P2Vs, 2)
+        
+        # Generate a polynomial function from the coefficients
+        polynomial = np.poly1d(coefficients)
+        
+        # Generate x values for the polynomial curve (e.g., for plotting)
+        sorted_dists_fit = np.linspace(sorted_dists[0], sorted_dists[-1], 100)
+        
+        # Generate y values for the polynomial curve
+        sorted_P2V_fit = polynomial(sorted_dists_fit)
+        
+        ax.plot(sorted_dists_fit, sorted_P2V_fit, color=next(color), ls='-', 
+                    alpha=0.5, label=f'immersion={fiber_immersion}mm',
+                    linewidth=3, markersize=10)
+        
+    else:
+        ax.plot(sorted_dists, sorted_P2Vs, color=next(color), ls='-', 
+                    marker=next(marker),alpha=0.5, label=f'immersion={fiber_immersion}mm',
+                    linewidth=3, markersize=10)
+        
+    count += 1
+    
+title = ('P2V of different immersions vs sources distance' + 
+         f'\nEL gap={el_gap_choice[-1]}mm,' +
+         f' pitch={pitch_choice[-1]}mm,' +
+         f' anode distance={anode_distance_choice[-1]}mm,'+ 
+         f' holder thickness={holder_thickness_choice[-1]}mm')
+plt.xlabel('Distance [mm]')
+plt.ylabel('P2V')
+plt.grid()
+plt.legend(loc='upper left',fontsize=10)
+fig.suptitle(title,size=12)
+plt.show()
+print(f'total geometries used: {count}')
 
 
 # In[9]
