@@ -1770,7 +1770,7 @@ print(f'total geometries used: {count}')
 
 
 # In[9.1]
-### GRAPHS - Find optimal anode distance ###  
+### GRAPHS - Find optimal anode distance FOR NEXT SETUP ###  
 
 # Parameter choices to slice to - DO NOT CHANGE FOR CURRENT DATASET!
 fiber_immersion_choice = [3,6]
@@ -1846,7 +1846,7 @@ for dist in tqdm(dists):
     plt.ylabel('P2V')
     plt.grid()
     plt.legend(loc='upper left',fontsize=10)
-    title = (f'Comparison of fiber immmersions for source spacing of {dist}mm' + 
+    title = (f'Source spacing = {dist}mm' + 
              f'\nEL gap={el_gap_choice[-1]}mm,' +
              f' pitch={pitch_choice[-1]}mm,' +
              f' holder thickness={holder_thickness_choice[-1]}mm')
@@ -1857,19 +1857,54 @@ for dist in tqdm(dists):
 # In[9.2]
 ### GRAPHS - Find optimal pitch ###  
 
+def custom_polyfit(sorted_dists, sorted_P2Vs):
+    
+    sorted_dists, sorted_P2Vs = np.array(sorted_dists), np.array(sorted_P2Vs)
+    
+    for i, p2v in enumerate(sorted_P2Vs):
+        if p2v > 1:
+            last_index_with_P2V_1 = i - 1
+            break
+    else: # who knew you can have an else statement for a "for" loop ?!
+        last_index_with_P2V_1 = len(sorted_P2Vs) - 1
+
+    # last_index_with_P2V_1 = np.max(np.where(sorted_P2Vs == 1)[0])
+    
+    # Use data from this index onwards for fitting
+    relevant_dists = sorted_dists[last_index_with_P2V_1 + 1:]
+    relevant_P2Vs = sorted_P2Vs[last_index_with_P2V_1 + 1:]
+    
+    # Fit a polynomial of degree 2 (a parabola) to the relevant part of the data
+    coefficients = np.polyfit(relevant_dists, relevant_P2Vs, 2)
+    
+    # Ensure the leading coefficient is positive for a "smiling" parabola
+    if coefficients[0] < 0:
+        coefficients[0] = - coefficients[0]
+    
+    # Generate a polynomial function from the coefficients
+    polynomial = np.poly1d(coefficients)
+    
+    # Generate x values for the polynomial curve (e.g., for plotting)
+    sorted_dists_fit = np.linspace(relevant_dists[0], relevant_dists[-1], 100)
+    
+    # Generate y values for the polynomial curve
+    sorted_P2V_fit = polynomial(sorted_dists_fit)
+    
+    return sorted_dists_fit, sorted_P2V_fit
+
 # Parameter choices to slice to - DO NOT CHANGE FOR CURRENT DATASET!
 fiber_immersion_choice = [0]
 pitch_choice = [5,10,15.6]
-el_gap_choice = [10]
-anode_distance_choice = [10]
+el_gap_choice = [1]
+anode_distance_choice = [2.5]
 holder_thickness_choice = [10]
-
+count = 0
 color = iter(['red', 'green', 'blue'])
 marker = iter(['^', '*', 's'])
 SHOW_ORIGINAL_SPACING = True
 if SHOW_ORIGINAL_SPACING is False:
     custom_spacing = 2
-POLYNOMIAL_FIT = False
+POLYNOMIAL_FIT = True
 
 fig, ax = plt.subplots(figsize=(10,7), dpi = 600)
 
@@ -1891,7 +1926,7 @@ for i, geo_dir in tqdm(enumerate(geometry_dirs)):
                                       geo_params).group(1))
     fiber_immersion = 5 - fiber_immersion
     
-    
+    # continue if geometry is not in search space
     if (el_gap not in el_gap_choice or
         pitch not in pitch_choice or
         anode_distance not in anode_distance_choice or
@@ -1944,39 +1979,49 @@ for i, geo_dir in tqdm(enumerate(geometry_dirs)):
                                                               averaged_P2Vs)
         
     if POLYNOMIAL_FIT:
-        # Fit the data to a 2nd degree polynomial
-        coefficients = np.polyfit(sorted_dists, sorted_P2Vs, 2)
+        # custom fit a polynomial of 2nd degree to data
+        sorted_dists_fit, sorted_P2V_fit = custom_polyfit(sorted_dists,
+                                                          sorted_P2Vs)
         
-        # Generate a polynomial function from the coefficients
-        polynomial = np.poly1d(coefficients)
         
-        # Generate x values for the polynomial curve (e.g., for plotting)
-        sorted_dists_fit = np.linspace(sorted_dists[0], sorted_dists[-1], 100)
-        
-        # Generate y values for the polynomial curve
-        sorted_P2V_fit = polynomial(sorted_dists_fit)
-        
-        ax.plot(sorted_dists_fit, sorted_P2V_fit, color=next(color), ls='-', 
-                    alpha=0.5, label=f'pitch={pitch}mm',linewidth=3, markersize=10)
+        this_color = next(color)
+        this_marker = next(marker)
+        # Plot original data
+        ax.plot(sorted_dists, sorted_P2Vs, color=this_color, ls='-', 
+                    alpha=0.8, label=f'pitch={pitch}mm',marker=this_marker,
+                    linewidth=3, markersize=10)
+        # Plot fitted data
+        ax.plot(sorted_dists_fit, sorted_P2V_fit, color=this_color, ls='--',
+                 alpha=0.5, label=f'{pitch}mm fitted',linewidth=3)
         
     else:
         ax.plot(sorted_dists, sorted_P2Vs, color=next(color), ls='-', 
-                    marker=next(marker),alpha=0.5, label=f'pitch={pitch}mm',
+                    marker=next(marker),alpha=0.8, label=f'pitch={pitch}mm',
                     linewidth=3, markersize=10)
         
     count += 1
     
-title = ('Separation for different pitch values vs sources distance' + 
-         f'\nEL gap={el_gap_choice[-1]}mm,' +
-         f' fiber immersion={fiber_immersion_choice[-1]}mm,' +
-         f' anode distance={anode_distance_choice[-1]}mm,'+ 
-         f' holder thickness={holder_thickness_choice[-1]}mm')
-plt.xlabel('Distance [mm]')
+plt.xlabel('Sources distance [mm]')
 plt.ylabel('P2V')
 plt.grid()
-plt.xlim([5,25])
+plt.xlim([None,25])
 plt.legend(loc='upper left',fontsize=10)
-fig.suptitle(title,size=12)
+
+title = (f'EL gap={el_gap_choice[-1]}mm' +
+         f'\nFiber immersion={fiber_immersion_choice[-1]}mm' +
+         f'\nAnode distance={anode_distance_choice[-1]}mm'+ 
+         f'\nHolder thickness={holder_thickness_choice[-1]}mm')
+# fine tune box positionand parameters
+if POLYNOMIAL_FIT:
+    xloc, yloc = 0.14, 0.68
+else:
+    xloc, yloc = 0.14, 0.79
+plt.text(xloc, yloc, title, ha='center', va='center',
+         transform=plt.gca().transAxes,
+         bbox=dict(facecolor='yellow', alpha=0.5,boxstyle='round,pad=0.5'),
+         fontsize=10, weight='bold', linespacing=1.5)  # Adjust this value to increase spacing between lines, if necessary
+
+# fig.suptitle(title,size=12)
 plt.show()
 print(f'total geometries used: {count}')
 
@@ -1985,7 +2030,7 @@ print(f'total geometries used: {count}')
 ### GRAPHS - Find optimal EL gap ###  
 
 # Parameter choices to slice to - DO NOT CHANGE FOR CURRENT DATASET!
-fiber_immersion_choice = [3]
+fiber_immersion_choice = [0]
 pitch_choice = [15.6]
 el_gap_choice = [1,10]
 anode_distance_choice = [10]
@@ -1995,7 +2040,143 @@ color = iter(['red', 'green'])
 marker = iter(['^', '*'])
 SHOW_ORIGINAL_SPACING = False
 if SHOW_ORIGINAL_SPACING is False:
-    custom_spacing = 3
+    custom_spacing = 2
+POLYNOMIAL_FIT = True
+
+fig, ax = plt.subplots(figsize=(10,7), dpi = 600)
+
+for i, geo_dir in tqdm(enumerate(geometry_dirs)):
+    
+    working_dir = geo_dir + r'/P2V'
+    geo_params = geo_dir.split('/SquareFiberDatabase/')[-1]
+    
+    
+    el_gap = float(re.search(r"ELGap=(-?\d+\.?\d*)mm",
+                             geo_params).group(1))
+    pitch = float(re.search(r"pitch=(-?\d+\.?\d*)mm",
+                            geo_params).group(1))
+    anode_distance = float(re.search(r"distanceAnodeHolder=(-?\d+\.?\d*)mm",
+                                     geo_params).group(1))
+    holder_thickness = float(re.search(r"holderThickness=(-?\d+\.?\d*)mm",
+                                       geo_params).group(1))
+    fiber_immersion = float(re.search(r"distanceFiberHolder=(-?\d+\.?\d*)mm",
+                                      geo_params).group(1))
+    fiber_immersion = 5 - fiber_immersion
+    
+    
+    if (el_gap not in el_gap_choice or
+        pitch not in pitch_choice or
+        anode_distance not in anode_distance_choice or
+        fiber_immersion not in fiber_immersion_choice or
+        holder_thickness not in holder_thickness_choice):
+        # print(i)
+        continue
+    
+    
+    dir_data = glob.glob(working_dir + '/*/*.txt')
+    dists = []
+    P2Vs = []
+        
+    if SHOW_ORIGINAL_SPACING:
+        for data in dir_data:
+            dist, P2V = np.loadtxt(data)
+            if P2V > 100 or P2V == float('inf'):
+                P2V = 100
+            dists.append(dist)
+            P2Vs.append(P2V)
+            
+        # zip and sort in ascending order
+        sorted_dists, sorted_P2Vs = sort_ascending_dists_P2Vs(dists,P2Vs)
+       
+    else:
+        averaged_dists = []
+        averaged_P2Vs = []
+        for j in range(0, len(dir_data), custom_spacing):  # Step through dir_data two at a time
+            data_pairs = dir_data[j:j+custom_spacing]  # Get the current pair of data files
+            dists = []
+            P2Vs = []
+            for data in data_pairs:
+                dist, P2V = np.loadtxt(data)
+                if P2V > 100 or P2V == float('inf'):
+                    P2V = 100
+                dists.append(dist)
+                P2Vs.append(P2V)
+                # print(f'data_pair dist={dist}, P2V={P2V}')
+            
+            # Only proceed if we have a pair, to avoid index out of range errors
+            if len(dists) == custom_spacing and len(P2Vs) == custom_spacing:
+                averaged_dist = sum(dists) / custom_spacing
+                averaged_P2V = sum(P2Vs) / custom_spacing
+                # print(f'averaged_dist={averaged_dist}, averaged_P2V={averaged_P2V}',end='\n\n')
+                averaged_dists.append(averaged_dist)
+                averaged_P2Vs.append(averaged_P2V)
+        
+        # zip and sort in ascending order
+        sorted_dists, sorted_P2Vs = sort_ascending_dists_P2Vs(averaged_dists,
+                                                              averaged_P2Vs)
+        
+    if POLYNOMIAL_FIT:
+        # custom fit a polynomial of 2nd degree to data        
+        sorted_dists_fit, sorted_P2V_fit = custom_polyfit(sorted_dists,
+                                                          sorted_P2Vs)
+        
+        
+        this_color = next(color)
+        this_marker = next(marker)
+        # Plot original data
+        ax.plot(sorted_dists, sorted_P2Vs, color=this_color, ls='-', 
+                    alpha=0.8, label=f'EL={el_gap}mm',marker=this_marker,
+                    linewidth=3, markersize=10)
+        # Plot fitted data
+        ax.plot(sorted_dists_fit, sorted_P2V_fit, color=this_color, ls='--',
+                 alpha=0.5, label=f'{el_gap}mm fitted',linewidth=3)
+        
+    else:
+        print(f'EL={el_gap}')
+        ax.plot(sorted_dists, sorted_P2Vs, color=next(color), ls='-', 
+                    marker=next(marker),alpha=0.8, label=f'EL gap={el_gap}mm',
+                    linewidth=3, markersize=10)
+        
+    count += 1
+    
+
+plt.xlabel('Distance [mm]')
+plt.ylabel('P2V')
+plt.grid()
+plt.legend(loc='upper left',fontsize=10)
+title = (f'Pitch={pitch_choice[-1]}mm' +
+         f'\nFiber immersion={fiber_immersion_choice[-1]}mm' +
+         f'\nAnode distance={anode_distance_choice[-1]}mm'+ 
+         f'\nHolder thickness={holder_thickness_choice[-1]}mm')
+if POLYNOMIAL_FIT:
+    xloc, yloc = 0.14, 0.75
+else:
+    xloc, yloc = 0.14, 0.82
+plt.text(xloc, yloc, title, ha='center', va='center',
+         transform=plt.gca().transAxes,
+         bbox=dict(facecolor='yellow', alpha=0.5,boxstyle='round,pad=0.5'),
+         fontsize=10, weight='bold', linespacing=1.5)  # Adjust this value to increase spacing between lines, if necessary
+
+
+# fig.suptitle(title,size=15)
+plt.show()
+print(f'total geometries used: {count}')
+
+# In[9.3]
+### GRAPHS - Find optimal immersion ###  
+
+# Parameter choices to slice to - DO NOT CHANGE FOR CURRENT DATASET!
+fiber_immersion_choice = [0,3,6]
+pitch_choice = [5]
+el_gap_choice = [10]
+anode_distance_choice = [2.5]
+holder_thickness_choice = [10]
+
+color = iter(['red', 'green', 'blue'])
+marker = iter(['^', '*', 's'])
+SHOW_ORIGINAL_SPACING = False
+if SHOW_ORIGINAL_SPACING is False:
+    custom_spacing = 2
 POLYNOMIAL_FIT = False
 
 fig, ax = plt.subplots(figsize=(10,7), dpi = 600)
@@ -2071,164 +2252,46 @@ for i, geo_dir in tqdm(enumerate(geometry_dirs)):
                                                               averaged_P2Vs)
         
     if POLYNOMIAL_FIT:
-        # Fit the data to a 2nd degree polynomial
-        coefficients = np.polyfit(sorted_dists, sorted_P2Vs, 2)
         
-        # Generate a polynomial function from the coefficients
-        polynomial = np.poly1d(coefficients)
+        # custom fit a polynomial of 2nd degree to data
+        sorted_dists_fit, sorted_P2V_fit = custom_polyfit(sorted_dists,
+                                                          sorted_P2Vs)
         
-        # Generate x values for the polynomial curve (e.g., for plotting)
-        sorted_dists_fit = np.linspace(sorted_dists[0], sorted_dists[-1], 100)
-        
-        # Generate y values for the polynomial curve
-        sorted_P2V_fit = polynomial(sorted_dists_fit)
-        ax.plot(sorted_dists_fit, sorted_P2V_fit, color=next(color), ls='-', 
-                    marker=next(marker), alpha=0.5, label=f'EL gap={el_gap}mm',
+        this_color = next(color)
+        this_marker = next(marker)
+        # Plot original data
+        ax.plot(sorted_dists, sorted_P2Vs, color=this_color, ls='-', 
+                    alpha=0.8, label=f'Pitch={pitch}mm',marker=this_marker,
                     linewidth=3, markersize=10)
+        # Plot fitted data
+        ax.plot(sorted_dists_fit, sorted_P2V_fit, color=this_color, ls='--',
+                 alpha=0.5, label=f'{pitch}mm fitted',linewidth=3)
         
     else:
         ax.plot(sorted_dists, sorted_P2Vs, color=next(color), ls='-', 
-                    marker=next(marker),alpha=0.5, label=f'EL gap={el_gap}mm',
+                    marker=next(marker),alpha=0.8, label=f'immersion={fiber_immersion}mm',
                     linewidth=3, markersize=10)
         
     count += 1
     
-title = ('P2V of different EL gaps vs sources distance' + 
-         f'\npitch={pitch_choice[-1]}mm,' +
-         f' fiber immersion={fiber_immersion_choice[-1]}mm,' +
-         f' anode distance={anode_distance_choice[-1]}mm,'+ 
-         f' holder thickness={holder_thickness_choice[-1]}mm')
-plt.xlabel('Distance [mm]')
-plt.ylabel('P2V')
-plt.grid()
-plt.legend(loc='upper left',fontsize=15)
-fig.suptitle(title,size=15)
-plt.show()
-print(f'total geometries used: {count}')
-
-# In[9.3]
-### GRAPHS - Find optimal immersion ###  
-
-# Parameter choices to slice to - DO NOT CHANGE FOR CURRENT DATASET!
-fiber_immersion_choice = [0,3,6]
-pitch_choice = [15.6]
-el_gap_choice = [10]
-anode_distance_choice = [10]
-holder_thickness_choice = [10]
-
-color = iter(['red', 'green', 'blue'])
-marker = iter(['^', '*', 's'])
-SHOW_ORIGINAL_SPACING = False
-if SHOW_ORIGINAL_SPACING is False:
-    custom_spacing = 2
-POLYNOMIAL_FIT = False
-
-fig, ax = plt.subplots(figsize=(10,7), dpi = 600)
-
-for i, geo_dir in tqdm(enumerate(geometry_dirs)):
-    
-    working_dir = geo_dir + r'/P2V'
-    geo_params = geo_dir.split('/SquareFiberDatabase/')[-1]
-    
-    
-    el_gap = float(re.search(r"ELGap=(-?\d+\.?\d*)mm",
-                             geo_params).group(1))
-    pitch = float(re.search(r"pitch=(-?\d+\.?\d*)mm",
-                            geo_params).group(1))
-    anode_distance = float(re.search(r"distanceAnodeHolder=(-?\d+\.?\d*)mm",
-                                     geo_params).group(1))
-    holder_thickness = float(re.search(r"holderThickness=(-?\d+\.?\d*)mm",
-                                       geo_params).group(1))
-    fiber_immersion = float(re.search(r"distanceFiberHolder=(-?\d+\.?\d*)mm",
-                                      geo_params).group(1))
-    fiber_immersion = 5 - fiber_immersion
-    
-    
-    if (el_gap not in el_gap_choice or
-        pitch not in pitch_choice or
-        anode_distance not in anode_distance_choice or
-        fiber_immersion not in fiber_immersion_choice or
-        holder_thickness not in holder_thickness_choice):
-        # print(i)
-        continue
-    
-    
-    dir_data = glob.glob(working_dir + '/*/*.txt')
-    dists = []
-    P2Vs = []
-        
-    if SHOW_ORIGINAL_SPACING:
-        for data in dir_data:
-            dist, P2V = np.loadtxt(data)
-            if P2V > 100 or P2V == float('inf'):
-                P2V = 100
-            dists.append(dist)
-            P2Vs.append(P2V)
-            
-        # zip and sort in ascending order
-        sorted_dists, sorted_P2Vs = sort_ascending_dists_P2Vs(dists,P2Vs)
-       
-    else:
-        averaged_dists = []
-        averaged_P2Vs = []
-        for j in range(0, len(dir_data), custom_spacing):  # Step through dir_data two at a time
-            data_pairs = dir_data[j:j+custom_spacing]  # Get the current pair of data files
-            dists = []
-            P2Vs = []
-            for data in data_pairs:
-                dist, P2V = np.loadtxt(data)
-                if P2V > 100 or P2V == float('inf'):
-                    P2V = 100
-                dists.append(dist)
-                P2Vs.append(P2V)
-                print(f'data_pair dist={dist}, P2V={P2V}')
-            
-            # Only proceed if we have a pair, to avoid index out of range errors
-            if len(dists) == custom_spacing and len(P2Vs) == custom_spacing:
-                averaged_dist = sum(dists) / custom_spacing
-                averaged_P2V = sum(P2Vs) / custom_spacing
-                print(f'averaged_dist={averaged_dist}, averaged_P2V={averaged_P2V}',end='\n\n')
-                averaged_dists.append(averaged_dist)
-                averaged_P2Vs.append(averaged_P2V)
-        
-        # zip and sort in ascending order
-        sorted_dists, sorted_P2Vs = sort_ascending_dists_P2Vs(averaged_dists,
-                                                              averaged_P2Vs)
-        
-    if POLYNOMIAL_FIT:
-        # Fit the data to a 2nd degree polynomial
-        coefficients = np.polyfit(sorted_dists, sorted_P2Vs, 2)
-        
-        # Generate a polynomial function from the coefficients
-        polynomial = np.poly1d(coefficients)
-        
-        # Generate x values for the polynomial curve (e.g., for plotting)
-        sorted_dists_fit = np.linspace(sorted_dists[0], sorted_dists[-1], 100)
-        
-        # Generate y values for the polynomial curve
-        sorted_P2V_fit = polynomial(sorted_dists_fit)
-        
-        ax.plot(sorted_dists_fit, sorted_P2V_fit, color=next(color), ls='-', 
-                    alpha=0.5, label=f'immersion={fiber_immersion}mm',
-                    linewidth=3, markersize=10)
-        
-    else:
-        ax.plot(sorted_dists, sorted_P2Vs, color=next(color), ls='-', 
-                    marker=next(marker),alpha=0.5, label=f'immersion={fiber_immersion}mm',
-                    linewidth=3, markersize=10)
-        
-    count += 1
-    
-title = ('P2V of different immersions vs sources distance' + 
-         f'\nEL gap={el_gap_choice[-1]}mm,' +
-         f' pitch={pitch_choice[-1]}mm,' +
-         f' anode distance={anode_distance_choice[-1]}mm,'+ 
-         f' holder thickness={holder_thickness_choice[-1]}mm')
 plt.xlabel('Distance [mm]')
 plt.ylabel('P2V')
 plt.grid()
 plt.legend(loc='upper left',fontsize=10)
-fig.suptitle(title,size=12)
+title = (f'EL gap={el_gap_choice[-1]}mm' +
+         f'\nPitch={pitch_choice[-1]}mm' +
+         f'\nAnode distance={anode_distance_choice[-1]}mm'+ 
+         f'\nHolder thickness={holder_thickness_choice[-1]}mm')
+if POLYNOMIAL_FIT:
+    xloc, yloc = 0.14, 0.68
+else:
+    xloc, yloc = 0.14, 0.79
+plt.text(xloc, yloc, title, ha='center', va='center',
+         transform=plt.gca().transAxes,
+         bbox=dict(facecolor='yellow', alpha=0.5,boxstyle='round,pad=0.5'),
+         fontsize=10, weight='bold', linespacing=1.5)  # Adjust this value to increase spacing between lines, if necessary
+
+# fig.suptitle(title,size=12)
 plt.show()
 print(f'total geometries used: {count}')
 
