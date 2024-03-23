@@ -334,7 +334,9 @@ def plot_PSF(PSF,size=100):
     total_TPB_photon_hits = int(np.sum(PSF))
     
     fig, (ax0, ax1) = plt.subplots(1, 2, figsize=(16.5,8), dpi=600)
-    title = f'{total_TPB_photon_hits}/100M TPB hits PSF, current geometry:' + f'\n{os.path.basename(os.getcwd())}'
+    fig.patch.set_facecolor('white')
+    title = (f'{total_TPB_photon_hits}/100M TPB hits PSF, current geometry:' +
+             f'\n{os.path.basename(os.getcwd())}')
     fig.suptitle(title, fontsize=15)
     im = ax0.imshow(PSF, extent=[-size/2, size/2, -size/2, size/2])
     ax0.set_xlabel('x [mm]');
@@ -1078,7 +1080,7 @@ interpolate, deconv, rotate and save.
 TO_GENERATE = True
 TO_SAVE = False
 TO_PLOT_EACH_STEP = False
-TO_PLOT_DECONVE_STACK = False
+TO_PLOT_DECONVE_STACK = True
 
 TO_SMOOTH_PSF = False
 if TO_GENERATE:
@@ -1213,41 +1215,73 @@ if TO_GENERATE:
                 
                 if TO_PLOT_EACH_STEP:
                     
-                    # plot SR combined event
-                    plt.imshow(hist.T, extent=[-size/2, size/2, -size/2, size/2],
-                                vmin=0, origin='lower')
-                    plt.colorbar(label='Photon hits')
-                    plt.title('SR Combined event')
-                    plt.xlabel('x [mm]')
-                    plt.ylabel('y [mm]')
+                    size = 50
+                    bins = size
+                    
+                    ## Plot stages of deconv aggregation ##
+                    
+                    fig, ax = plt.subplots(2,2,figsize=(12,12),
+                                           sharex=True,sharey=True,dpi=600)
+                    fig.patch.set_facecolor('white')
+                    plt.subplots_adjust(left=0.1, right=0.9, top=0.9,
+                                        bottom=0.1, wspace=0.1, hspace=0.1)
+                    # Format colorbar tick labels in scientific notation
+                    formatter = ticker.ScalarFormatter(useMathText=True)
+                    formatter.set_scientific(True)
+                    formatter.set_powerlimits((-1, 1))  # You can adjust limits as needed
+                    
+                    # SR combined event
+                    im = ax[0,0].imshow(hist.T[100:150,100:150],
+                                        extent=[-size/2, size/2, -size/2, size/2],
+                                        vmin=0, origin='lower')
+                    divider = make_axes_locatable(ax[0,0])
+                    cax = divider.append_axes("right", size="5%", pad=0.05)
+                    cbar = plt.colorbar(im, cax=cax, label='Photon hits')
+                    cbar.ax.yaxis.set_major_formatter(formatter)
+                    ax[0,0].set_title('SR',fontsize=13,fontweight='bold')
+                    ax[0,0].set_xlabel('x [mm]')
+                    ax[0,0].set_ylabel('y [mm]')
+                    
+                    # Interpolated combined event
+                    im = ax[0,1].imshow(interp_img[100:150,100:150],
+                                        extent=[-size/2, size/2, -size/2, size/2],
+                                        vmin=0, origin='lower')
+                    divider = make_axes_locatable(ax[0,1])
+                    cax = divider.append_axes("right", size="5%", pad=0.05)
+                    cbar = plt.colorbar(im, cax=cax, label='Photon hits')
+                    cbar.ax.yaxis.set_major_formatter(formatter)
+                    ax[0,1].set_title('Cubic Interpolation of SR',
+                                      fontsize=13,fontweight='bold')
+                    ax[0,1].set_xlabel('x [mm]')
+                    ax[0,1].set_ylabel('y [mm]')
+                    
+                    # RL deconvolution
+                    im = ax[1,0].imshow(deconv[100:150,100:150],
+                                        extent=[-size/2, size/2, -size/2, size/2],
+                                        vmin=0, origin='lower')
+                    divider = make_axes_locatable(ax[1,0])
+                    cax = divider.append_axes("right", size="5%", pad=0.05)
+                    cbar = plt.colorbar(im, cax=cax, label='Photon hits')
+                    cbar.ax.yaxis.set_major_formatter(formatter)
+                    ax[1,0].set_title('RL deconvolution',fontsize=13,fontweight='bold')
+                    ax[1,0].set_xlabel('x [mm]')
+                    ax[1,0].set_ylabel('y [mm]')
+
+                    # ROTATED RL deconvolution
+                    im = ax[1,1].imshow(rotated_deconv[100:150,100:150],
+                                        extent=[-size/2, size/2, -size/2, size/2],
+                                        vmin=0, origin='lower')
+                    divider = make_axes_locatable(ax[1,1])
+                    cax = divider.append_axes("right", size="5%", pad=0.05)
+                    cbar = plt.colorbar(im, cax=cax, label='Photon hits')
+                    cbar.ax.yaxis.set_major_formatter(formatter)
+                    ax[1,1].set_title('Rotated RL deconvolution',
+                                      fontsize=13,fontweight='bold')
+                    ax[1,1].set_xlabel('x [mm]')
+                    ax[1,1].set_ylabel('y [mm]')
+                    fig.tight_layout()
                     plt.show()
                     
-                    # plot interpolated combined event
-                    plt.imshow(interp_img, extent=[-size/2, size/2, -size/2, size/2],
-                                vmin=0, origin='lower')
-                    plt.colorbar(label='Photon hits')
-                    plt.title('Cubic Interpolation of Combined event')
-                    plt.xlabel('x [mm]')
-                    plt.ylabel('y [mm]')
-                    plt.show()
-                    
-                    # plot RL deconvolution
-                    plt.imshow(deconv, extent=[-size/2, size/2, -size/2, size/2],
-                                vmin=0, origin='lower')
-                    plt.colorbar(label='Photon hits')
-                    plt.title('RL deconvolution')
-                    plt.xlabel('x [mm]')
-                    plt.ylabel('y [mm]')
-                    plt.show()
-                    
-                    # plot ROTATED RL deconvolution
-                    plt.imshow(rotated_deconv, extent=[-size/2, size/2, -size/2, size/2],
-                                vmin=0, origin='lower')
-                    plt.colorbar(label='Photon hits')
-                    plt.title('Rotated RL deconvolution')
-                    plt.xlabel('x [mm]')
-                    plt.ylabel('y [mm]')
-                    plt.show()
                     
                     # plot deconvolution stacking
                     plt.imshow(deconv_stack, extent=[-size/2, size/2, -size/2, size/2],
@@ -1257,7 +1291,8 @@ if TO_GENERATE:
                     plt.xlabel('x [mm]')
                     plt.ylabel('y [mm]')
                     plt.show()
-                
+                    size = 250
+                    bins = size
             
             avg_cutoff_iter = np.mean(cutoff_iter_list)
             avg_rel_diff_checkout = np.mean(rel_diff_checkout_list)
@@ -1265,23 +1300,34 @@ if TO_GENERATE:
             ## save deconv_stack+avg_cutoff_iter+avg_rel_diff_checkout ###
             if TO_SAVE:
                 ## plot deconv##
-                fig = plt.figure(figsize=(8,7.5),dpi=600)
-                # deconv
-                plt.imshow(deconv_stack, extent=[-size/2, size/2, -size/2, size/2])
-                plt.colorbar()
-                plt.xlabel('x [mm]')
-                plt.ylabel('y [mm]')
-                plt.title('Stacked RL deconvolution')
-                plt.grid()
+                size = 50
+                bins = size
+                fig, ax = plt.subplots(figsize=(8,7.5),dpi=600)
+                fig.patch.set_facecolor('white')
+                formatter = ticker.ScalarFormatter(useMathText=True)
+                formatter.set_scientific(True)
+                formatter.set_powerlimits((-1, 1))  # You can adjust limits as needed
                     
-                title = (f'EL gap={el_gap}mm, pitch={pitch}mm,' + 
-                          f' fiber immersion={fiber_immersion}mm,\nanode distance={anode_distance}mm,' + 
-                          f' holder thickness={holder_thickness}mm\n\nEvent spacing={dist}mm,' + 
+                # deconv
+                im = ax.imshow(deconv_stack[100:150,100:150], extent=[-size/2, size/2, -size/2, size/2])
+                divider = make_axes_locatable(ax)
+                cax = divider.append_axes("right", size="5%", pad=0.05)
+                cbar = plt.colorbar(im, cax=cax, label='Photon hits')
+                cbar.ax.yaxis.set_major_formatter(formatter)
+                ax.set_xlabel('x [mm]')
+                ax.set_ylabel('y [mm]')
+                ax.set_title('Stacked RL deconvolutions',fontsize=15,fontweight='bold')
+                    
+                title = (f'EL gap={el_gap}mm, pitch={pitch} mm,' + 
+                          f' fiber immersion={fiber_immersion} mm,\nanode distance={anode_distance} mm' + 
+                          f'\n\nEvent spacing={dist} mm,' + 
                         f' Avg RL iterations={int(avg_cutoff_iter)},'  +
                         f' Avg RL relative diff={np.around(avg_rel_diff_checkout,4)}')
             
-                fig.suptitle(title,fontsize=15)
+                # fig.suptitle(title,fontsize=15,fontweight='bold')
                 fig.tight_layout()
+                size = 250
+                bins = size
                 
                 # save files and deconv image plot in correct folder #
                 spacing = 0.5
@@ -1477,6 +1523,7 @@ if TO_GENERATE:
             
             ## plot deconv + deconv profile (with rotation) ##
             fig, (ax0, ax1) = plt.subplots(1,2,figsize=(15,7),dpi=600)
+            fig.patch.set_facecolor('white')
             # deconv
             deconv_stack = np.flip(deconv_stack)
             deconv_stack_1d = np.flip(deconv_stack_1d)
@@ -1500,7 +1547,7 @@ if TO_GENERATE:
             # ax1.plot(np.arange(-size/2,size/2), deconv_stack_1d,
             #           linewidth=3,color='red')
             ax1.plot(np.arange(-25,25), deconv_stack_1d[100:150],
-                     linewidth=3,color='red')
+                     linewidth=3,color='blue')
             ax1.ticklabel_format(style='sci', axis='y',scilimits=(0,0))
             
             if TO_SMOOTH_SIGNAL:
@@ -1513,23 +1560,26 @@ if TO_GENERATE:
             ax1.set_title('Stacked RL deconvolution profile')
             ax1.grid()
             
-            text = f'P2V={np.around(P2V_deconv_stack_1d,2)}'
+            text = (f'P2V={np.around(P2V_deconv_stack_1d,2)}'+
+                    f'\nPitch={pitch} mm' +
+                    f'\nEL gap={el_gap} mm' +
+                    f'\nImmersion={fiber_immersion} mm' +
+                    f'\nanode dist={anode_distance} mm')
             ax1.text(0.04, 0.95, text, ha='left', va='top',
                      transform=ax1.transAxes,
-                     bbox=dict(facecolor='white', alpha=0.5, boxstyle='square,pad=0.3'),
-                     fontsize=16,color='red', fontweight='bold', linespacing=1.5)
+                     bbox=dict(facecolor='white', alpha=0.5, boxstyle='round,pad=0.3'),  # Set edgecolor to 'none'
+                     fontsize=13, color='blue', fontweight='bold', linespacing=1.5)
+
 
                   
-            title = (f'EL gap={el_gap}mm, pitch={pitch}mm,' + 
-                      f' fiber immersion={fiber_immersion}mm, anode distance={anode_distance}mm,' + 
-                      f' holder thickness={holder_thickness}mm\n\nEvent spacing={dist}mm,' + 
-                    f' Avg RL iterations={int(avg_cutoff_iter)},'  +
-                    f' Avg RL relative diff={np.around(avg_rel_diff_checkout,4)}')
+            title = (f' Event spacing={dist} mm,' + 
+                     f' Avg RL iterations={int(avg_cutoff_iter)},'  +
+                     f' Avg RL relative diff={np.around(avg_rel_diff_checkout,4)}')
             
 
 
 
-            fig.suptitle(title,fontsize=15)
+            fig.suptitle(title,fontsize=16,fontweight='bold')
             fig.tight_layout()
             if TO_SAVE:
                 # save files and deconv image plot in correct folder #
@@ -1802,6 +1852,7 @@ for dist in tqdm(dists):
     anode_distance_immersion_3, anode_distance_immersion_6 = [], []
     P2Vs_immersion_3, P2Vs_immersion_6 = [], [] 
     fig, ax = plt.subplots(figsize=(10,7), dpi = 600)
+    fig.patch.set_facecolor('white')
     
     for i, geo_dir in tqdm(enumerate(geometry_dirs)):
         
@@ -1858,18 +1909,20 @@ for dist in tqdm(dists):
     #             label=f"immersion={fiber_immersion_choice[1]}mm") 
     
     plt.xlabel('Anode distance [mm]')
-    plt.ylabel('P2V [a.u.]')
+    plt.ylabel('P2V')
     plt.grid()
     # plt.legend(loc='upper left',fontsize=10)
     
-    title = ( f'Fiber immersion={fiber_immersion_choice[0]}mm' +
-             f'\nEL gap={el_gap_choice[-1]}mm' +
-             f'\npitch={pitch_choice[-1]}mm')
-    plt.text(0.13, 0.94, title, ha='center', va='center',
+    text = ( f'Immersion={fiber_immersion_choice[0]} mm' +
+             f'\nEL gap={el_gap_choice[-1]} mm' +
+             f'\nPitch={pitch_choice[-1]} mm')
+    
+    plt.text(0.04, 0.95, text, ha='left', va='top',
              transform=plt.gca().transAxes,
-             bbox=dict(facecolor='yellow', alpha=0.5,boxstyle='round,pad=0.5'),
-             fontsize=10, weight='bold', linespacing=1.5)  # Adjust this value to increase spacing between lines, if necessary
-    fig.suptitle(f'Sources distance = {dist}mm')
+             bbox=dict(facecolor='white', alpha=0.5,boxstyle='round,pad=0.3'),
+             fontsize=13, weight='bold', linespacing=1.5)  # Adjust this value to increase spacing between lines, if necessary
+    fig.suptitle(f'Distance between two sources = {dist} mm',fontsize=15, fontweight='bold')
+    fig.tight_layout()
     plt.show()
 
 
@@ -1915,7 +1968,7 @@ def custom_polyfit(sorted_dists, sorted_P2Vs, power=2):
 fiber_immersion_choice = [3]
 pitch_choice = [5,10,15.6]
 el_gap_choice = [1]
-anode_distance_choice = [5]
+anode_distance_choice = [2.5]
 holder_thickness_choice = [10]
 count = 0
 color = iter(['red', 'green', 'blue'])
@@ -1926,6 +1979,7 @@ if SHOW_ORIGINAL_SPACING is False:
 POLYNOMIAL_FIT = False
 
 fig, ax = plt.subplots(figsize=(10,7), dpi = 600)
+fig.patch.set_facecolor('white')
 
 for i, geo_dir in tqdm(enumerate(geometry_dirs)):
     
@@ -2019,40 +2073,42 @@ for i, geo_dir in tqdm(enumerate(geometry_dirs)):
         this_marker = next(marker)
         # Plot original data
         ax.plot(sorted_dists, sorted_P2Vs, color=this_color, ls='-', 
-                    alpha=0.8, label=f'pitch={pitch}mm',marker=this_marker,
+                    alpha=0.8, label=f'pitch={pitch} mm',marker=this_marker,
                     linewidth=3, markersize=10)
         # Plot fitted data
         ax.plot(sorted_dists_fit, sorted_P2V_fit, color=this_color, ls='--',
-                 alpha=0.5, label=f'{pitch}mm fitted',linewidth=3)
+                 alpha=0.5, label=f'{pitch} mm fitted',linewidth=3)
         
     else:
         ax.plot(sorted_dists, sorted_P2Vs, color=next(color), ls='-', 
-                    marker=next(marker),alpha=0.8, label=f'pitch={pitch}mm',
+                    marker=next(marker),alpha=0.8, label=f'pitch={pitch} mm',
                     linewidth=3, markersize=10)
         
     count += 1
     
-plt.xlabel('Sources distance [mm]')
-plt.ylabel('P2V [a.u.]')
+plt.xlabel('Distance between two sources [mm]')
+plt.ylabel('P2V')
 plt.grid()
 plt.xlim([None,25])
 plt.legend(loc='upper left',fontsize=14)
 
-title = (f'EL gap={el_gap_choice[-1]}mm' +
-         f'\nImmersion={fiber_immersion_choice[-1]}mm' +
-         f'\nAnode dist={anode_distance_choice[-1]}mm')
+text = (f'EL gap={el_gap_choice[-1]} mm' +
+         f'\nImmersion={fiber_immersion_choice[-1]} mm' +
+         f'\nAnode dist={anode_distance_choice[-1]} mm')
 # fine tune box positionand parameters
 if POLYNOMIAL_FIT:
-    xloc, yloc = 0.13, 0.7
+    xloc, yloc = 0.14, 0.65
     
 else:
-    xloc, yloc = 0.13, 0.81
-plt.text(xloc, yloc, title, ha='center', va='center',
+    xloc, yloc = 0.03, 0.79
+    
+plt.text(xloc, yloc,  text, ha='left', va='top',
          transform=plt.gca().transAxes,
-         bbox=dict(facecolor='yellow', alpha=0.5,boxstyle='round,pad=0.5'),
+         bbox=dict(facecolor='white', alpha=0.5,boxstyle='round,pad=0.3'),
          fontsize=14, weight='bold', linespacing=1.5)  # Adjust this value to increase spacing between lines, if necessary
 
 # fig.suptitle(title,size=12)
+# fig.tight_layout()
 plt.show()
 print(f'total geometries used: {count}')
 
@@ -2109,7 +2165,7 @@ pitch_choice = [15.6]
 el_gap_choice = [1,10]
 anode_distance_choice = [2.5,5,10]
 holder_thickness_choice = [10]
-x_left_lim = pitch_choice[0]-2 # manual option remove plot area where there's P2V of 1 
+x_left_lim = pitch_choice[0]-1 # manual option remove plot area where there's P2V of 1 
 
 SHOW_ORIGINAL_SPACING = False
 if SHOW_ORIGINAL_SPACING is False:
@@ -2117,8 +2173,9 @@ if SHOW_ORIGINAL_SPACING is False:
 POLYNOMIAL_FIT = False
 
 fig, ax = plt.subplots(3,3,figsize=(10,7), sharex=True,sharey=True,dpi=600)
+fig.patch.set_facecolor('white')
 plt.subplots_adjust(left=0.1, right=0.9, top=0.9, bottom=0.1, wspace=0.1, hspace=0.1)
-fig.supxlabel('Distance [mm]',fontsize=12,fontweight='bold')
+fig.supxlabel('Distance between two sources [mm]',fontsize=12,fontweight='bold')
 fig.supylabel('P2V',fontweight='bold')
 
 for m,anode_dist in enumerate(anode_distance_choice):
@@ -2201,7 +2258,7 @@ for m,anode_dist in enumerate(anode_distance_choice):
                 
             else:
                 this_color = next(color)
-                print(f'color={this_color},EL={el_gap}')
+                # print(f'color={this_color},EL={el_gap}')
                 ax[m,n].plot(sorted_dists, sorted_P2Vs, color=this_color,
                              ls='-', linewidth=3)
              
@@ -2223,6 +2280,8 @@ line2, = plt.plot([], [], color='red', linestyle='-',
 fig.legend(handles=[line1, line2], labels=['EL gap=1 mm', 'EL gap=10 mm'],
            loc='upper left',ncol=2, fontsize=9)
 fig.suptitle(f'Pitch = {pitch_choice[0]} mm',fontsize=18,fontweight='bold')
+fig.tight_layout()
+
 plt.show()
 print(f'total geometries used: {count}')
 
@@ -2244,6 +2303,7 @@ if SHOW_ORIGINAL_SPACING is False:
 POLYNOMIAL_FIT = False
 
 fig, ax = plt.subplots(figsize=(10,7), dpi = 600)
+fig.patch.set_facecolor('white')
 
 for i, geo_dir in tqdm(enumerate(geometry_dirs)):
     
@@ -2340,25 +2400,26 @@ for i, geo_dir in tqdm(enumerate(geometry_dirs)):
     count += 1
     
 
-plt.xlabel('Distance [mm]')
+plt.xlabel('Distance between two sources [mm]')
 plt.ylabel('P2V')
 plt.grid()
-plt.legend(loc='upper left',fontsize=10)
-title = (f'Pitch={pitch_choice[-1]}mm' +
-         f'\nFiber immersion={fiber_immersion_choice[-1]}mm' +
-         f'\nAnode distance={anode_distance_choice[-1]}mm'+ 
-         f'\nHolder thickness={holder_thickness_choice[-1]}mm')
+plt.legend(loc='upper left',fontsize=13)
+text = (f'Pitch={pitch_choice[-1]} mm' +
+         f'\nFiber immersion={fiber_immersion_choice[-1]} mm' +
+         f'\nAnode distance={anode_distance_choice[-1]} mm')
 if POLYNOMIAL_FIT:
-    xloc, yloc = 0.14, 0.75
+    xloc, yloc = 0.0, 0.75
 else:
-    xloc, yloc = 0.14, 0.82
-plt.text(xloc, yloc, title, ha='center', va='center',
+    xloc, yloc = 0.03, 0.85
+    
+plt.text(xloc, yloc, text, ha='left', va='top',
          transform=plt.gca().transAxes,
-         bbox=dict(facecolor='yellow', alpha=0.5,boxstyle='round,pad=0.5'),
-         fontsize=10, weight='bold', linespacing=1.5)  # Adjust this value to increase spacing between lines, if necessary
+         bbox=dict(facecolor='white', alpha=0.5,boxstyle='round,pad=0.5'),
+         fontsize=13, weight='bold', linespacing=1.5)  # Adjust this value to increase spacing between lines, if necessary
 
 
 # fig.suptitle(title,size=15)
+fig.tight_layout()
 plt.show()
 print(f'total geometries used: {count}')
 
@@ -2372,7 +2433,7 @@ pitch_choice = [15.6]
 el_gap_choice = [1,10]
 anode_distance_choice = [2.5,5,10]
 holder_thickness_choice = [10]
-x_left_lim = pitch_choice[0]-2 # manual option remove plot area where there's P2V of 1 
+x_left_lim = pitch_choice[0]-1 # manual option remove plot area where there's P2V of 1 
 
 SHOW_ORIGINAL_SPACING = False
 if SHOW_ORIGINAL_SPACING is False:
@@ -2380,8 +2441,9 @@ if SHOW_ORIGINAL_SPACING is False:
 POLYNOMIAL_FIT = False
 
 fig, ax = plt.subplots(3,2,figsize=(10,7), sharex=True,sharey=True,dpi=600)
+fig.patch.set_facecolor('white')
 plt.subplots_adjust(left=0.1, right=0.9, top=0.9, bottom=0.1, wspace=0.1, hspace=0.2)
-fig.supxlabel('Distance [mm]',fontsize=12,fontweight='bold')
+fig.supxlabel('Distance between two sources [mm]',fontsize=12,fontweight='bold')
 fig.supylabel('P2V',fontweight='bold')
 
 for m,anode_dist in enumerate(anode_distance_choice):
@@ -2493,6 +2555,7 @@ fig.legend(handles=[line1, line2, line3], labels=['Immersion=0 mm',
             loc='upper left',ncol=2, fontsize=9)
 
 fig.suptitle(f'Pitch = {pitch_choice[0]} mm',fontsize=18,fontweight='bold')
+fig.tight_layout()
 plt.show()
 print(f'total geometries used: {count}')
 
@@ -2514,7 +2577,7 @@ if SHOW_ORIGINAL_SPACING is False:
 POLYNOMIAL_FIT = False
 
 fig, ax = plt.subplots(figsize=(10,7), dpi = 600)
-
+fig.patch.set_facecolor('white')
 for i, geo_dir in tqdm(enumerate(geometry_dirs)):
     
     working_dir = geo_dir + r'/P2V'
@@ -2595,15 +2658,15 @@ for i, geo_dir in tqdm(enumerate(geometry_dirs)):
         this_marker = next(marker)
         # Plot original data
         ax.plot(sorted_dists, sorted_P2Vs, color=this_color, ls='-', 
-                    alpha=0.8, label=f'Pitch={pitch}mm',marker=this_marker,
+                    alpha=0.8, label=f'Pitch={pitch} mm',marker=this_marker,
                     linewidth=3, markersize=10)
         # Plot fitted data
         ax.plot(sorted_dists_fit, sorted_P2V_fit, color=this_color, ls='--',
-                 alpha=0.5, label=f'{pitch}mm fitted',linewidth=3)
+                 alpha=0.5, label=f'{pitch} mm fitted',linewidth=3)
         
     else:
         ax.plot(sorted_dists, sorted_P2Vs, color=next(color), ls='-', 
-                    marker=next(marker),alpha=0.8, label=f'immersion={fiber_immersion}mm',
+                    marker=next(marker),alpha=0.8, label=f'immersion={fiber_immersion} mm',
                     linewidth=3, markersize=10)
         
     count += 1
@@ -2611,21 +2674,23 @@ for i, geo_dir in tqdm(enumerate(geometry_dirs)):
 plt.xlabel('Distance [mm]')
 plt.ylabel('P2V')
 plt.grid()
-plt.legend(loc='upper left',fontsize=10)
-title = (f'EL gap={el_gap_choice[-1]}mm' +
-         f'\nPitch={pitch_choice[-1]}mm' +
-         f'\nAnode distance={anode_distance_choice[-1]}mm'+ 
-         f'\nHolder thickness={holder_thickness_choice[-1]}mm')
+plt.legend(loc='upper left',fontsize=13)
+text = (f'EL gap={el_gap_choice[-1]} mm' +
+         f'\nPitch={pitch_choice[-1]} mm' +
+         f'\nAnode distance={anode_distance_choice[-1]} mm'+ 
+         f'\nHolder thickness={holder_thickness_choice[-1]} mm')
 if POLYNOMIAL_FIT:
-    xloc, yloc = 0.14, 0.68
+    xloc, yloc = 0.03, 0.68
 else:
-    xloc, yloc = 0.14, 0.79
-plt.text(xloc, yloc, title, ha='center', va='center',
+    xloc, yloc = 0.03, 0.8
+    
+plt.text(xloc, yloc, text, ha='left', va='top',
          transform=plt.gca().transAxes,
-         bbox=dict(facecolor='yellow', alpha=0.5,boxstyle='round,pad=0.5'),
-         fontsize=10, weight='bold', linespacing=1.5)  # Adjust this value to increase spacing between lines, if necessary
+         bbox=dict(facecolor='white', alpha=0.5,boxstyle='round,pad=0.5'),
+         fontsize=13, weight='bold', linespacing=1.5)  # Adjust this value to increase spacing between lines, if necessary
 
 # fig.suptitle(title,size=12)
+fig.tight_layout()
 plt.show()
 print(f'total geometries used: {count}')
 
@@ -2638,7 +2703,7 @@ pitch_choice = [15.6]
 el_gap_choice = [1,10]
 anode_distance_choice = [2.5,5,10]
 holder_thickness_choice = [10]
-x_left_lim = pitch_choice[0]-2 # manual option remove plot area where there's P2V of 1 
+x_left_lim = pitch_choice[0]-1 # manual option remove plot area where there's P2V of 1 
 
 SHOW_ORIGINAL_SPACING = False
 if SHOW_ORIGINAL_SPACING is False:
@@ -2646,8 +2711,9 @@ if SHOW_ORIGINAL_SPACING is False:
 POLYNOMIAL_FIT = False
 
 fig, ax = plt.subplots(3,2,figsize=(10,7), sharex=True,sharey=True,dpi=600)
+fig.patch.set_facecolor('white')
 plt.subplots_adjust(left=0.1, right=0.9, top=0.9, bottom=0.1, wspace=0.1, hspace=0.2)
-fig.supxlabel('Distance [mm]',fontsize=12,fontweight='bold')
+fig.supxlabel('Distance between two sources [mm]',fontsize=12,fontweight='bold')
 fig.supylabel('P2V',fontweight='bold')
 
 for m,immersion in enumerate(fiber_immersion_choice):
@@ -2759,6 +2825,7 @@ fig.legend(handles=[line1, line2, line3], labels=['Anode dist=2.5 mm',
             loc='upper left',ncol=2, fontsize=9)
 
 fig.suptitle(f'Pitch = {pitch_choice[0]} mm',fontsize=18,fontweight='bold')
+fig.tight_layout()
 plt.show()
 print(f'total geometries used: {count}')
 
