@@ -54,49 +54,52 @@ geometry_dirs = [os.path.join(path_to_dataset, d) for d in os.listdir(path_to_da
 ### Figure for Lior , with TPB ###
 # TPB, plot of the absorbed WLS blue photons in sipm vs fiber coating reflectivity
 
-n_UV = 100000
-# Note: in reality only 1K photons for 100% reflectivity
-vikuiti_ref = [96, 97, 98, 99, 100]
-# SiPM_hits = [5699, 7841, 11488, 19013, 56640] # results from point source (0,0,-1.1um)
-SiPM_hits = [6006, 8092, 11806, 19365, 55300] # Randomly on face
-SiPM_hits = [x / n_UV for x in SiPM_hits]
-plt.plot(vikuiti_ref, SiPM_hits, '-^', color='rebeccapurple')
-text = "100K UV photons at 7.21[eV] per sample\n" + \
-       "Randomly generated in TPB center, facing forward\n" + \
-       "1K UV photons for 100% reflectivity due to runtime"
-plt.text(96, 0.52, text, bbox=dict(facecolor='rebeccapurple', alpha=0.5))
-plt.xlabel("Fiber Coating Reflectivity [%]")
-plt.ylabel("Fraction of photons absorbed in SiPM")
-plt.title("WLS blue photons absorbed in SiPM vs fiber coating reflectivity")
-plt.grid()
-plt.xlim(min(vikuiti_ref) - 0.1, max(vikuiti_ref) + 0.1)
+n_photons = 100000
+vikuiti_ref = [96, 97, 98, 99, 99.9] # % reflection, in geant optical materials file
+SiPM_hits = [4001, 5547, 8437, 14145 , 31333] # Random XY in TPB center
+SiPM_hits = [x / n_photons for x in SiPM_hits]
+
+fig, ax = plt.subplots(1,figsize=(10,8),dpi=600)
+fig.patch.set_facecolor('white')
+ax.plot(vikuiti_ref, SiPM_hits, '-*', color='rebeccapurple',linewidth=3,
+         markersize=12)
+text = ("100K VUV photons facing forward at 7.21 eV per reflectivity\n" + \
+       "Random XY generation in TPB center")
+ax.text(96.1, 0.31, text, bbox=dict(facecolor='rebeccapurple', alpha=0.5),
+        fontsize=15)
+ax.set_xlabel("Fiber Coating Reflectivity [%]")
+ax.set_ylabel("Fraction of photons absorbed in SiPM")
+ax.grid()
+ax.set_xlim(min(vikuiti_ref) - 0.1, max(vikuiti_ref) + 0.1)
 plt.gca().ticklabel_format(style='plain', useOffset=False)
-save_path = r'/home/amir/Desktop/Sipm_hits_vs_coating_reflectivity_TPB.jpg'
-plt.savefig(save_path, dpi=600)
+# fig.suptitle("Absorbed WLS photons in SiPM vs fiber coating reflectivity")
+# save_path = r'/home/amir/Desktop/Sipm_hits_vs_coating_reflectivity_TPB.jpg'
+# plt.savefig(save_path, dpi=600)
 plt.show()
 # In[0.3]
 ### Figure for Lior , without TPB ###
 # No TPB, plot of the absorbed WLS blue photons in sipm vs fiber coating reflectivity
 
-n_UV = 100000
-# Note: in reality only 1K photons for 100% reflectivity
-vikuiti_ref = [96, 97, 98, 99, 100]
+n_photons = 100000
+vikuiti_ref = [96, 97, 98, 99, 99.9] # % reflection, in geant optical materials file
+SiPM_hits = [ 15142, 19944, 27350, 40016, 75690] # Random XY pn fiber face (inside)
+SiPM_hits = [x / n_photons for x in SiPM_hits]
 
-SiPM_hits = [ 15294, 20062, 27828, 42391, 95800]
-SiPM_hits = [x / n_UV for x in SiPM_hits]
-plt.plot(vikuiti_ref, SiPM_hits, '-^b')
-text = "100K blue photons at 2.883[eV] per sample\n" + \
-       "Randomly generated on face of fiber, facing forward, no TPB\n" + \
-       "1K blue photons for 100% reflectivity due to runtime"
-plt.text(96, 0.88, text, bbox=dict(facecolor='blue', alpha=0.5))
+fig, ax = plt.subplots(1,figsize=(10,8),dpi=600)
+fig.patch.set_facecolor('white')
+plt.plot(vikuiti_ref, SiPM_hits, '-*b',linewidth=3,markersize=12)
+text = ("100K blue photons facing forward at 2.883 eV per reflectivity\n" + \
+       "Random XY generation on PMMA fiber face")
+plt.text(96.1, 0.72, text, bbox=dict(facecolor='blue', alpha=0.5),
+         fontsize=15)
 plt.xlabel("Fiber Coating Reflectivity [%]")
 plt.ylabel("Fraction of photons absorbed in SiPM")
-plt.title("WLS blue photons absorbed in SiPM vs fiber coating reflectivity")
 plt.grid()
 plt.xlim(min(vikuiti_ref) - 0.1, max(vikuiti_ref) + 0.1)
 plt.gca().ticklabel_format(style='plain', useOffset=False)
-save_path = r'/home/amir/Desktop/Sipm_hits_vs_coating_reflectivity_no_TPB.jpg'
-plt.savefig(save_path, dpi=600)
+# fig.suptitle("Absorbed photons in SiPM vs fiber coating reflectivity")
+# save_path = r'/home/amir/Desktop/Sipm_hits_vs_coating_reflectivity_no_TPB.jpg'
+# plt.savefig(save_path, dpi=600)
 plt.show()
 
 
@@ -176,7 +179,8 @@ def assign_hit_to_SiPM(hit, pitch, n):
     nearest_y = round((y + half_grid_length) / pitch) * pitch - half_grid_length
 
     # Check if the hit is within the bounds of the SiPM
-    if -half_grid_length <= nearest_x <= half_grid_length and -half_grid_length <= nearest_y <= half_grid_length:
+    if (-half_grid_length <= nearest_x <= half_grid_length and
+        -half_grid_length <= nearest_y <= half_grid_length):
         return (np.around(nearest_x,1), np.around(nearest_y,1))
     else:
         return None
@@ -257,7 +261,7 @@ def psf_creator(directory, create_from, to_plot=False,to_smooth=False):
         
         if plot_event:
             plot_sensor_response(hitmap, bins, size,
-                                 title='Single Geant4 event')
+                                 title='Single Geant4 Kr event')
         
         # Assign each hit to a SiPM before shifting the hitmap
         new_hitmap = []
@@ -271,7 +275,7 @@ def psf_creator(directory, create_from, to_plot=False,to_smooth=False):
         
         if plot_sipm_assigned_event:
             plot_sensor_response(new_hitmap, bins, size,
-                                 title='Single event sensor response')
+                                 title='SR of single event')
         
         
         
@@ -281,7 +285,7 @@ def psf_creator(directory, create_from, to_plot=False,to_smooth=False):
         
         if plot_shifted_event:
             plot_sensor_response(shifted_hitmap, bins, size,
-                                 title='Shifted event sensor response')
+                                 title='SR of shifted event')
         
         
         PSF_list.append(shifted_hitmap)
@@ -313,20 +317,24 @@ def psf_creator(directory, create_from, to_plot=False,to_smooth=False):
 def plot_sensor_response(event, bins, size, title='', noise=False):
     hist, x_hist, y_hist = np.histogram2d(event[:,0], event[:,1],
                                                          range=[[-size/2, size/2], [-size/2, size/2]],
-                                                         bins=bins)  
+                                                         bins=[bins,bins])  
     if noise:
         hist = np.random.poisson(hist)
 
     # # Transpose the array to correctly align the axes
     hist = hist.T
-
-    plt.imshow(hist,extent=[-size/2, size/2, -size/2, size/2], vmin=0,
-               origin='lower')
+    
+    fig, ax = plt.subplots(1, figsize=(7,7), dpi=600)
+    fig.set_facecolor('white')
+    im = ax.imshow(hist,extent=[x_hist[0], x_hist[-1], y_hist[0], y_hist[-1]], vmin=0,
+                origin='lower',interpolation=None,aspect='equal')
+    divider = make_axes_locatable(ax)
+    cax = divider.append_axes("right", size="5%", pad=0.05)
+    plt.colorbar(im, cax=cax, label='Photon hits')
     if title!="":
-        plt.title(title)
-    plt.xlabel('x [mm]')
-    plt.ylabel('y [mm]')
-    plt.colorbar(label='Photon hits')
+        ax.set_title(title,fontsize=13,fontweight='bold')
+    ax.set_xlabel('x [mm]')
+    ax.set_ylabel('y [mm]')
     plt.show()
 
 
@@ -915,8 +923,8 @@ def count_npy_files(directory):
 
 
 
-TO_GENERATE = True
-TO_PLOT = True
+TO_GENERATE = False
+TO_PLOT = False
 TO_SAVE = False
 FORCE_DISTANCE_RANGE = False
 random_shift = False
@@ -1077,12 +1085,12 @@ if TO_GENERATE:
 Load twin events after shifted and centered.
 interpolate, deconv, rotate and save.
 '''
-TO_GENERATE = True
+TO_GENERATE = False
 TO_SAVE = False
 TO_PLOT_EACH_STEP = False
 TO_PLOT_DECONVE_STACK = True
-
 TO_SMOOTH_PSF = False
+
 if TO_GENERATE:
     for geo_dir in tqdm(geometry_dirs[0]):
         
@@ -1149,7 +1157,7 @@ if TO_GENERATE:
             if match:
                 dist = float(match.group(1))
             dist_dir = user_chosen_dir
-            print(f'Working on:\n{dist_dir}')
+            print(f'\nWorking on:\n{dist_dir}')
             deconv_stack = np.zeros((size,size))
             cutoff_iter_list = []
             rel_diff_checkout_list = []
@@ -1162,6 +1170,9 @@ if TO_GENERATE:
                 ##### interpolation #####
 
                 # Create a 2D histogram
+                size=250
+                bins=size
+                # bins = np.arange(-size/2,size/2,3.25)
                 hist, x_edges, y_edges = np.histogram2d(event[:,0], event[:,1],
                                                         range=[[-size/2, size/2],
                                                                 [-size/2, size/2]],
@@ -1211,7 +1222,7 @@ if TO_GENERATE:
                 deconv_stack += rotated_deconv
                 
 
-
+                
                 
                 if TO_PLOT_EACH_STEP:
                     
@@ -1220,8 +1231,7 @@ if TO_GENERATE:
                     
                     ## Plot stages of deconv aggregation ##
                     
-                    fig, ax = plt.subplots(2,2,figsize=(12,12),
-                                           sharex=True,sharey=True,dpi=600)
+                    fig, ax = plt.subplots(2,2,figsize=(12,12),dpi=600)
                     fig.patch.set_facecolor('white')
                     plt.subplots_adjust(left=0.1, right=0.9, top=0.9,
                                         bottom=0.1, wspace=0.1, hspace=0.1)
@@ -1283,16 +1293,20 @@ if TO_GENERATE:
                     plt.show()
                     
                     
-                    # plot deconvolution stacking
-                    plt.imshow(deconv_stack, extent=[-size/2, size/2, -size/2, size/2],
-                                vmin=0, origin='lower')
-                    plt.colorbar(label='Photon hits')
-                    plt.title('Accomulated RL deconvolution')
-                    plt.xlabel('x [mm]')
-                    plt.ylabel('y [mm]')
-                    plt.show()
+                    # # plot deconvolution stacking
+                    # plt.imshow(deconv_stack, extent=[-size/2, size/2, -size/2, size/2],
+                    #             vmin=0, origin='lower')
+                    # plt.colorbar(label='Photon hits')
+                    # plt.title('Accomulated RL deconvolution')
+                    # plt.xlabel('x [mm]')
+                    # plt.ylabel('y [mm]')
+                    # plt.show()
+                    
                     size = 250
                     bins = size
+                    
+            # # Optional: show the averaged deconv, added after talk to Gonzalo
+            # deconv_stack = deconv_stack/len(event_files)
             
             avg_cutoff_iter = np.mean(cutoff_iter_list)
             avg_rel_diff_checkout = np.mean(rel_diff_checkout_list)
@@ -1385,7 +1399,7 @@ TO_PLOT_P2V = True
 TO_SMOOTH_SIGNAL = False
 if TO_SMOOTH_SIGNAL: # If True, only one option must be True - the other, False.
     DOUBLE_GAUSSIAN_FIT = True # currently, the most promising approach !
-    PSD_AND_BUTTERWORTH = False 
+    PSD_AND_BUTTERWORTH = not DOUBLE_GAUSSIAN_FIT
 
 
 
@@ -1427,7 +1441,7 @@ if TO_GENERATE:
         dist_dirs = sorted(dist_dirs, key=extract_dir_number)
 
         # # option to choose a single distance and see P2V
-        dist = 9
+        dist = 5.5
         user_chosen_dir = find_subdirectory_by_distance(working_dir, dist)
         
         for dist_dir in dist_dirs:
@@ -1966,16 +1980,16 @@ def custom_polyfit(sorted_dists, sorted_P2Vs, power=2):
 
 # Parameter choices to slice to - DO NOT CHANGE FOR CURRENT DATASET!
 fiber_immersion_choice = [3]
-pitch_choice = [5,10,15.6]
-el_gap_choice = [1]
-anode_distance_choice = [2.5]
+pitch_choice = [15.6]
+el_gap_choice = [10]
+anode_distance_choice = [10]
 holder_thickness_choice = [10]
 count = 0
 color = iter(['red', 'green', 'blue'])
 marker = iter(['^', '*', 's'])
 SHOW_ORIGINAL_SPACING = False
 if SHOW_ORIGINAL_SPACING is False:
-    custom_spacing = 2
+    custom_spacing = 3
 POLYNOMIAL_FIT = False
 
 fig, ax = plt.subplots(figsize=(10,7), dpi = 600)
@@ -2089,8 +2103,8 @@ for i, geo_dir in tqdm(enumerate(geometry_dirs)):
 plt.xlabel('Distance between two sources [mm]')
 plt.ylabel('P2V')
 plt.grid()
-plt.xlim([None,25])
-plt.legend(loc='upper left',fontsize=14)
+# plt.xlim([None,25])
+# plt.legend(loc='upper left',fontsize=14)
 
 text = (f'EL gap={el_gap_choice[-1]} mm' +
          f'\nImmersion={fiber_immersion_choice[-1]} mm' +
@@ -2100,7 +2114,8 @@ if POLYNOMIAL_FIT:
     xloc, yloc = 0.14, 0.65
     
 else:
-    xloc, yloc = 0.03, 0.79
+    # xloc, yloc = 0.03, 0.79
+    xloc, yloc = 0.03, 0.96
     
 plt.text(xloc, yloc,  text, ha='left', va='top',
          transform=plt.gca().transAxes,
@@ -2260,7 +2275,7 @@ for m,anode_dist in enumerate(anode_distance_choice):
                 this_color = next(color)
                 # print(f'color={this_color},EL={el_gap}')
                 ax[m,n].plot(sorted_dists, sorted_P2Vs, color=this_color,
-                             ls='-', linewidth=3)
+                             ls='-', linewidth=1.5, alpha=0.85)
              
             count += 1
             
@@ -2528,7 +2543,7 @@ for m,anode_dist in enumerate(anode_distance_choice):
                 this_color = next(color)
                 print(f'color={this_color},immersion={fiber_immersion}')
                 ax[m,n].plot(sorted_dists, sorted_P2Vs, color=this_color,
-                             ls='-', linewidth=3)
+                             ls='-', linewidth=1)
              
             count += 1
             
@@ -2565,7 +2580,7 @@ print(f'total geometries used: {count}')
 # Parameter choices to slice to - DO NOT CHANGE FOR CURRENT DATASET!
 fiber_immersion_choice = [0,3,6]
 pitch_choice = [5]
-el_gap_choice = [10]
+el_gap_choice = [1]
 anode_distance_choice = [2.5]
 holder_thickness_choice = [10]
 
@@ -2666,8 +2681,8 @@ for i, geo_dir in tqdm(enumerate(geometry_dirs)):
         
     else:
         ax.plot(sorted_dists, sorted_P2Vs, color=next(color), ls='-', 
-                    marker=next(marker),alpha=0.8, label=f'immersion={fiber_immersion} mm',
-                    linewidth=3, markersize=10)
+                    marker=next(marker),alpha=0.85, label=f'immersion={fiber_immersion} mm',
+                    linewidth=1.5, markersize=10)
         
     count += 1
     
@@ -2798,7 +2813,7 @@ for m,immersion in enumerate(fiber_immersion_choice):
                 this_color = next(color)
                 print(f'color={this_color},anode dist={anode_distance}')
                 ax[m,n].plot(sorted_dists, sorted_P2Vs, color=this_color,
-                             ls='-', linewidth=3)
+                             ls='-', linewidth=1)
              
             count += 1
             

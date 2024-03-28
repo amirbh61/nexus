@@ -17,25 +17,6 @@
 #include "G4SDManager.hh"
 
 
-
-/// To DO, 22.5.23:
-// doesn't write to TPB file -> DONE
-// make sure TPB is fixed on nexus -> might be ok
-
-// ask gonzalo to write a new PersistencyManager that doesn't save the hd5 - DONE, changed .init settings
-// ask Lior the length of fibers, min is best to avoid losing light 
-
-// "mpt->AddConstProperty("WLSMEANNUMBERPHOTONS", num); is causing effect. It seems that G4's OpWLS
-// is only for the absorption of UV photon and has nothing to do with the emissions. larger 
-// values of WLSMEANNUMBERPHOTONS cause more WLS photons -> DONE
-
-// To DO, 19.5.23:
-// writing output file to /dev/null doesn't work now - stream of warning messages
-// for 462K photons .h5 file size of ~500mb without SaveAllSteppingAction
-
-
-
-
 namespace nexus{
 
 REGISTER_CLASS(SquareOpticalFiber, GeometryBase)
@@ -65,11 +46,13 @@ SquareOpticalFiber::~SquareOpticalFiber(){
 
 void SquareOpticalFiber::Construct(){
     G4int n = 25;
-    bool claddingExists = true; // a flag -> needed for specific geometry change for cladding
-    bool wallsExists = false; // a flag -> needed for specific geometry change for walls
-    bool holderExists = true; // a flag -> needed for specific geometry change for holder
-    bool holderTPBExist = false; // a flag -> needed for specific geometry change for holder TPB
-  
+    bool claddingExists = true;
+    bool wallsExists = false;
+    bool holderExists = true;
+    bool fiberTPBExist = true;
+    bool holderTPBExist = false;
+
+
     ///// Materials /////
 
     G4NistManager *nist = G4NistManager::Instance();
@@ -416,16 +399,17 @@ void SquareOpticalFiber::Construct(){
 
 
             // name = "TPB_(x,y)=(" + x_str + "," + y_str + ")";
-            fiberTPBPhysicalVolume = new G4PVPlacement(
-                                                    0,                // no rotation
-                                                    G4ThreeVector(x,y,zFiberTPB),  // at (0,0,0)
-                                                    fiberTPBLogicalVolume, // its logical volume
-                                                    "TPB_Fiber",               //its name
-                                                    worldLogicalVolume,   //its mother volume
-                                                    false,            // no boolean operation
-                                                    0,                // copy number
-                                                    false);          // checking overlaps)
-
+            if (fiberTPBExist){
+                fiberTPBPhysicalVolume = new G4PVPlacement(
+                                                        0,                // no rotation
+                                                        G4ThreeVector(x,y,zFiberTPB),  // at (0,0,0)
+                                                        fiberTPBLogicalVolume, // its logical volume
+                                                        "TPB_Fiber",               //its name
+                                                        worldLogicalVolume,   //its mother volume
+                                                        false,            // no boolean operation
+                                                        0,                // copy number
+                                                        false);          // checking overlaps)
+            }
 
 
             // Border surfaces
@@ -479,8 +463,6 @@ void SquareOpticalFiber::Construct(){
     G4double x;
     G4double y;
 
-    G4cout << "Number of rows in lattice_points: " << lattice_points.size() << G4endl;
-
     G4MultiUnion* multiUnionHolder = new G4MultiUnion("MultiUnion_Holder");
     for (G4int i=0; i<nHoles*nHoles; i++) {
         x = lattice_points[i][0];
@@ -512,7 +494,6 @@ void SquareOpticalFiber::Construct(){
                                                         0,
                                                         false);
 
-        G4cout << "Physical holder OK !!" << G4endl << G4endl;
     }
 
 
@@ -566,7 +547,6 @@ void SquareOpticalFiber::Construct(){
                                                     0,
                                                     false);
 
-        G4cout << "Physical holder TPB OK !!" << G4endl << G4endl;
     }
 
 
