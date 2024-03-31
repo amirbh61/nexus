@@ -12,9 +12,10 @@
 
 
 ### Generation
-#/Generator/SingleParticle/particle opticalphoton
+/Generator/SingleParticle/particle opticalphoton
+
 #/Generator/SingleParticle/min_energy 2.883 eV
-/Generator/SingleParticle/max_energy 2.883 eV
+#/Generator/SingleParticle/max_energy 2.883 eV
 /Generator/SingleParticle/min_energy  7.21 eV
 /Generator/SingleParticle/max_energy 7.21 eV
 

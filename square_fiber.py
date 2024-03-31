@@ -53,7 +53,7 @@ geometry_dirs = [os.path.join(path_to_dataset, d) for d in os.listdir(path_to_da
 # In[0.2]
 ### Figure for Lior , with TPB ###
 # TPB, plot of the absorbed WLS blue photons in sipm vs fiber coating reflectivity
-
+# geant seed was set to 10002
 n_photons = 100000
 vikuiti_ref = [96, 97, 98, 99, 99.9] # % reflection, in geant optical materials file
 SiPM_hits = [4001, 5547, 8437, 14145 , 31333] # Random XY in TPB center
@@ -79,8 +79,10 @@ plt.show()
 # In[0.3]
 ### Figure for Lior , without TPB ###
 # No TPB, plot of the absorbed WLS blue photons in sipm vs fiber coating reflectivity
+# geant seed was set to 10002
 
 n_photons = 100000
+# DO NOT CHANGE !!
 vikuiti_ref = [96, 97, 98, 99, 99.9] # % reflection, in geant optical materials file
 SiPM_hits = [ 15142, 19944, 27350, 40016, 75690] # Random XY pn fiber face (inside)
 SiPM_hits = [x / n_photons for x in SiPM_hits]
@@ -102,7 +104,39 @@ plt.gca().ticklabel_format(style='plain', useOffset=False)
 # plt.savefig(save_path, dpi=600)
 plt.show()
 
+# In[0.3]
+# How fiber length affects the light fraction detected , 98 % vikuiti reflectivity
+# 2.2 um TPB thickness
+# geant seed was set to 10002
 
+
+n_photons = 100000
+# DO NOT CHANGE !!
+
+fiber_length = np.arange(10,105,5) # mm
+SiPM_hits = [25459, 21991, 19367, 17100, 15445,
+             14124, 12795, 11794, 11013, 10291,
+             9388, 8735, 8437, 7899, 7256, 6970,
+             6578, 6148, 5868]
+SiPM_hits = [x / n_photons for x in SiPM_hits]
+
+
+fig, ax = plt.subplots(1,figsize=(10,8),dpi=600)
+fig.patch.set_facecolor('white')
+plt.plot(fiber_length, SiPM_hits, '-*m',linewidth=3,markersize=12)
+text = ("100K VUV photons facing forward at 7.21 eV per length" + \
+       "\nRandom XY generation in TPB center" + \
+       "\nFiber coating reflectivity of 98%")
+plt.text(28, 0.265, text, bbox=dict(facecolor='magenta', alpha=0.5),
+         fontsize=15)
+plt.xlabel("Fiber length [mm]")
+plt.ylabel("Fraction of photons absorbed in SiPM")
+plt.grid()
+plt.gca().ticklabel_format(style='plain', useOffset=False)
+# fig.suptitle("Absorbed photons in SiPM vs fiber coating reflectivity")
+# save_path = r'/home/amir/Desktop/Sipm_hits_vs_coating_reflectivity_no_TPB.jpg'
+# plt.savefig(save_path, dpi=600)
+plt.show()
 
 
 
@@ -1984,7 +2018,6 @@ pitch_choice = [15.6]
 el_gap_choice = [10]
 anode_distance_choice = [10]
 holder_thickness_choice = [10]
-count = 0
 color = iter(['red', 'green', 'blue'])
 marker = iter(['^', '*', 's'])
 SHOW_ORIGINAL_SPACING = False
@@ -2098,7 +2131,6 @@ for i, geo_dir in tqdm(enumerate(geometry_dirs)):
                     marker=next(marker),alpha=0.8, label=f'pitch={pitch} mm',
                     linewidth=3, markersize=10)
         
-    count += 1
     
 plt.xlabel('Distance between two sources [mm]')
 plt.ylabel('P2V')
@@ -2125,7 +2157,6 @@ plt.text(xloc, yloc,  text, ha='left', va='top',
 # fig.suptitle(title,size=12)
 # fig.tight_layout()
 plt.show()
-print(f'total geometries used: {count}')
 
 
 
@@ -2190,7 +2221,7 @@ POLYNOMIAL_FIT = False
 fig, ax = plt.subplots(3,3,figsize=(10,7), sharex=True,sharey=True,dpi=600)
 fig.patch.set_facecolor('white')
 plt.subplots_adjust(left=0.1, right=0.9, top=0.9, bottom=0.1, wspace=0.1, hspace=0.1)
-fig.supxlabel('Distance between two sources [mm]',fontsize=12,fontweight='bold')
+fig.supxlabel('AB distance [mm]',fontsize=12,fontweight='bold')
 fig.supylabel('P2V',fontweight='bold')
 
 for m,anode_dist in enumerate(anode_distance_choice):
@@ -2265,7 +2296,7 @@ for m,anode_dist in enumerate(anode_distance_choice):
                 this_color = next(color)
                 # Plot original data
                 ax[m,n].plot(sorted_dists, sorted_P2Vs, color=this_color,
-                             ls='-', linewidth=3)
+                             ls='-', linewidth=2, alpha=0.85)
                 # Plot fitted data
                 ax[m,n].plot(sorted_dists_fit, sorted_P2V_fit, color=this_color,
                              ls='--')
@@ -2275,9 +2306,8 @@ for m,anode_dist in enumerate(anode_distance_choice):
                 this_color = next(color)
                 # print(f'color={this_color},EL={el_gap}')
                 ax[m,n].plot(sorted_dists, sorted_P2Vs, color=this_color,
-                             ls='-', linewidth=1.5, alpha=0.85)
+                             ls='-', linewidth=2, alpha=0.85)
              
-            count += 1
             
         text=f'Anode dist={anode_dist} mm'
         ax[m, n].text(0.05, 0.93, text, ha='left', va='top',
@@ -2401,7 +2431,7 @@ for i, geo_dir in tqdm(enumerate(geometry_dirs)):
         # Plot original data
         ax.plot(sorted_dists, sorted_P2Vs, color=this_color, ls='-', 
                     alpha=0.8, label=f'EL={el_gap}mm',marker=this_marker,
-                    linewidth=3, markersize=10)
+                    linewidth=2, markersize=10)
         # Plot fitted data
         ax.plot(sorted_dists_fit, sorted_P2V_fit, color=this_color, ls='--',
                  alpha=0.5, label=f'{el_gap}mm fitted',linewidth=3)
@@ -2409,13 +2439,12 @@ for i, geo_dir in tqdm(enumerate(geometry_dirs)):
     else:
         print(f'EL={el_gap}')
         ax.plot(sorted_dists, sorted_P2Vs, color=next(color), ls='-', 
-                    marker=next(marker),alpha=0.8, label=f'EL gap={el_gap}mm',
-                    linewidth=3, markersize=10)
+                    marker=next(marker),alpha=0.85, label=f'EL gap={el_gap}mm',
+                    linewidth=2, markersize=10)
         
-    count += 1
     
 
-plt.xlabel('Distance between two sources [mm]')
+plt.xlabel('AB distance [mm]')
 plt.ylabel('P2V')
 plt.grid()
 plt.legend(loc='upper left',fontsize=13)
@@ -2458,7 +2487,7 @@ POLYNOMIAL_FIT = False
 fig, ax = plt.subplots(3,2,figsize=(10,7), sharex=True,sharey=True,dpi=600)
 fig.patch.set_facecolor('white')
 plt.subplots_adjust(left=0.1, right=0.9, top=0.9, bottom=0.1, wspace=0.1, hspace=0.2)
-fig.supxlabel('Distance between two sources [mm]',fontsize=12,fontweight='bold')
+fig.supxlabel('AB distance [mm]',fontsize=12,fontweight='bold')
 fig.supylabel('P2V',fontweight='bold')
 
 for m,anode_dist in enumerate(anode_distance_choice):
@@ -2533,7 +2562,7 @@ for m,anode_dist in enumerate(anode_distance_choice):
                 this_color = next(color)
                 # Plot original data
                 ax[m,n].plot(sorted_dists, sorted_P2Vs, color=this_color,
-                             ls='-', linewidth=3)
+                             ls='-', linewidth=2, alpha=0.85)
                 # Plot fitted data
                 ax[m,n].plot(sorted_dists_fit, sorted_P2V_fit, color=this_color,
                              ls='--')
@@ -2543,9 +2572,8 @@ for m,anode_dist in enumerate(anode_distance_choice):
                 this_color = next(color)
                 print(f'color={this_color},immersion={fiber_immersion}')
                 ax[m,n].plot(sorted_dists, sorted_P2Vs, color=this_color,
-                             ls='-', linewidth=1)
+                             ls='-', linewidth=2, alpha=0.85)
              
-            count += 1
             
         text=f'Anode dist={anode_dist} mm'
         ax[m, n].text(0.05, 0.93, text, ha='left', va='top',
@@ -2673,20 +2701,19 @@ for i, geo_dir in tqdm(enumerate(geometry_dirs)):
         this_marker = next(marker)
         # Plot original data
         ax.plot(sorted_dists, sorted_P2Vs, color=this_color, ls='-', 
-                    alpha=0.8, label=f'Pitch={pitch} mm',marker=this_marker,
-                    linewidth=3, markersize=10)
+                    alpha=0.85, label=f'Pitch={pitch} mm',marker=this_marker,
+                    linewidth=2, markersize=10)
         # Plot fitted data
         ax.plot(sorted_dists_fit, sorted_P2V_fit, color=this_color, ls='--',
-                 alpha=0.5, label=f'{pitch} mm fitted',linewidth=3)
+                 label=f'{pitch} mm fitted')
         
     else:
         ax.plot(sorted_dists, sorted_P2Vs, color=next(color), ls='-', 
                     marker=next(marker),alpha=0.85, label=f'immersion={fiber_immersion} mm',
-                    linewidth=1.5, markersize=10)
+                    linewidth=2, markersize=10)
         
-    count += 1
     
-plt.xlabel('Distance [mm]')
+plt.xlabel('AB distance [mm]')
 plt.ylabel('P2V')
 plt.grid()
 plt.legend(loc='upper left',fontsize=13)
@@ -2728,7 +2755,7 @@ POLYNOMIAL_FIT = False
 fig, ax = plt.subplots(3,2,figsize=(10,7), sharex=True,sharey=True,dpi=600)
 fig.patch.set_facecolor('white')
 plt.subplots_adjust(left=0.1, right=0.9, top=0.9, bottom=0.1, wspace=0.1, hspace=0.2)
-fig.supxlabel('Distance between two sources [mm]',fontsize=12,fontweight='bold')
+fig.supxlabel('AB distance [mm]',fontsize=12,fontweight='bold')
 fig.supylabel('P2V',fontweight='bold')
 
 for m,immersion in enumerate(fiber_immersion_choice):
@@ -2803,7 +2830,7 @@ for m,immersion in enumerate(fiber_immersion_choice):
                 this_color = next(color)
                 # Plot original data
                 ax[m,n].plot(sorted_dists, sorted_P2Vs, color=this_color,
-                             ls='-', linewidth=3)
+                             ls='-', linewidth=2, alpha=0.85)
                 # Plot fitted data
                 ax[m,n].plot(sorted_dists_fit, sorted_P2V_fit, color=this_color,
                              ls='--')
@@ -2813,9 +2840,8 @@ for m,immersion in enumerate(fiber_immersion_choice):
                 this_color = next(color)
                 print(f'color={this_color},anode dist={anode_distance}')
                 ax[m,n].plot(sorted_dists, sorted_P2Vs, color=this_color,
-                             ls='-', linewidth=1)
+                             ls='-', linewidth=2, alpha=0.85)
              
-            count += 1
             
         text=f'Immersion={immersion} mm'
         ax[m, n].text(0.05, 0.93, text, ha='left', va='top',
@@ -2843,6 +2869,148 @@ fig.suptitle(f'Pitch = {pitch_choice[0]} mm',fontsize=18,fontweight='bold')
 fig.tight_layout()
 plt.show()
 print(f'total geometries used: {count}')
+
+# In[9.6]
+# Best geometry for each pitch 
+# WARNING: These parameters were not easy to come by, do not delete #
+best_geo_pitch_5 = {'EL':[1], 'pitch':[5], 'immersion':[3], 'anode_dist':[2.5]}
+best_geo_pitch_10 = {'EL':[1], 'pitch':[10], 'immersion':[3], 'anode_dist':[5]}
+best_geo_pitch_15 = {'EL':[10], 'pitch':[15.6], 'immersion':[3], 'anode_dist':[10]}
+best_geos = [best_geo_pitch_5, best_geo_pitch_10, best_geo_pitch_15]
+holder_thickness_choice = [10]
+
+
+color = iter(['red', 'green', 'blue'])
+marker = iter(['^', '*', 's'])
+SHOW_ORIGINAL_SPACING = False
+if SHOW_ORIGINAL_SPACING is False:
+    custom_spacing = 2
+POLYNOMIAL_FIT = False
+
+fig, ax = plt.subplots(figsize=(10,7), dpi=600)
+fig.patch.set_facecolor('white')
+for geo in best_geos:
+    for i, geo_dir in tqdm(enumerate(geometry_dirs)):
+        
+        working_dir = geo_dir + r'/P2V'
+        geo_params = geo_dir.split('/SquareFiberDatabase/')[-1]
+        
+        
+        el_gap = float(re.search(r"ELGap=(-?\d+\.?\d*)mm",
+                                 geo_params).group(1))
+        pitch = float(re.search(r"pitch=(-?\d+\.?\d*)mm",
+                                geo_params).group(1))
+        anode_distance = float(re.search(r"distanceAnodeHolder=(-?\d+\.?\d*)mm",
+                                         geo_params).group(1))
+        holder_thickness = float(re.search(r"holderThickness=(-?\d+\.?\d*)mm",
+                                           geo_params).group(1))
+        fiber_immersion = float(re.search(r"distanceFiberHolder=(-?\d+\.?\d*)mm",
+                                          geo_params).group(1))
+        fiber_immersion = 5 - fiber_immersion
+        
+        
+        if (el_gap not in geo['EL'] or
+            pitch not in geo['pitch'] or
+            anode_distance not in geo['anode_dist'] or
+            fiber_immersion not in geo['immersion'] or
+            holder_thickness not in holder_thickness_choice):
+            # print(i)
+            continue
+        
+        
+        dir_data = glob.glob(working_dir + '/*/*.txt')
+        dists = []
+        P2Vs = []
+            
+        if SHOW_ORIGINAL_SPACING:
+            for data in dir_data:
+                dist, P2V = np.loadtxt(data)
+                if P2V > 100 or P2V == float('inf'):
+                    P2V = 100
+                dists.append(dist)
+                P2Vs.append(P2V)
+                
+            # zip and sort in ascending order
+            sorted_dists, sorted_P2Vs = sort_ascending_dists_P2Vs(dists,P2Vs)
+           
+        else:
+            averaged_dists = []
+            averaged_P2Vs = []
+            for j in range(0, len(dir_data), custom_spacing):  # Step through dir_data two at a time
+                data_pairs = dir_data[j:j+custom_spacing]  # Get the current pair of data files
+                dists = []
+                P2Vs = []
+                for data in data_pairs:
+                    dist, P2V = np.loadtxt(data)
+                    if P2V > 100 or P2V == float('inf'):
+                        P2V = 100
+                    dists.append(dist)
+                    P2Vs.append(P2V)
+                    # print(f'data_pair dist={dist}, P2V={P2V}')
+                
+                # Only proceed if we have a pair, to avoid index out of range errors
+                if len(dists) == custom_spacing and len(P2Vs) == custom_spacing:
+                    averaged_dist = sum(dists) / custom_spacing
+                    averaged_P2V = sum(P2Vs) / custom_spacing
+                    # print(f'averaged_dist={averaged_dist}, averaged_P2V={averaged_P2V}',end='\n\n')
+                    averaged_dists.append(averaged_dist)
+                    averaged_P2Vs.append(averaged_P2V)
+            
+            # zip and sort in ascending order
+            sorted_dists, sorted_P2Vs = sort_ascending_dists_P2Vs(averaged_dists,
+                                                                  averaged_P2Vs)
+            
+        if POLYNOMIAL_FIT:
+            
+            # custom fit a polynomial of 2nd degree to data
+            sorted_dists_fit, sorted_P2V_fit = custom_polyfit(sorted_dists,
+                                                              sorted_P2Vs)
+            
+            this_color = next(color)
+            this_marker = next(marker)
+            # Plot original data
+            ax.plot(sorted_dists, sorted_P2Vs, color=this_color, ls='-', 
+                        alpha=0.85, label=f'Pitch={pitch} mm',marker=this_marker,
+                        linewidth=2, markersize=10)
+            # Plot fitted data
+            ax.plot(sorted_dists_fit, sorted_P2V_fit, color=this_color, ls='--',
+                     label=f'{pitch} mm fitted')
+            
+        else:
+            ax.plot(sorted_dists, sorted_P2Vs, color=next(color), ls='-', 
+                        marker=next(marker),alpha=0.7, label=f'pitch={pitch} mm',
+                        linewidth=3, markersize=10)
+        
+    
+plt.xlabel('AB distance [mm]')
+plt.ylabel('P2V')
+plt.grid()
+plt.legend(loc='upper left',fontsize=13)
+plt.ylim([0.99,None])
+pitch_5_text = (f"EL gap={best_geo_pitch_5['EL'][-1]} mm" +
+         f"\nImmersion={best_geo_pitch_5['immersion'][-1]} mm" +
+         f"\nAnode distance={best_geo_pitch_5['anode_dist'][-1]} mm")
+plt.text(11, 2.67, pitch_5_text, ha='left', va='top',
+         bbox=dict(facecolor='white', alpha=0.5,boxstyle='round,pad=0.5'),
+         fontsize=10, weight='bold', color='red', linespacing=1.5)
+
+pitch_10_text = (f"EL gap={best_geo_pitch_10['EL'][-1]} mm" +
+         f"\nImmersion={best_geo_pitch_10['immersion'][-1]} mm" +
+         f"\nAnode distance={best_geo_pitch_10['anode_dist'][-1]} mm")
+plt.text(14.5, 2.2, pitch_10_text, ha='left', va='top',
+         bbox=dict(facecolor='white', alpha=0.5,boxstyle='round,pad=0.5'),
+         fontsize=10, weight='bold', color='green', linespacing=1.5)  # Adjust this value to increase spacing between lines, if necessary
+
+pitch_15_text = (f"EL gap={best_geo_pitch_15['EL'][-1]} mm" +
+         f"\nImmersion={best_geo_pitch_15['immersion'][-1]} mm" +
+         f"\nAnode distance={best_geo_pitch_15['anode_dist'][-1]} mm")
+plt.text(25, 1.6, pitch_15_text, ha='left', va='top',
+         bbox=dict(facecolor='white', alpha=0.5,boxstyle='round,pad=0.5'),
+         fontsize=10, weight='bold', color='blue', linespacing=1.5)  # Adjust this value to increase spacing between lines, if necessary
+
+
+# fig.suptitle(title,size=12)
+plt.show()
 
 
 # In[9]
