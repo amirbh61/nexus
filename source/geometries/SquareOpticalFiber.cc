@@ -45,10 +45,10 @@ SquareOpticalFiber::~SquareOpticalFiber(){
 
 
 void SquareOpticalFiber::Construct(){
-    G4int n = 25;
+    G4int n = 1;
     bool claddingExists = true;
     bool wallsExists = false;
-    bool holderExists = true;
+    bool holderExists = false;
     bool fiberTPBExist = true;
     bool holderTPBExist = false;
 
@@ -84,6 +84,7 @@ void SquareOpticalFiber::Construct(){
     G4OpticalSurface* TPBFiberSurface = new G4OpticalSurface("TPB_surface", glisur,
                                                         ground, dielectric_dielectric, 0.01);
     TPBFiberSurface->SetMaterialPropertiesTable(opticalprops::TPB());
+
 
     G4OpticalSurface* VikuitiCoating = new G4OpticalSurface("Vikuiti_Surface", unified,
                                                                      polished, dielectric_metal);
@@ -185,12 +186,12 @@ void SquareOpticalFiber::Construct(){
 
 
     ///// SIPM ARRAY /////
-    G4double sideSiPM = 1.5*mm;
+    G4double sizeSiPM = 1.5*mm;
 
-    G4double thicknessSiPM = sideSiPM/2;
+    G4double thicknessSiPM = sizeSiPM/2;
     G4Box *SiPMSolidVolume = new G4Box("SiPM", //name
-                              sideSiPM, //side a
-                              sideSiPM, //side b
+                              sizeSiPM, //side a
+                              sizeSiPM, //side b
                               thicknessSiPM); //side c
 
     G4LogicalVolume* SiPMLogicalVolume = new G4LogicalVolume(SiPMSolidVolume, 
@@ -211,7 +212,7 @@ void SquareOpticalFiber::Construct(){
 
 
     ///// SQUARE FIBER CORE /////
-    G4double fiberSize = 1.5*mm;
+    G4double fiberSize = sizeSiPM;
     G4double holderWidth = 0.5*holderThickness_;
     G4double fiberLength = 0.5*(cylLength-delta);
 
@@ -365,7 +366,6 @@ void SquareOpticalFiber::Construct(){
                                                     false,            // no boolean operation
                                                     0,                // copy number
                                                     false);        // checking overlaps                                                   
-
 
 
             if (claddingExists){

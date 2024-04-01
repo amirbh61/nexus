@@ -51,12 +51,25 @@ geometry_dirs = [os.path.join(path_to_dataset, d) for d in os.listdir(path_to_da
 
 
 # In[0.2]
-### Figure for Lior , with TPB ###
+### Figure for Lior , with coating, with TPB ###
 # TPB, plot of the absorbed WLS blue photons in sipm vs fiber coating reflectivity
 # geant seed was set to 10002
 n_photons = 100000
+
+# New results 1.4.24, NO holder here
+vikuiti_ref = [95, 96, 97, 98, 99, 99.9] # % reflection, in geant optical materials file
+# SiPM_hits = [2361, 3162, 4339 ,6572  , 11174 ,24998 ] # Random XY in TPB center, z=-0.023
+SiPM_hits = [2475, 3241,  4366, 6828 , 11546 , 25786 ] # Random XY in TPB center z=-0.0023
+
+'''
+Older  WRONG results 31.3.24. In here I generated the photons at random xy on the center
+plane of the TPB. I should have generated them on the TPB face. I also allowed 
+a holder - there should be no holder.
+seed was 10002 and z=-0.0011 mm (in center plane of the TPB)
+
 vikuiti_ref = [96, 97, 98, 99, 99.9] # % reflection, in geant optical materials file
 SiPM_hits = [4001, 5547, 8437, 14145 , 31333] # Random XY in TPB center
+'''
 SiPM_hits = [x / n_photons for x in SiPM_hits]
 
 fig, ax = plt.subplots(1,figsize=(10,8),dpi=600)
@@ -64,8 +77,8 @@ fig.patch.set_facecolor('white')
 ax.plot(vikuiti_ref, SiPM_hits, '-*', color='rebeccapurple',linewidth=3,
          markersize=12)
 text = ("100K VUV photons facing forward at 7.21 eV per reflectivity\n" + \
-       "Random XY generation in TPB center")
-ax.text(96.1, 0.31, text, bbox=dict(facecolor='rebeccapurple', alpha=0.5),
+       "Random XY generation on TPB face")
+ax.text(95.1, 0.27, text, bbox=dict(facecolor='rebeccapurple', alpha=0.5),
         fontsize=15)
 ax.set_xlabel("Fiber Coating Reflectivity [%]")
 ax.set_ylabel("Fraction of photons absorbed in SiPM")
@@ -77,14 +90,26 @@ plt.gca().ticklabel_format(style='plain', useOffset=False)
 # plt.savefig(save_path, dpi=600)
 plt.show()
 # In[0.3]
-### Figure for Lior , without TPB ###
+### Figure for Lior , with coating, without TPB ###
 # No TPB, plot of the absorbed WLS blue photons in sipm vs fiber coating reflectivity
 # geant seed was set to 10002
 
 n_photons = 100000
 # DO NOT CHANGE !!
+
+# New results 1.4.24, NO holder here
+vikuiti_ref = [95, 96, 97, 98, 99, 99.9] # % reflection, in geant optical materials file
+SiPM_hits = [ 24721, 29228 , 34895 , 41901, 50794, 60509] # Random XY pn fiber face (inside)
+
+'''
+Older WRONG results 31.3.24. Here I accidently holder and TPB for 
+the fibers in geant4. there should be no  holder or TPB! 
+seed was 10002 and z=+0.001 mm (inside face of the fiber)
+
 vikuiti_ref = [96, 97, 98, 99, 99.9] # % reflection, in geant optical materials file
 SiPM_hits = [ 15142, 19944, 27350, 40016, 75690] # Random XY pn fiber face (inside)
+'''
+
 SiPM_hits = [x / n_photons for x in SiPM_hits]
 
 fig, ax = plt.subplots(1,figsize=(10,8),dpi=600)
@@ -92,7 +117,7 @@ fig.patch.set_facecolor('white')
 plt.plot(vikuiti_ref, SiPM_hits, '-*b',linewidth=3,markersize=12)
 text = ("100K blue photons facing forward at 2.883 eV per reflectivity\n" + \
        "Random XY generation on PMMA fiber face")
-plt.text(96.1, 0.72, text, bbox=dict(facecolor='blue', alpha=0.5),
+plt.text(95.1, 0.6, text, bbox=dict(facecolor='blue', alpha=0.5),
          fontsize=15)
 plt.xlabel("Fiber Coating Reflectivity [%]")
 plt.ylabel("Fraction of photons absorbed in SiPM")
@@ -113,11 +138,22 @@ plt.show()
 n_photons = 100000
 # DO NOT CHANGE !!
 
+
+# New results 1.4.24, NO holder here
+fiber_length = np.arange(10,105,5)
+SiPM_hits = [ 20754, 17705, 15620, 14166, 12725 ,
+             11763, 10581, 9785, 9295, 8435,
+             7735, 7266, 6828, 6351, 6037, 5737,
+             5281, 4913, 4660]
+
+'''
+Older WRONG results 31.3.24. Here we used a holder and z=-0.0011 mm
 fiber_length = np.arange(10,105,5) # mm
 SiPM_hits = [25459, 21991, 19367, 17100, 15445,
              14124, 12795, 11794, 11013, 10291,
              9388, 8735, 8437, 7899, 7256, 6970,
              6578, 6148, 5868]
+'''
 SiPM_hits = [x / n_photons for x in SiPM_hits]
 
 
@@ -125,9 +161,9 @@ fig, ax = plt.subplots(1,figsize=(10,8),dpi=600)
 fig.patch.set_facecolor('white')
 plt.plot(fiber_length, SiPM_hits, '-*m',linewidth=3,markersize=12)
 text = ("100K VUV photons facing forward at 7.21 eV per length" + \
-       "\nRandom XY generation in TPB center" + \
-       "\nFiber coating reflectivity of 98%")
-plt.text(28, 0.265, text, bbox=dict(facecolor='magenta', alpha=0.5),
+       "\nRandom XY generation on TPB face" + \
+       "\nFiber coating reflectivity set to 98%")
+plt.text(29, 0.195, text, bbox=dict(facecolor='magenta', alpha=0.5),
          fontsize=15)
 plt.xlabel("Fiber length [mm]")
 plt.ylabel("Fraction of photons absorbed in SiPM")
