@@ -68,7 +68,7 @@ void SquareOpticalFiber::Construct(){
     G4Material *TPB = materials::TPB();
     G4Material *FPethylene = materials::FPethylene();
 
-    // Optical Materials 
+    // Optical Materials
     Xe->SetMaterialPropertiesTable(opticalprops::GXe(pressure, temperature, sc_yield, e_lifetime ));
     Teflon->SetMaterialPropertiesTable(opticalprops::PTFE());
     PMMA->SetMaterialPropertiesTable(opticalprops::PMMA());
@@ -81,6 +81,7 @@ void SquareOpticalFiber::Construct(){
                                                             ground, dielectric_metal);
     teflonSurface->SetMaterialPropertiesTable(opticalprops::PTFE());
 
+    // Use 'unified' here for a more realistic photon interaction with TPB surface
     G4OpticalSurface* TPBFiberSurface = new G4OpticalSurface("TPB_surface", glisur,
                                                         ground, dielectric_dielectric, 0.01);
     TPBFiberSurface->SetMaterialPropertiesTable(opticalprops::TPB());
@@ -89,8 +90,6 @@ void SquareOpticalFiber::Construct(){
     G4OpticalSurface* VikuitiCoating = new G4OpticalSurface("Vikuiti_Surface", unified,
                                                                      polished, dielectric_metal);
     VikuitiCoating->SetMaterialPropertiesTable(opticalprops::Vikuiti());
-
-
 
 
 
@@ -121,7 +120,7 @@ void SquareOpticalFiber::Construct(){
 
 
     ///// Create the detector cylinder /////
-    G4float delta = 1*mm; // SiPM is X*mm outside Cap1
+    G4float delta = 1*mm; // SiPM extrusion away from the teflon cap
     G4double BarrelThickness = 5*cm;
     G4double barrelOuterRadius = 50.*cm;
     G4double barrelInnerRadius = barrelOuterRadius - BarrelThickness;
@@ -259,34 +258,34 @@ void SquareOpticalFiber::Construct(){
 
 
 
-    ///// TEFLON WALL SURROUNDING FIBER CORE /////
-    G4double WallThickness = 0.5*mm;
-    G4double outerTeflonWallSide = 0.5*pitch_;
-    G4double innerTeflonWallSide = outerTeflonWallSide - WallThickness;
-    G4double teflonWallLength = 0.5*(cylLength - distanceFiberHolder_ - holderWidth);
-    // G4double teflonWallLength = 0.5*(cylLength - distanceFiberHolder_); //for a single fiber heatmap simulation
+    // ///// TEFLON WALL SURROUNDING FIBER CORE /////
+    // G4double WallThickness = 0.5*mm;
+    // G4double outerTeflonWallSide = 0.5*pitch_;
+    // G4double innerTeflonWallSide = outerTeflonWallSide - WallThickness;
+    // G4double teflonWallLength = 0.5*(cylLength - distanceFiberHolder_ - holderWidth);
+    // // G4double teflonWallLength = 0.5*(cylLength - distanceFiberHolder_); //for a single fiber heatmap simulation
 
 
-    G4Box *teflonWallOuter = new G4Box("Teflon_Wall_Outer", //name
-                           outerTeflonWallSide, //side a 
-                           outerTeflonWallSide, //side b 
-                           teflonWallLength); //length
+    // G4Box *teflonWallOuter = new G4Box("Teflon_Wall_Outer", //name
+    //                        outerTeflonWallSide, //side a 
+    //                        outerTeflonWallSide, //side b 
+    //                        teflonWallLength); //length
 
-    G4Box *teflonWallInner = new G4Box("Teflon_wall_Inner",
-                            innerTeflonWallSide,
-                            innerTeflonWallSide,
-                            teflonWallLength);
+    // G4Box *teflonWallInner = new G4Box("Teflon_wall_Inner",
+    //                         innerTeflonWallSide,
+    //                         innerTeflonWallSide,
+    //                         teflonWallLength);
 
-    G4SubtractionSolid *teflonWall = new G4SubtractionSolid("Teflon_Wall",teflonWallOuter,teflonWallInner); 
+    // G4SubtractionSolid *teflonWall = new G4SubtractionSolid("Teflon_Wall",teflonWallOuter,teflonWallInner); 
 
-    G4LogicalVolume *teflonWallLogicalVolume = new G4LogicalVolume(teflonWall, Teflon, "Teflon_Wall");  
+    // G4LogicalVolume *teflonWallLogicalVolume = new G4LogicalVolume(teflonWall, Teflon, "Teflon_Wall");  
 
-    //add reflective properties to teflon wall
-    new G4LogicalSkinSurface( "Teflon_Wall", teflonWallLogicalVolume, teflonSurface);
+    // //add reflective properties to teflon wall
+    // new G4LogicalSkinSurface( "Teflon_Wall", teflonWallLogicalVolume, teflonSurface);
 
-    G4Color grey = G4Color::Grey();
-    G4VisAttributes* teflonWallColor = new G4VisAttributes(grey);
-    teflonWallLogicalVolume->SetVisAttributes(teflonWallColor);
+    // G4Color grey = G4Color::Grey();
+    // G4VisAttributes* teflonWallColor = new G4VisAttributes(grey);
+    // teflonWallLogicalVolume->SetVisAttributes(teflonWallColor);
 
 
 
@@ -313,8 +312,7 @@ void SquareOpticalFiber::Construct(){
 
     G4int numOfFibers = numberOfSiPMs;
     G4double zFiber = fiberLength;
-    G4double zTeflonWall = teflonWallLength + holderWidth + distanceFiberHolder_;
-    // G4double zTeflonWall = teflonWallLength + distanceFiberHolder_; //for a single fiber heatmap simulation
+    // G4double zTeflonWall = teflonWallLength + holderWidth + distanceFiberHolder_;
     G4double zFiberTPB = zFiber-fiberLength-TPBFiberWidth;
 
     std::vector<std::vector<double>> lattice_points;
@@ -383,18 +381,18 @@ void SquareOpticalFiber::Construct(){
 
 
 
-            if (wallsExists){
-                name = "wall_(x,y)=(" + x_str + "," + y_str + ")";
-                new G4PVPlacement(
-                                0,                // no rotation
-                                G4ThreeVector(x,y,zTeflonWall),  // at (0,0,0)
-                                teflonWallLogicalVolume, // its logical volume
-                                name,               //its name
-                                worldLogicalVolume,   //its mother volume
-                                false,            // no boolean operation
-                                0,                // copy number
-                                false);          // checking overlaps)
-            }
+            // if (wallsExists){
+            //     name = "wall_(x,y)=(" + x_str + "," + y_str + ")";
+            //     new G4PVPlacement(
+            //                     0,                // no rotation
+            //                     G4ThreeVector(x,y,zTeflonWall),  // at (0,0,0)
+            //                     teflonWallLogicalVolume, // its logical volume
+            //                     name,               //its name
+            //                     worldLogicalVolume,   //its mother volume
+            //                     false,            // no boolean operation
+            //                     0,                // copy number
+            //                     false);          // checking overlaps)
+            // }
 
 
 
@@ -717,6 +715,8 @@ G4ThreeVector SquareOpticalFiber::GenerateVertex(const G4String& region) const {
         G4double xGen = x_dist_(gen_);
         G4double yGen = y_dist_(gen_);
         G4double zGen = specific_vertex_.z();
+        // z_dist_ = std::uniform_real_distribution<double>(-0.0022*mm, 0*mm);
+        // G4double zGen = z_dist_(gen_);
         G4ThreeVector random_vertex = G4ThreeVector(xGen, yGen, zGen);
         return random_vertex;
     }

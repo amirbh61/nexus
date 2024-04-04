@@ -134,17 +134,28 @@ plt.show()
 # 2.2 um TPB thickness
 # geant seed was set to 10002
 
-
 n_photons = 100000
 # DO NOT CHANGE !!
 
 
 # New results 1.4.24, NO holder here
-fiber_length = np.arange(10,105,5)
-SiPM_hits = [ 20754, 17705, 15620, 14166, 12725 ,
+fiber_length = np.arange(5,105,5).tolist() # mm
+
+# insert additional data point
+# fiber_length.insert(0,0.01) # no tpb gives 81641, with tpb gives 38322
+fiber_length.insert(0,1) # no tpb gives 61522, with tpb gives 31651
+
+# here z=-0.0023 mm
+SiPM_hits_with_TPB = [ 31651, 24846, 20754, 17705, 15620, 14166, 12725 ,
              11763, 10581, 9785, 9295, 8435,
              7735, 7266, 6828, 6351, 6037, 5737,
              5281, 4913, 4660]
+
+# here z=-0.0001 mm
+SiPM_hits_without_TPB = [ 61522, 60057, 58224, 56775, 55260, 53510,  51941,
+             50504, 49392, 48701, 46655, 45600,
+             44078, 43071, 42013, 40846, 39746, 38652,
+             37777, 36881, 35650]
 
 '''
 Older WRONG results 31.3.24. Here we used a holder and z=-0.0011 mm
@@ -154,25 +165,112 @@ SiPM_hits = [25459, 21991, 19367, 17100, 15445,
              9388, 8735, 8437, 7899, 7256, 6970,
              6578, 6148, 5868]
 '''
-SiPM_hits = [x / n_photons for x in SiPM_hits]
+SiPM_hits_with_TPB = [x / n_photons for x in SiPM_hits_with_TPB]
+SiPM_hits_without_TPB = [x / n_photons for x in SiPM_hits_without_TPB]
 
 
 fig, ax = plt.subplots(1,figsize=(10,8),dpi=600)
 fig.patch.set_facecolor('white')
-plt.plot(fiber_length, SiPM_hits, '-*m',linewidth=3,markersize=12)
-text = ("100K VUV photons facing forward at 7.21 eV per length" + \
-       "\nRandom XY generation on TPB face" + \
+plt.plot(fiber_length, SiPM_hits_with_TPB, '-*m',linewidth=3,markersize=12,label='Fiber+TPB')
+plt.plot(fiber_length, SiPM_hits_without_TPB, '-*k',linewidth=3,markersize=12,label='Fiber only')
+plt.plot(fiber_length, np.divide(SiPM_hits_with_TPB,SiPM_hits_without_TPB),
+         '-*y',linewidth=3,markersize=12,label='Fiber+TPB / Fiber Ratio')
+text = ("100K photons facing forward per length" + \
+       "\nRandom XY generation on external face" + \
        "\nFiber coating reflectivity set to 98%")
-plt.text(29, 0.195, text, bbox=dict(facecolor='magenta', alpha=0.5),
-         fontsize=15)
+plt.text(12, 0.615, text, bbox=dict(facecolor='magenta', alpha=0.5),
+          fontsize=14)
 plt.xlabel("Fiber length [mm]")
 plt.ylabel("Fraction of photons absorbed in SiPM")
+plt.xticks(np.arange(0,110,10))
+plt.legend(fontsize=12)
+# plt.yticks(np.arange(0,0.275,0.025))
 plt.grid()
 plt.gca().ticklabel_format(style='plain', useOffset=False)
 # fig.suptitle("Absorbed photons in SiPM vs fiber coating reflectivity")
 # save_path = r'/home/amir/Desktop/Sipm_hits_vs_coating_reflectivity_no_TPB.jpg'
 # plt.savefig(save_path, dpi=600)
 plt.show()
+
+# In[0.4]
+# TPB absorption 
+
+# Constants
+h_Planck = 6.62607015e-34  # Planck's constant in m^2 kg / s
+c_light = 299792458  # Speed of light in m / s
+nm = 1e-9  # Nanometer to meter conversion factor
+
+# Calculating energy values for each wavelength in Joules
+WLS_abs_energy = [
+    h_Planck * c_light / (380. * nm),  h_Planck * c_light / (370. * nm),
+    h_Planck * c_light / (360. * nm),  h_Planck * c_light / (330. * nm),
+    h_Planck * c_light / (320. * nm),  h_Planck * c_light / (310. * nm),
+    h_Planck * c_light / (300. * nm),  h_Planck * c_light / (270. * nm),
+    h_Planck * c_light / (250. * nm),  h_Planck * c_light / (230. * nm),
+    h_Planck * c_light / (210. * nm),  h_Planck * c_light / (190. * nm),
+    h_Planck * c_light / (170. * nm),  h_Planck * c_light / (150. * nm)
+]
+
+# Absorption lengths in meters
+WLS_absLength = [
+    50. * nm,  50. * nm,  # 380 , 370 nm
+    30. * nm,  30. * nm,  # 360 , 330 nm
+    50. * nm,  80. * nm,  # 320 , 310 nm
+    100. * nm, 100. * nm, # 300 , 270 nm
+    400. * nm, 400. * nm, # 250 , 230 nm
+    350. * nm, 250. * nm, # 210 , 190 nm
+    350. * nm, 400. * nm  # 170 , 150 nm
+]
+
+
+WLS_abs_energy = [E*6.25*10**18 for E in WLS_abs_energy]
+WLS_absLength = [lamda for lamda in WLS_absLength]
+
+plt.plot(WLS_abs_energy, WLS_absLength)
+plt.xlabel('E [ev]')
+plt.ylabel('absorption legtn [um]')
+plt.show()
+
+# In[0.5]
+'''
+Quick TPB MC - simualtes how many photons continue to fiber vs how many
+exit back to the Xe
+'''
+
+starting_photons = 1000000
+TPB_WLS_eff = 0.53
+chance_to_not_scatter_off_TPB_surface = 1-0.19
+actual_gen_TPB_photons = int(starting_photons*TPB_WLS_eff*
+                             chance_to_not_scatter_off_TPB_surface)
+chance_to_enter = 0.27
+chance_to_escape = 0.099
+rand = random.uniform(0,1)
+entered = 0
+escaped = 0
+
+for i in range(actual_gen_TPB_photons):
+    solid_angle_rand = random.uniform(0,1)
+    forward_backwords_rand = random.randint(0,1) # 0 - to fiber, 1 - to Xe
+    in_TPB = True
+    
+    # entered fiber
+    if forward_backwords_rand==0 and 0<solid_angle_rand<chance_to_enter*2 and in_TPB:
+        entered += 1
+        in_TPB = False
+    if forward_backwords_rand==0 and solid_angle_rand>chance_to_enter*2 and in_TPB:
+        in_TPB = True
+        forward_backwords_rand=1 #flip direction
+    
+    if forward_backwords_rand==1 and solid_angle_rand>(1-chance_to_escape)*2 and in_TPB:
+        escaped += 1
+        in_TPB = False
+    if forward_backwords_rand==1 and solid_angle_rand<(1-chance_to_escape)*2 and in_TPB:
+        in_TPB = True
+        forward_backwords_rand=0 #flip direction
+        
+print(f'Entered = {entered}/{starting_photons}\nEscaped = {escaped}/{starting_photons}')
+
+
 
 
 

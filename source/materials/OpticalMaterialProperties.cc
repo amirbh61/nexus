@@ -700,7 +700,7 @@ namespace opticalprops {
 
 
 
-  /// Si ///
+  /// Si-Pure Silicon ///
   G4MaterialPropertiesTable* Si()
   {
     // properties taken from  https://www.pveducation.org/pvcdrom/materials/optical-properties-of-silicon

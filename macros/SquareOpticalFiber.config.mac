@@ -28,15 +28,15 @@
 
 
 #/Generator/SingleParticle/region ACTIVE
-#/Generator/SingleParticle/min_costheta 0
-#/Generator/SingleParticle/max_costheta 0.451
+#/Generator/SingleParticle/min_phi 0
+#/Generator/SingleParticle/max_phi 90
 /Generator/SingleParticle/min_costheta 0
 /Generator/SingleParticle/max_costheta 1
 
 
 ####  SETUP PARAMETERS  ####
 /nexus/random_seed 10002
-#/Geometry/SquareOpticalFiber/specific_vertex 0 0 -0.001 mm # face of fiber TPB, "AD_HOC"
+#/Geometry/SquareOpticalFiber/specific_vertex 0 0 -0.0001 mm # face of fiber TPB, "AD_HOC"
 #/Geometry/SquareOpticalFiber/specific_vertex 0 0 -0.0023 mm # z-value not relevant here in "LINE_SOURCE_EL" mode
 /Geometry/SquareOpticalFiber/specific_vertex 0 0 -0.0023 mm # face of fiber, "FACE_RANDOM_DIST"
 
