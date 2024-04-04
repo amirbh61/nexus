@@ -56,20 +56,10 @@ geometry_dirs = [os.path.join(path_to_dataset, d) for d in os.listdir(path_to_da
 # geant seed was set to 10002
 n_photons = 100000
 
-# New results 1.4.24, NO holder here
 vikuiti_ref = [95, 96, 97, 98, 99, 99.9] # % reflection, in geant optical materials file
-# SiPM_hits = [2361, 3162, 4339 ,6572  , 11174 ,24998 ] # Random XY in TPB center, z=-0.023
 SiPM_hits = [2475, 3241,  4366, 6828 , 11546 , 25786 ] # Random XY in TPB center z=-0.0023
 
-'''
-Older  WRONG results 31.3.24. In here I generated the photons at random xy on the center
-plane of the TPB. I should have generated them on the TPB face. I also allowed 
-a holder - there should be no holder.
-seed was 10002 and z=-0.0011 mm (in center plane of the TPB)
 
-vikuiti_ref = [96, 97, 98, 99, 99.9] # % reflection, in geant optical materials file
-SiPM_hits = [4001, 5547, 8437, 14145 , 31333] # Random XY in TPB center
-'''
 SiPM_hits = [x / n_photons for x in SiPM_hits]
 
 fig, ax = plt.subplots(1,figsize=(10,8),dpi=600)
@@ -97,18 +87,8 @@ plt.show()
 n_photons = 100000
 # DO NOT CHANGE !!
 
-# New results 1.4.24, NO holder here
 vikuiti_ref = [95, 96, 97, 98, 99, 99.9] # % reflection, in geant optical materials file
 SiPM_hits = [ 24721, 29228 , 34895 , 41901, 50794, 60509] # Random XY pn fiber face (inside)
-
-'''
-Older WRONG results 31.3.24. Here I accidently holder and TPB for 
-the fibers in geant4. there should be no  holder or TPB! 
-seed was 10002 and z=+0.001 mm (inside face of the fiber)
-
-vikuiti_ref = [96, 97, 98, 99, 99.9] # % reflection, in geant optical materials file
-SiPM_hits = [ 15142, 19944, 27350, 40016, 75690] # Random XY pn fiber face (inside)
-'''
 
 SiPM_hits = [x / n_photons for x in SiPM_hits]
 
@@ -135,7 +115,6 @@ plt.show()
 # geant seed was set to 10002
 
 n_photons = 100000
-# DO NOT CHANGE !!
 
 
 # New results 1.4.24, NO holder here
@@ -145,93 +124,66 @@ fiber_length = np.arange(5,105,5).tolist() # mm
 # fiber_length.insert(0,0.01) # no tpb gives 81641, with tpb gives 38322
 fiber_length.insert(0,1) # no tpb gives 61522, with tpb gives 31651
 
-# here z=-0.0023 mm
+# DO NOT CHANGE the following fixed values!!
+# here z=-0.0023 mm, tiny bit outside the TPB
 SiPM_hits_with_TPB = [ 31651, 24846, 20754, 17705, 15620, 14166, 12725 ,
              11763, 10581, 9785, 9295, 8435,
              7735, 7266, 6828, 6351, 6037, 5737,
              5281, 4913, 4660]
 
-# here z=-0.0001 mm
+# here z=-0.0001 mm, tiny bit outside the fiber
 SiPM_hits_without_TPB = [ 61522, 60057, 58224, 56775, 55260, 53510,  51941,
              50504, 49392, 48701, 46655, 45600,
              44078, 43071, 42013, 40846, 39746, 38652,
              37777, 36881, 35650]
 
-'''
-Older WRONG results 31.3.24. Here we used a holder and z=-0.0011 mm
-fiber_length = np.arange(10,105,5) # mm
-SiPM_hits = [25459, 21991, 19367, 17100, 15445,
-             14124, 12795, 11794, 11013, 10291,
-             9388, 8735, 8437, 7899, 7256, 6970,
-             6578, 6148, 5868]
-'''
 SiPM_hits_with_TPB = [x / n_photons for x in SiPM_hits_with_TPB]
 SiPM_hits_without_TPB = [x / n_photons for x in SiPM_hits_without_TPB]
 
 
-fig, ax = plt.subplots(1,figsize=(10,8),dpi=600)
+fig, ax1 = plt.subplots(figsize=(10, 8), dpi=600)
 fig.patch.set_facecolor('white')
-plt.plot(fiber_length, SiPM_hits_with_TPB, '-*m',linewidth=3,markersize=12,label='Fiber+TPB')
-plt.plot(fiber_length, SiPM_hits_without_TPB, '-*k',linewidth=3,markersize=12,label='Fiber only')
-plt.plot(fiber_length, np.divide(SiPM_hits_with_TPB,SiPM_hits_without_TPB),
-         '-*y',linewidth=3,markersize=12,label='Fiber+TPB / Fiber Ratio')
-text = ("100K photons facing forward per length" + \
-       "\nRandom XY generation on external face" + \
-       "\nFiber coating reflectivity set to 98%")
-plt.text(12, 0.615, text, bbox=dict(facecolor='magenta', alpha=0.5),
-          fontsize=14)
-plt.xlabel("Fiber length [mm]")
-plt.ylabel("Fraction of photons absorbed in SiPM")
-plt.xticks(np.arange(0,110,10))
-plt.legend(fontsize=12)
-# plt.yticks(np.arange(0,0.275,0.025))
-plt.grid()
-plt.gca().ticklabel_format(style='plain', useOffset=False)
-# fig.suptitle("Absorbed photons in SiPM vs fiber coating reflectivity")
-# save_path = r'/home/amir/Desktop/Sipm_hits_vs_coating_reflectivity_no_TPB.jpg'
-# plt.savefig(save_path, dpi=600)
+
+# Plotting on the primary y-axis
+ax1.plot(fiber_length, SiPM_hits_with_TPB, '-ok', linewidth=3, markersize=10, label='Fiber+TPB')
+ax1.plot(fiber_length, SiPM_hits_without_TPB, '--^k', linewidth=3, markersize=10, label='Fiber only')
+ax1.set_xlabel("Fiber length [mm]",fontsize=15)
+ax1.set_ylabel("Fraction of photons absorbed in SiPM",fontsize=15)
+ax1.tick_params(axis='y', labelcolor='black')
+
+# Adding the text box
+text = ("100K photons facing forward per length" +
+        "\nRandom XY generation on external face" +
+        "\nFiber coating reflectivity set to 98%")
+ax1.text(12, 0.615, text, bbox=dict(facecolor='magenta', alpha=0.5), fontsize=14)
+
+# Setting x and primary y-axis scales and labels
+ax1.set_xticks(np.arange(0, 110, 10))
+ax1.set_xlim([0,None])
+ax1.grid()
+ax1.ticklabel_format(style='plain', useOffset=False)
+
+# Creating a secondary y-axis
+ax2 = ax1.twinx()
+
+# Match the y-range and y-ticks of ax2 to ax1
+ax2.set_ylim(ax1.get_ylim())  # Set y-range of ax2 to match ax1
+ax2.set_yticks(ax1.get_yticks())  # Set y-ticks of ax2 to match ax1
+
+# Plotting the ratio on the secondary y-axis
+ax2.plot(fiber_length, np.divide(SiPM_hits_with_TPB, SiPM_hits_without_TPB), '-sr', linewidth=3, markersize=10, label='Fiber+TPB / Fiber Ratio')
+ax2.set_ylabel("Fiber+TPB / Fiber Ratio", color='red',fontsize=15)
+ax2.tick_params(axis='y', labelcolor='red')
+
+# Adding a legend that includes all plots
+lines, labels = ax1.get_legend_handles_labels()
+lines2, labels2 = ax2.get_legend_handles_labels()
+ax2.legend(lines + lines2, labels + labels2, fontsize=12)
+
 plt.show()
+
 
 # In[0.4]
-# TPB absorption 
-
-# Constants
-h_Planck = 6.62607015e-34  # Planck's constant in m^2 kg / s
-c_light = 299792458  # Speed of light in m / s
-nm = 1e-9  # Nanometer to meter conversion factor
-
-# Calculating energy values for each wavelength in Joules
-WLS_abs_energy = [
-    h_Planck * c_light / (380. * nm),  h_Planck * c_light / (370. * nm),
-    h_Planck * c_light / (360. * nm),  h_Planck * c_light / (330. * nm),
-    h_Planck * c_light / (320. * nm),  h_Planck * c_light / (310. * nm),
-    h_Planck * c_light / (300. * nm),  h_Planck * c_light / (270. * nm),
-    h_Planck * c_light / (250. * nm),  h_Planck * c_light / (230. * nm),
-    h_Planck * c_light / (210. * nm),  h_Planck * c_light / (190. * nm),
-    h_Planck * c_light / (170. * nm),  h_Planck * c_light / (150. * nm)
-]
-
-# Absorption lengths in meters
-WLS_absLength = [
-    50. * nm,  50. * nm,  # 380 , 370 nm
-    30. * nm,  30. * nm,  # 360 , 330 nm
-    50. * nm,  80. * nm,  # 320 , 310 nm
-    100. * nm, 100. * nm, # 300 , 270 nm
-    400. * nm, 400. * nm, # 250 , 230 nm
-    350. * nm, 250. * nm, # 210 , 190 nm
-    350. * nm, 400. * nm  # 170 , 150 nm
-]
-
-
-WLS_abs_energy = [E*6.25*10**18 for E in WLS_abs_energy]
-WLS_absLength = [lamda for lamda in WLS_absLength]
-
-plt.plot(WLS_abs_energy, WLS_absLength)
-plt.xlabel('E [ev]')
-plt.ylabel('absorption legtn [um]')
-plt.show()
-
-# In[0.5]
 '''
 Quick TPB MC - simualtes how many photons continue to fiber vs how many
 exit back to the Xe
