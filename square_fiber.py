@@ -18,15 +18,11 @@ pd.set_option('display.max_columns', None)
 pd.set_option('display.max_rows', 500)
 import glob
 import re
-from mpl_toolkits.axes_grid1 import make_axes_locatable
 from scipy import ndimage
-import time
 from scipy.signal           import fftconvolve
 from scipy.signal           import convolve
 # from invisible_cities.reco.deconv_functions     import richardson_lucy
-from scipy.interpolate import interp2d
 from scipy.interpolate import griddata
-from scipy.interpolate import RectBivariateSpline
 from scipy.signal import find_peaks, peak_widths
 from scipy.signal import butter, filtfilt, welch
 from scipy.ndimage import rotate
@@ -48,7 +44,7 @@ path_to_dataset = '/media/amir/Extreme Pro/SquareFiberDatabase'
 # List full paths of the Geant4_PSF_events folders inside SquareFiberDatabase
 geometry_dirs = [os.path.join(path_to_dataset, d) for d in os.listdir(path_to_dataset)
                  if os.path.isdir(os.path.join(path_to_dataset, d))]
-
+delta_r = '\u0394' + 'r'
 
 # In[0.2]
 ### Figure for Lior , with coating, with TPB ###
@@ -110,6 +106,44 @@ plt.gca().ticklabel_format(style='plain', useOffset=False)
 plt.show()
 
 # In[0.3]
+# plot both fiber and fiber+TPB on a single graph
+
+n_photons = 100000
+
+# no TPB data
+vikuiti_ref = [95, 96, 97, 98, 99, 99.9] # % reflection, in geant optical materials file
+SiPM_hits = [ 24721, 29228 , 34895 , 41901, 50794, 60509] # Random XY pn fiber face (inside)
+SiPM_hits_NO_TPB = [x / n_photons for x in SiPM_hits]
+
+# TPB data 
+SiPM_hits = [2475, 3241,  4366, 6828 , 11546 , 25786 ] # Random XY in TPB center z=-0.0023
+
+SiPM_hits_TPB = [x / n_photons for x in SiPM_hits]
+
+fig, ax = plt.subplots(1,figsize=(9,7),dpi=600)
+fig.patch.set_facecolor('white')
+ax.plot(vikuiti_ref, SiPM_hits_NO_TPB, '-*g',linewidth=3,markersize=12,label="Fiber only")
+ax.plot(vikuiti_ref, SiPM_hits_TPB, '-*r', linewidth=3,
+         markersize=12, label="fiber+TPB")
+
+text = ("100K photons facing forward per reflectivity\n" + \
+       "Random XY generation on external face")
+
+ax.text(95.1, 0.63, text, bbox=dict(facecolor='blue', alpha=0.5),
+        fontsize=15)
+ax.set_xlabel("Fiber Coating Reflectivity [%]",fontweight='bold')
+ax.set_ylabel("Fraction of photons absorbed in SiPM",fontweight='bold')
+ax.grid()
+ax.set_xlim(min(vikuiti_ref) - 0.1, max(vikuiti_ref) + 0.1)
+plt.gca().ticklabel_format(style='plain', useOffset=False)
+plt.legend(fontsize=13)
+# fig.suptitle("Absorbed WLS photons in SiPM vs fiber coating reflectivity")
+# save_path = r'/home/amir/Desktop/Sipm_hits_vs_coating_reflectivity_TPB.jpg'
+# plt.savefig(save_path, dpi=600)
+plt.show()
+
+
+# In[0.4]
 # How fiber length affects the light fraction detected , 98 % vikuiti reflectivity
 # 2.2 um TPB thickness
 # geant seed was set to 10002
@@ -147,8 +181,8 @@ fig.patch.set_facecolor('white')
 # Plotting on the primary y-axis
 ax1.plot(fiber_length, SiPM_hits_with_TPB, '-ok', linewidth=3, markersize=10, label='Fiber+TPB')
 ax1.plot(fiber_length, SiPM_hits_without_TPB, '--^k', linewidth=3, markersize=10, label='Fiber only')
-ax1.set_xlabel("Fiber length [mm]",fontsize=15)
-ax1.set_ylabel("Fraction of photons absorbed in SiPM",fontsize=15)
+ax1.set_xlabel("Fiber length [mm]",fontsize=15,fontweight='bold')
+ax1.set_ylabel("Fraction of photons absorbed in SiPM",fontsize=15,fontweight='bold')
 ax1.tick_params(axis='y', labelcolor='black')
 
 # Adding the text box
@@ -172,7 +206,7 @@ ax2.set_yticks(ax1.get_yticks())  # Set y-ticks of ax2 to match ax1
 
 # Plotting the ratio on the secondary y-axis
 ax2.plot(fiber_length, np.divide(SiPM_hits_with_TPB, SiPM_hits_without_TPB), '-sr', linewidth=3, markersize=10, label='Fiber+TPB / Fiber Ratio')
-ax2.set_ylabel("Fiber+TPB / Fiber Ratio", color='red',fontsize=15)
+ax2.set_ylabel("Fiber+TPB / Fiber Ratio", color='red',fontsize=15,fontweight='bold')
 ax2.tick_params(axis='y', labelcolor='red')
 
 # Adding a legend that includes all plots
@@ -181,47 +215,6 @@ lines2, labels2 = ax2.get_legend_handles_labels()
 ax2.legend(lines + lines2, labels + labels2, fontsize=12)
 
 plt.show()
-
-
-# In[0.4]
-'''
-Quick TPB MC - simualtes how many photons continue to fiber vs how many
-exit back to the Xe
-'''
-
-starting_photons = 1000000
-TPB_WLS_eff = 0.53
-chance_to_not_scatter_off_TPB_surface = 1-0.19
-actual_gen_TPB_photons = int(starting_photons*TPB_WLS_eff*
-                             chance_to_not_scatter_off_TPB_surface)
-chance_to_enter = 0.27
-chance_to_escape = 0.099
-rand = random.uniform(0,1)
-entered = 0
-escaped = 0
-
-for i in range(actual_gen_TPB_photons):
-    solid_angle_rand = random.uniform(0,1)
-    forward_backwords_rand = random.randint(0,1) # 0 - to fiber, 1 - to Xe
-    in_TPB = True
-    
-    # entered fiber
-    if forward_backwords_rand==0 and 0<solid_angle_rand<chance_to_enter*2 and in_TPB:
-        entered += 1
-        in_TPB = False
-    if forward_backwords_rand==0 and solid_angle_rand>chance_to_enter*2 and in_TPB:
-        in_TPB = True
-        forward_backwords_rand=1 #flip direction
-    
-    if forward_backwords_rand==1 and solid_angle_rand>(1-chance_to_escape)*2 and in_TPB:
-        escaped += 1
-        in_TPB = False
-    if forward_backwords_rand==1 and solid_angle_rand<(1-chance_to_escape)*2 and in_TPB:
-        in_TPB = True
-        forward_backwords_rand=0 #flip direction
-        
-print(f'Entered = {entered}/{starting_photons}\nEscaped = {escaped}/{starting_photons}')
-
 
 
 
@@ -1956,8 +1949,8 @@ for i, geo_dir in tqdm(enumerate(geometry_dirs)):
 xlim = 30
 plt.axhline(y=1,color='red',alpha=0.7)
 plt.xticks(np.arange(0,xlim),rotation=45, size=10)
-plt.xlabel('Distance [mm]')
-plt.ylabel('P2V')
+plt.xlabel('Distance [mm]', fontweight='bold')
+plt.ylabel('P2V', fontweight='bold')
 plt.ylim([-1,5])
 plt.xlim([0,xlim])
 plt.grid()
@@ -1965,8 +1958,6 @@ plt.legend(loc='upper left', bbox_to_anchor=(1, 1),
            title='Datasets', fontsize='small', ncol=1)
 # fig.suptitle(f'Fiber immersion = {immersion_choice}mm')
 plt.show()
-
-print(f'total geometries used: {count}')
 
 
 # In[9.1]
@@ -2013,6 +2004,7 @@ for dist in tqdm(dists):
             holder_thickness not in holder_thickness_choice):
             continue
         
+        dist = 24
         user_chosen_dir = find_subdirectory_by_distance(working_dir, dist)
         dir_data = glob.glob(user_chosen_dir + '/*.txt')[-1]
         _, P2V = np.loadtxt(dir_data)
@@ -2042,8 +2034,8 @@ for dist in tqdm(dists):
     #             marker='*',markersize=10, alpha=0.8,
     #             label=f"immersion={fiber_immersion_choice[1]}mm") 
     
-    plt.xlabel('Anode distance [mm]')
-    plt.ylabel('P2V')
+    plt.xlabel(f'Anode distance [mm]', fontweight='bold')
+    plt.ylabel('P2V', fontweight='bold')
     plt.grid()
     # plt.legend(loc='upper left',fontsize=10)
     
@@ -2055,7 +2047,7 @@ for dist in tqdm(dists):
              transform=plt.gca().transAxes,
              bbox=dict(facecolor='white', alpha=0.5,boxstyle='round,pad=0.3'),
              fontsize=13, weight='bold', linespacing=1.5)  # Adjust this value to increase spacing between lines, if necessary
-    fig.suptitle(f'Distance between two sources = {dist} mm',fontsize=15, fontweight='bold')
+    fig.suptitle(f'{delta_r} = {dist} [mm]',fontsize=15, fontweight='bold')
     fig.tight_layout()
     plt.show()
 
@@ -2100,15 +2092,15 @@ def custom_polyfit(sorted_dists, sorted_P2Vs, power=2):
 
 # Parameter choices to slice to - DO NOT CHANGE FOR CURRENT DATASET!
 fiber_immersion_choice = [3]
-pitch_choice = [15.6]
-el_gap_choice = [10]
-anode_distance_choice = [10]
+pitch_choice = [5,10,15.6]
+el_gap_choice = [1]
+anode_distance_choice = [2.5]
 holder_thickness_choice = [10]
 color = iter(['red', 'green', 'blue'])
 marker = iter(['^', '*', 's'])
 SHOW_ORIGINAL_SPACING = False
 if SHOW_ORIGINAL_SPACING is False:
-    custom_spacing = 3
+    custom_spacing = 2
 POLYNOMIAL_FIT = False
 
 fig, ax = plt.subplots(figsize=(10,7), dpi = 600)
@@ -2218,11 +2210,11 @@ for i, geo_dir in tqdm(enumerate(geometry_dirs)):
                     linewidth=3, markersize=10)
         
     
-plt.xlabel('Distance between two sources [mm]')
+plt.xlabel(f'{delta_r} [mm]')
 plt.ylabel('P2V')
 plt.grid()
-# plt.xlim([None,25])
-# plt.legend(loc='upper left',fontsize=14)
+plt.xlim([None,25])
+plt.legend(loc='upper left',fontsize=14)
 
 text = (f'EL gap={el_gap_choice[-1]} mm' +
          f'\nImmersion={fiber_immersion_choice[-1]} mm' +
@@ -2232,8 +2224,7 @@ if POLYNOMIAL_FIT:
     xloc, yloc = 0.14, 0.65
     
 else:
-    # xloc, yloc = 0.03, 0.79
-    xloc, yloc = 0.03, 0.96
+    xloc, yloc = 0.02, 0.79
     
 plt.text(xloc, yloc,  text, ha='left', va='top',
          transform=plt.gca().transAxes,
@@ -2307,7 +2298,7 @@ POLYNOMIAL_FIT = False
 fig, ax = plt.subplots(3,3,figsize=(10,7), sharex=True,sharey=True,dpi=600)
 fig.patch.set_facecolor('white')
 plt.subplots_adjust(left=0.1, right=0.9, top=0.9, bottom=0.1, wspace=0.1, hspace=0.1)
-fig.supxlabel('AB distance [mm]',fontsize=12,fontweight='bold')
+fig.supxlabel(f'{delta_r} [mm]',fontsize=12,fontweight='bold')
 fig.supylabel('P2V',fontweight='bold')
 
 for m,anode_dist in enumerate(anode_distance_choice):
@@ -2414,7 +2405,6 @@ fig.suptitle(f'Pitch = {pitch_choice[0]} mm',fontsize=18,fontweight='bold')
 fig.tight_layout()
 
 plt.show()
-print(f'total geometries used: {count}')
 
 # In[9.31]
 ### GRAPHS - Find optimal EL gap 1x1 ###  
@@ -2530,7 +2520,7 @@ for i, geo_dir in tqdm(enumerate(geometry_dirs)):
         
     
 
-plt.xlabel('AB distance [mm]')
+plt.xlabel(f'{delta_r} [mm]')
 plt.ylabel('P2V')
 plt.grid()
 plt.legend(loc='upper left',fontsize=13)
@@ -2551,7 +2541,6 @@ plt.text(xloc, yloc, text, ha='left', va='top',
 # fig.suptitle(title,size=15)
 fig.tight_layout()
 plt.show()
-print(f'total geometries used: {count}')
 
 
 # In[9.4]
@@ -2573,7 +2562,7 @@ POLYNOMIAL_FIT = False
 fig, ax = plt.subplots(3,2,figsize=(10,7), sharex=True,sharey=True,dpi=600)
 fig.patch.set_facecolor('white')
 plt.subplots_adjust(left=0.1, right=0.9, top=0.9, bottom=0.1, wspace=0.1, hspace=0.2)
-fig.supxlabel('AB distance [mm]',fontsize=12,fontweight='bold')
+fig.supxlabel(f'{delta_r} [mm]',fontsize=12,fontweight='bold')
 fig.supylabel('P2V',fontweight='bold')
 
 for m,anode_dist in enumerate(anode_distance_choice):
@@ -2686,7 +2675,6 @@ fig.legend(handles=[line1, line2, line3], labels=['Immersion=0 mm',
 fig.suptitle(f'Pitch = {pitch_choice[0]} mm',fontsize=18,fontweight='bold')
 fig.tight_layout()
 plt.show()
-print(f'total geometries used: {count}')
 
 # In[9.41]
 ### GRAPHS - Find optimal immersion 1x1 ###  
@@ -2799,7 +2787,7 @@ for i, geo_dir in tqdm(enumerate(geometry_dirs)):
                     linewidth=2, markersize=10)
         
     
-plt.xlabel('AB distance [mm]')
+plt.xlabel(f'{delta_r} [mm]')
 plt.ylabel('P2V')
 plt.grid()
 plt.legend(loc='upper left',fontsize=13)
@@ -2820,7 +2808,6 @@ plt.text(xloc, yloc, text, ha='left', va='top',
 # fig.suptitle(title,size=12)
 fig.tight_layout()
 plt.show()
-print(f'total geometries used: {count}')
 
 # In[9.5]
 ### GRAPHS - Find optimal anode distance 2x3 ###  
@@ -2841,7 +2828,7 @@ POLYNOMIAL_FIT = False
 fig, ax = plt.subplots(3,2,figsize=(10,7), sharex=True,sharey=True,dpi=600)
 fig.patch.set_facecolor('white')
 plt.subplots_adjust(left=0.1, right=0.9, top=0.9, bottom=0.1, wspace=0.1, hspace=0.2)
-fig.supxlabel('AB distance [mm]',fontsize=12,fontweight='bold')
+fig.supxlabel(f'{delta_r} [mm]',fontsize=12,fontweight='bold')
 fig.supylabel('P2V',fontweight='bold')
 
 for m,immersion in enumerate(fiber_immersion_choice):
@@ -2954,7 +2941,7 @@ fig.legend(handles=[line1, line2, line3], labels=['Anode dist=2.5 mm',
 fig.suptitle(f'Pitch = {pitch_choice[0]} mm',fontsize=18,fontweight='bold')
 fig.tight_layout()
 plt.show()
-print(f'total geometries used: {count}')
+
 
 # In[9.6]
 # Best geometry for each pitch 
@@ -3068,8 +3055,8 @@ for geo in best_geos:
                         linewidth=3, markersize=10)
         
     
-plt.xlabel('AB distance [mm]')
-plt.ylabel('P2V')
+plt.xlabel(f'{delta_r} [mm]',fontweight='bold')
+plt.ylabel('P2V',fontweight='bold')
 plt.grid()
 plt.legend(loc='upper left',fontsize=13)
 plt.ylim([0.99,None])
