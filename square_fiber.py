@@ -77,7 +77,10 @@ TO_GENERATE = True
 TO_SAVE = False
 print('Generating PSF plots')
 if TO_GENERATE:
-    for directory in tqdm(geometry_dirs):
+    for directory in tqdm(geometry_dirs[0]):
+        directory = ('/media/amir/Extreme Pro/SquareFiberDatabase/' +
+                    'ELGap=1mm_pitch=5mm_distanceFiberHolder=2mm_' +
+                    'distanceAnodeHolder=5mm_holderThickness=10mm')
         os.chdir(directory)
         print(r'Working on directory:'+f'\n{os.getcwd()}')
         PSF = np.load(r'PSF.npy')
@@ -91,67 +94,6 @@ if TO_GENERATE:
 '''
 Generate and save twin events dataset, after shifting, centering and rotation
 '''
-
-def find_highest_number(directory,file_format='.npy'):
-    '''
-    Finds the highest data sample number in a directory where files are
-    named in the format:
-    "intnumber_rotation_angle_rad=value.npy"
-    The idea is that if we are adding new data to existing data, then the 
-    numbering of oyr newly generated data should continue the existing numbering.
-
-    Parameters
-    ----------
-    directory : str
-        The directory of data to search in.
-
-    Returns
-    -------
-    highest_number : int
-        The number of the last data sample created.
-        If not found, returns -1.
-    '''
-    highest_number = -1
-
-    for entry in os.scandir(directory):
-        if entry.is_dir():
-            for file in os.scandir(entry.path):
-                if file.is_file() and file.name.endswith(file_format):
-                    try:
-                        # Extracting the number before the first underscore
-                        number = int(file.name.split('_')[0])
-                        highest_number = max(highest_number, number)
-                    except ValueError:
-                        # Handle cases where the conversion to int might fail
-                        continue
-
-    return highest_number
-
-
-def count_npy_files(directory):
-    '''
-    Counts all .npy files in the specified directory and its subdirectories.
-
-    Parameters
-    ----------
-    directory : str
-        The directory to search in.
-
-    Returns
-    -------
-    int
-        The number of .npy files found.
-    '''
-    npy_file_count = 0
-
-    # Walk through all directories and files in the specified directory
-    for root, dirs, files in os.walk(directory):
-        for file in files:
-            if file.endswith('.npy'):
-                npy_file_count += 1
-
-    return npy_file_count
-
 
 
 TO_GENERATE = False
@@ -620,15 +562,15 @@ if TO_SMOOTH_SIGNAL: # If True, only one option must be True - the other, False.
 
 
 if TO_GENERATE:
-    for geo_dir in tqdm(geometry_dirs):
+    for geo_dir in tqdm(geometry_dirs[0]):
         
         # geo_dir = ('/media/amir/Extreme Pro/SquareFiberDatabase/' +
         #             'ELGap=1mm_pitch=15.6mm_distanceFiberHolder=-1mm_' +
         #             'distanceAnodeHolder=2.5mm_holderThickness=10mm')
         
-        # geo_dir = ('/media/amir/Extreme Pro/SquareFiberDatabase/' +
-        #             'ELGap=1mm_pitch=5mm_distanceFiberHolder=2mm_' +
-        #             'distanceAnodeHolder=5mm_holderThickness=10mm')
+        geo_dir = ('/media/amir/Extreme Pro/SquareFiberDatabase/' +
+                    'ELGap=1mm_pitch=5mm_distanceFiberHolder=2mm_' +
+                    'distanceAnodeHolder=5mm_holderThickness=10mm')
 
         # grab geometry parameters for plot
         geo_params = geo_dir.split('/SquareFiberDatabase/')[-1]
@@ -657,8 +599,8 @@ if TO_GENERATE:
         dist_dirs = sorted(dist_dirs, key=extract_dir_number)
 
         # # option to choose a single distance and see P2V
-        # dist = 20
-        # user_chosen_dir = find_subdirectory_by_distance(working_dir, dist)
+        dist = 9
+        user_chosen_dir = find_subdirectory_by_distance(working_dir, dist)
         
         for dist_dir in dist_dirs:
             # print(dist_dir)
@@ -668,11 +610,11 @@ if TO_GENERATE:
             if match:
                 dist = float(match.group(1))
                 
-            # dist_dir = user_chosen_dir
-            # match = re.search(r'/(\d+(?:\.\d+)?)_mm$', dist_dir)
-            # if match:
-            #     dist = float(match.group(1))
-            # print(f'Working on:\n{dist_dir}')
+            dist_dir = user_chosen_dir
+            match = re.search(r'/(\d+(?:\.\d+)?)_mm$', dist_dir)
+            if match:
+                dist = float(match.group(1))
+            print(f'Working on:\n{dist_dir}')
             
             
             ## load deconv_stack+avg_cutoff_iter+avg_rel_diff_checkout ###
@@ -680,10 +622,6 @@ if TO_GENERATE:
             avg_cutoff_iter = float(np.genfromtxt(dist_dir + '/avg_cutoff_iter.txt'))
             avg_rel_diff_checkout = float(np.genfromtxt(dist_dir + '/avg_rel_diff_checkout.txt'))
 
-            # P2V deconv
-            # x_cm, y_cm = ndimage.measurements.center_of_mass(deconv_stack)
-            # x_cm, y_cm = int(x_cm), int(y_cm)
-            # deconv_stack_1d = deconv_stack[y_cm,:]
             deconv_stack_1d = deconv_stack.mean(axis=0)
         
             
@@ -758,9 +696,9 @@ if TO_GENERATE:
             # deconv
             deconv_stack = np.flip(deconv_stack)
             deconv_stack_1d = np.flip(deconv_stack_1d)
-            im = ax0.imshow(deconv_stack, extent=[-size/2, size/2, -size/2, size/2])
-            # im = ax0.imshow(deconv_stack[100:150,100:150],
-            #                 extent=[-25, 25, -25, 25])
+            # im = ax0.imshow(deconv_stack, extent=[-size/2, size/2, -size/2, size/2])
+            im = ax0.imshow(deconv_stack[100:150,100:150],
+                            extent=[-25, 25, -25, 25])
             divider = make_axes_locatable(ax0)
             cax = divider.append_axes("right", size="5%", pad=0.05)
             cbar = plt.colorbar(im, cax=cax)
@@ -771,14 +709,14 @@ if TO_GENERATE:
             formatter.set_powerlimits((-1, 1))  # You can adjust limits as needed
             cbar.ax.yaxis.set_major_formatter(formatter)
             
-            ax0.set_xlabel('x [mm]')
-            ax0.set_ylabel('y [mm]')
+            ax0.set_xlabel('x [mm]', fontsize=15)
+            ax0.set_ylabel('y [mm]', fontsize=15)
             ax0.set_title('Stacked RL deconvolution')
             # deconv profile
-            ax1.plot(np.arange(-size/2,size/2), deconv_stack_1d,
+            # ax1.plot(np.arange(-size/2,size/2), deconv_stack_1d,
+            #           linewidth=3,color='blue')
+            ax1.plot(np.arange(-25,25), deconv_stack_1d[100:150],
                       linewidth=3,color='blue')
-            # ax1.plot(np.arange(-25,25), deconv_stack_1d[100:150],
-            #          linewidth=3,color='blue')
             ax1.ticklabel_format(style='sci', axis='y',scilimits=(0,0))
             
             if TO_SMOOTH_SIGNAL:
@@ -786,8 +724,8 @@ if TO_GENERATE:
                           label='fitted signal',linewidth=3, color='black')
                 
             # ax1.plot([], [], ' ', label=legend)  # ' ' creates an invisible line
-            ax1.set_xlabel('x [mm]')
-            ax1.set_ylabel('photon hits')
+            ax1.set_xlabel('x [mm]', fontsize=15)
+            ax1.set_ylabel('photon hits', fontsize=15)
             ax1.set_title('Stacked RL deconvolution profile')
             ax1.grid()
             
@@ -810,7 +748,7 @@ if TO_GENERATE:
 
 
 
-            fig.suptitle(title,fontsize=16,fontweight='bold')
+            fig.suptitle(title,fontsize=15,fontweight='bold')
             fig.tight_layout()
             if TO_SAVE:
                 # save files and deconv image plot in correct folder #

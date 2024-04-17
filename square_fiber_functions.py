@@ -22,7 +22,10 @@ from scipy.signal           import convolve
 # from invisible_cities.reco.deconv_functions     import richardson_lucy
 from scipy.signal import find_peaks, peak_widths
 
-
+n_sipms = 25 # DO NOT CHANGE THIS VALUE
+n_sipms_per_side = (n_sipms-1)/2
+size = 250
+bins = size
 
 '''
 FUNCTIONS for square_fiber.py
@@ -258,26 +261,27 @@ def plot_sensor_response(event, bins, size, title='', noise=False):
 def plot_PSF(PSF,size=100):
     total_TPB_photon_hits = int(np.sum(PSF))
     
-    fig, (ax0, ax1) = plt.subplots(1, 2, figsize=(16.5,8), dpi=600)
+    fig, (ax0, ax1) = plt.subplots(1, 2, figsize=(15,7), dpi=600)
     fig.patch.set_facecolor('white')
     title = (f'{total_TPB_photon_hits}/100M TPB hits PSF, current geometry:' +
              f'\n{os.path.basename(os.getcwd())}')
-    fig.suptitle(title, fontsize=15)
+    # fig.suptitle(title, fontsize=15)
     im = ax0.imshow(PSF, extent=[-size/2, size/2, -size/2, size/2])
-    ax0.set_xlabel('x [mm]');
-    ax0.set_ylabel('y [mm]');
-    ax0.set_title('PSF image')
+    ax0.set_xlabel('x [mm]', fontsize=15);
+    ax0.set_ylabel('y [mm]', fontsize=15);
+    ax0.set_title('PSF image', fontsize=15, fontweight='bold')
     divider = make_axes_locatable(ax0)
     cax = divider.append_axes("right", size="5%", pad=0.05)
     plt.colorbar(im, cax=cax)
     
-    y = PSF[int(size/2),:]
+    # y = PSF[int(size/2),:]
+    y = PSF.mean(axis=0)
     peaks, _ = find_peaks(y)
     fwhm = np.max(peak_widths(y, peaks, rel_height=0.5)[0])
     ax1.plot(np.arange(-size/2,size/2,1), y, linewidth=2) #normalize
-    ax1.set_xlabel('mm')
-    ax1.set_ylabel('Charge')
-    ax1.set_title('Charge profile')
+    ax1.set_xlabel('x [mm]', fontsize=15)
+    ax1.set_ylabel('Charge', fontsize=15)
+    ax1.set_title('Charge profile', fontsize=15, fontweight='bold')
     ax1.grid(linewidth=1)
     fwhm_text = f"FWHM = {fwhm:.3f}"  # format to have 3 decimal places
     ax1.text(0.95, 0.95, fwhm_text, transform=ax1.transAxes, 
@@ -479,6 +483,66 @@ def extract_dir_number(dist_dir):
         return float(match.group(1))
     return 0  # Default to 0 if no number found
 
+
+def find_highest_number(directory,file_format='.npy'):
+    '''
+    Finds the highest data sample number in a directory where files are
+    named in the format:
+    "intnumber_rotation_angle_rad=value.npy"
+    The idea is that if we are adding new data to existing data, then the 
+    numbering of oyr newly generated data should continue the existing numbering.
+
+    Parameters
+    ----------
+    directory : str
+        The directory of data to search in.
+
+    Returns
+    -------
+    highest_number : int
+        The number of the last data sample created.
+        If not found, returns -1.
+    '''
+    highest_number = -1
+
+    for entry in os.scandir(directory):
+        if entry.is_dir():
+            for file in os.scandir(entry.path):
+                if file.is_file() and file.name.endswith(file_format):
+                    try:
+                        # Extracting the number before the first underscore
+                        number = int(file.name.split('_')[0])
+                        highest_number = max(highest_number, number)
+                    except ValueError:
+                        # Handle cases where the conversion to int might fail
+                        continue
+
+    return highest_number
+
+
+def count_npy_files(directory):
+    '''
+    Counts all .npy files in the specified directory and its subdirectories.
+
+    Parameters
+    ----------
+    directory : str
+        The directory to search in.
+
+    Returns
+    -------
+    int
+        The number of .npy files found.
+    '''
+    npy_file_count = 0
+
+    # Walk through all directories and files in the specified directory
+    for root, dirs, files in os.walk(directory):
+        for file in files:
+            if file.endswith('.npy'):
+                npy_file_count += 1
+
+    return npy_file_count
 
 # # tests for function assign_hit_to_SiPM
 # test_cases = [

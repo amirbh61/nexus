@@ -528,7 +528,7 @@ anode_distance_choice = [2.5]
 holder_thickness_choice = [10]
 color = iter(['red', 'green', 'blue'])
 marker = iter(['^', '*', 's'])
-SHOW_ORIGINAL_SPACING = True
+SHOW_ORIGINAL_SPACING = False
 if SHOW_ORIGINAL_SPACING is False:
     custom_spacing = 2
 POLYNOMIAL_FIT = False
@@ -640,8 +640,8 @@ for i, geo_dir in tqdm(enumerate(geometry_dirs)):
                     linewidth=3, markersize=10)
         
     
-plt.xlabel(f'{delta_r} [mm]')
-plt.ylabel('P2V')
+plt.xlabel(f'{delta_r} [mm]', fontsize=15)
+plt.ylabel('P2V', fontsize=15)
 plt.grid()
 plt.xlim([None,25])
 # plt.ylim([0.99,2.5])
@@ -716,7 +716,7 @@ def dists_and_P2Vs_custom_spacing(dir_data,spacing):
 # Parameter choices to slice to - DO NOT CHANGE FOR CURRENT DATASET!
 fiber_immersion_choice = [0,3,6]
 pitch_choice = [15.6]
-el_gap_choice = [10]
+el_gap_choice = [1,10]
 anode_distance_choice = [2.5,5,10]
 holder_thickness_choice = [10]
 x_left_lim = pitch_choice[0]-1 # manual option remove plot area where there's P2V of 1 
@@ -857,39 +857,38 @@ plt.show()
 
 min_sep_dist_list = np.reshape(min_sep_dist_list,[3,3])
 
-# Set up the plot
-fig, ax = plt.subplots()
-fig.patch.set_facecolor('white')
-# Display the array with no interpolation
-im = ax.imshow(min_sep_dist_list, interpolation='none',cmap='viridis')
-# Set custom ticks
-fig.suptitle(f"{delta_r} of earliest spatial separation\n" +\
-             f"Pitch={pitch_choice[0]} mm, EL gap={el_gap_choice[0]} mm",
-             fontsize=13, fontweight='bold')
-ax.set_xlabel("Fiber immersion [mm]",fontweight='bold')
-ax.set_ylabel("Anode distance [mm]",fontweight='bold')
-ax.set_xticks([0, 1, 2])
-ax.set_yticks([0, 1, 2])
-ax.set_xticklabels(['0', '3', '6'])
-ax.set_yticklabels(['2.5', '5', '10'])
+# # Plot delta r for initial separation 3x3 matrix
+# fig, ax = plt.subplots()
+# fig.patch.set_facecolor('white')
+# # Display the array with no interpolation
+# im = ax.imshow(min_sep_dist_list, interpolation='none',cmap='viridis')
 
-# Annotate each cell with the numeric value
-for i in range(min_sep_dist_list.shape[0]):
-    for j in range(min_sep_dist_list.shape[1]):
-        if min_sep_dist_list[i, j] == 0:
-            ax.text(j, i, 'No separation', ha='center', va='center', color='r',
-                    fontsize=12,fontweight='bold')
-        else:
-            ax.text(j, i, f'{min_sep_dist_list[i, j]:.1f}', ha='center', va='center',
-                    color='k',fontsize=15,fontweight='bold')
+# fig.suptitle(f"{delta_r} of earliest spatial separation\n" +\
+#              f"Pitch={pitch_choice[0]} mm, EL gap={el_gap_choice[0]} mm",
+#              fontsize=13, fontweight='bold')
+# ax.set_xlabel("Fiber immersion [mm]",fontweight='bold')
+# ax.set_ylabel("Anode distance [mm]",fontweight='bold')
+# ax.set_xticks([0, 1, 2])
+# ax.set_yticks([0, 1, 2])
+# ax.set_xticklabels(['0', '3', '6'])
+# ax.set_yticklabels(['2.5', '5', '10'])
 
-# Add a colorbar to show the color scale
-divider = make_axes_locatable(ax)
-cax = divider.append_axes("right", size="5%", pad=0.05)
-plt.colorbar(im, cax=cax)
+# # Annotate each cell with the numeric value
+# for i in range(min_sep_dist_list.shape[0]):
+#     for j in range(min_sep_dist_list.shape[1]):
+#         if min_sep_dist_list[i, j] == 0:
+#             ax.text(j, i, 'No separation', ha='center', va='center', color='r',
+#                     fontsize=12,fontweight='bold')
+#         else:
+#             ax.text(j, i, f'{min_sep_dist_list[i, j]:.1f}', ha='center', va='center',
+#                     color='k',fontsize=15,fontweight='bold')
 
-# Show the plot
-plt.show()
+# divider = make_axes_locatable(ax)
+# cax = divider.append_axes("right", size="5%", pad=0.05)
+# plt.colorbar(im, cax=cax)
+
+# # Show the plot
+# plt.show()
 
 
 # In[4.1]
@@ -1442,8 +1441,9 @@ best_geos = [best_geo_pitch_5, best_geo_pitch_10, best_geo_pitch_15]
 holder_thickness_choice = [10]
 
 
-color = iter(['red', 'green', 'blue'])
-marker = iter(['^', '*', 's'])
+
+color = iter(['blue', 'red', 'green'])
+marker = iter(['s', '^', '*'])
 SHOW_ORIGINAL_SPACING = False
 if SHOW_ORIGINAL_SPACING is False:
     custom_spacing = 2
@@ -1544,31 +1544,31 @@ for geo in best_geos:
                         linewidth=3, markersize=10)
         
     
-plt.xlabel(f'{delta_r} [mm]',fontweight='bold')
-plt.ylabel('P2V',fontweight='bold')
+plt.xlabel(f'{delta_r} [mm]',fontsize=15)
+plt.ylabel('P2V',fontsize=15)
 plt.grid()
 plt.legend(loc='upper left',fontsize=13)
 plt.ylim([0.99,None])
 pitch_5_text = (f"EL gap={best_geo_pitch_5['EL'][-1]} mm" +
          f"\nImmersion={best_geo_pitch_5['immersion'][-1]} mm" +
          f"\nAnode distance={best_geo_pitch_5['anode_dist'][-1]} mm")
-plt.text(11, 2.67, pitch_5_text, ha='left', va='top',
+plt.text(9.5, 2.5, pitch_5_text, ha='left', va='top',
          bbox=dict(facecolor='white', alpha=0.5,boxstyle='round,pad=0.5'),
-         fontsize=10, weight='bold', color='red', linespacing=1.5)
+         fontsize=10, weight='bold', color='blue', linespacing=1.5)
 
 pitch_10_text = (f"EL gap={best_geo_pitch_10['EL'][-1]} mm" +
          f"\nImmersion={best_geo_pitch_10['immersion'][-1]} mm" +
          f"\nAnode distance={best_geo_pitch_10['anode_dist'][-1]} mm")
-plt.text(14.5, 2.2, pitch_10_text, ha='left', va='top',
+plt.text(18, 3, pitch_10_text, ha='left', va='top',
          bbox=dict(facecolor='white', alpha=0.5,boxstyle='round,pad=0.5'),
-         fontsize=10, weight='bold', color='green', linespacing=1.5)  # Adjust this value to increase spacing between lines, if necessary
+         fontsize=10, weight='bold', color='red', linespacing=1.5)  # Adjust this value to increase spacing between lines, if necessary
 
 pitch_15_text = (f"EL gap={best_geo_pitch_15['EL'][-1]} mm" +
          f"\nImmersion={best_geo_pitch_15['immersion'][-1]} mm" +
          f"\nAnode distance={best_geo_pitch_15['anode_dist'][-1]} mm")
 plt.text(25, 1.6, pitch_15_text, ha='left', va='top',
          bbox=dict(facecolor='white', alpha=0.5,boxstyle='round,pad=0.5'),
-         fontsize=10, weight='bold', color='blue', linespacing=1.5)  # Adjust this value to increase spacing between lines, if necessary
+         fontsize=10, weight='bold', color='green', linespacing=1.5)  # Adjust this value to increase spacing between lines, if necessary
 
 
 # fig.suptitle(title,size=12)
