@@ -14,7 +14,7 @@ plots for square_fiber.py
 import os
 import pandas as pd
 import numpy as np
-
+import matplotlib
 from matplotlib import pyplot as plt
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 plt.style.use('classic')
@@ -225,18 +225,186 @@ ax2.legend(lines + lines2, labels + labels2, fontsize=12)
 
 plt.show()
 
+
 # In[1]
+### PSF comparison plots ###
+
+# profile plots, select comparison test
+immersion_test = False
+anode_distance_test = False
+EL_gap_test = True
+
+if immersion_test:
+    fiber_immersion_choice = [0,3,6]
+    pitch_choice = [10]
+    el_gap_choice = [1]
+    anode_distance_choice = [2.5]
+    holder_thickness_choice = [10]
+    color = iter(['red', 'green', 'blue'])
+    marker = iter(['^', '*', 's'])
+    
+if anode_distance_test:
+    fiber_immersion_choice = [0]
+    pitch_choice = [10]
+    el_gap_choice = [1]
+    anode_distance_choice = [2.5,5,10]
+    holder_thickness_choice = [10]
+    color = iter(['red', 'green', 'blue'])
+    marker = iter(['^', '*', 's'])
+
+if EL_gap_test:
+    fiber_immersion_choice = [3]
+    pitch_choice = [5]
+    el_gap_choice = [1,10]
+    anode_distance_choice = [2.5]
+    holder_thickness_choice = [10]
+    color = iter(['red', 'green'])
+    marker = iter(['^', '*'])
+
+
+fig, ax = plt.subplots(figsize=(9,7), dpi = 600)
+fig.patch.set_facecolor('white')
+
+for directory in tqdm(geometry_dirs):
+    
+    geo_params = directory.split('/SquareFiberDatabase/')[-1]
+    
+    
+    el_gap = float(re.search(r"ELGap=(-?\d+\.?\d*)mm",
+                             geo_params).group(1))
+    pitch = float(re.search(r"pitch=(-?\d+\.?\d*)mm",
+                            geo_params).group(1))
+    anode_distance = float(re.search(r"distanceAnodeHolder=(-?\d+\.?\d*)mm",
+                                     geo_params).group(1))
+    holder_thickness = float(re.search(r"holderThickness=(-?\d+\.?\d*)mm",
+                                       geo_params).group(1))
+    fiber_immersion = float(re.search(r"distanceFiberHolder=(-?\d+\.?\d*)mm",
+                                      geo_params).group(1))
+    fiber_immersion = 5 - fiber_immersion
+
+    if (el_gap not in el_gap_choice or
+        pitch not in pitch_choice or
+        anode_distance not in anode_distance_choice or
+        fiber_immersion not in fiber_immersion_choice or
+        holder_thickness not in holder_thickness_choice):
+        # print(i)
+        continue
+    
+    PSF = np.load(directory + '/PSF.npy')
+    psf_profile = PSF.mean(axis=0)
+    x_vec = np.arange(-PSF.shape[0]/2, PSF.shape[0]/2)+0.5 # shift to bin center
+    if immersion_test:
+        label = f'Fiber immersion={int(fiber_immersion)} mm'
+        
+        text = (f'Pitch={pitch_choice[-1]} mm' +
+                f'\nEL gap={el_gap_choice[-1]} mm' +
+                f'\nAnode distance={anode_distance_choice[-1]} mm')
+        
+        ax.text(0.03, 0.97, text, ha='left', va='top',
+                 transform=plt.gca().transAxes,
+                 bbox=dict(facecolor='white', alpha=0.5,
+                           boxstyle='round,pad=0.3'),
+                 fontsize=12, weight='bold', linespacing=1.5)
+        
+    if anode_distance_test:
+        label = f'Anode distance={anode_distance} mm'
+        
+        text = (f'Pitch={pitch_choice[-1]} mm' +
+                f'\nEL gap={el_gap_choice[-1]} mm' +
+                f'\nFiber immersion={fiber_immersion_choice[-1]} mm')
+        
+        ax.text(0.03, 0.97, text, ha='left', va='top',
+                 transform=plt.gca().transAxes,
+                 bbox=dict(facecolor='white', alpha=0.5,
+                           boxstyle='round,pad=0.3'),
+                 fontsize=12, weight='bold', linespacing=1.5)
+        
+    if EL_gap_test:
+        label = f'EL gap={int(el_gap)} mm'
+        
+        text = (f'Pitch={pitch_choice[-1]} mm' +
+                f'\nFiber immersion={fiber_immersion_choice[-1]} mm' +
+                f'\nAnode distance={anode_distance_choice[-1]} mm')
+        
+        ax.text(0.03, 0.97, text, ha='left', va='top',
+                 transform=plt.gca().transAxes,
+                 bbox=dict(facecolor='white', alpha=0.5,
+                           boxstyle='round,pad=0.3'),
+                 fontsize=12, weight='bold', linespacing=1.5)
+        
+    ax.plot(x_vec, psf_profile, color=next(color), ls='-', 
+            alpha=0.7, label=label, linewidth=3, markersize=7)
+
+
+plt.xlabel('x [mm]', fontweight='bold')
+plt.ylabel('Intensity', fontweight='bold')
+# plt.xlim([0,30])
+plt.grid()
+ax.ticklabel_format(axis='y', style='scientific', scilimits=(0,0))
+plt.legend(loc='upper right',fontsize=12)
+fig.suptitle(f'PSF profiles',fontsize=15, fontweight='bold')
+plt.show()
+
+# In[1.1]
+# PSF image plots - show square PSF
+geo_dir_1 = ('/media/amir/Extreme Pro/SquareFiberDatabase/' +
+            'ELGap=1mm_pitch=5mm_distanceFiberHolder=5mm_' +
+            'distanceAnodeHolder=2.5mm_holderThickness=10mm')
+
+geo_dir_2 = ('/media/amir/Extreme Pro/SquareFiberDatabase/' +
+            'ELGap=1mm_pitch=5mm_distanceFiberHolder=2mm_' +
+            'distanceAnodeHolder=2.5mm_holderThickness=10mm')
+
+geo_dir_3 = ('/media/amir/Extreme Pro/SquareFiberDatabase/' +
+            'ELGap=1mm_pitch=5mm_distanceFiberHolder=-1mm_' +
+            'distanceAnodeHolder=2.5mm_holderThickness=10mm')
+
+geo_dirs = [geo_dir_1,geo_dir_2,geo_dir_3]
+
+fig, ax = plt.subplots(1,3, figsize=(23,8), dpi = 600)
+fig.patch.set_facecolor('white')
+
+for i,geo_dir in enumerate(geo_dirs):
+    
+    geo_params = geo_dir.split('/SquareFiberDatabase/')[-1]
+    
+    fiber_immersion = float(re.search(r"distanceFiberHolder=(-?\d+\.?\d*)mm",
+                                      geo_params).group(1))
+    fiber_immersion = 5 - fiber_immersion
+    
+    PSF = np.load(geo_dir + '/PSF.npy')
+    PSF = PSF[25:75,25:75]
+    PSF_size = PSF.shape[0] / 2
+    
+    title = f'Immersion = {int(fiber_immersion)} mm'
+    im = ax[i].imshow(PSF, extent=[-PSF_size,PSF_size,-PSF_size,PSF_size])
+    
+    divider = make_axes_locatable(ax[i])
+    cax = divider.append_axes("right", size="5%", pad=0.05)
+    cbar = plt.colorbar(im, cax=cax)
+    
+    # Format colorbar tick labels in scientific notation
+    formatter = matplotlib.ticker.ScalarFormatter(useMathText=True)
+    formatter.set_scientific(True)
+    formatter.set_powerlimits((-1, 1))
+    cbar.ax.yaxis.set_major_formatter(formatter)
+    
+    ax[i].set_xlabel('x [mm]', fontsize=18)
+    ax[i].set_ylabel('y [mm]', fontsize=18)
+    ax[i].set_title(title, fontsize=20, fontweight='bold')
+
+title = ('Geometry parameters: pitch = 5 mm, EL gap = 1 mm, anode distance = 2.5 mm')
+fig.suptitle(title,fontsize=25, fontweight='bold')
+fig.tight_layout()
+plt.show()
+
+# In[2]
 ### GRAPHS - compare P2Vs of different geometries ###
-
-
 
 import matplotlib.cm as cm
 # Number of unique colors needed
 num_colors = len(geometry_dirs)
 
-# Create a colormap
-# 'viridis', 'plasma', 'inferno', 'magma', 'cividis' are good choices for distinct colors
-# You can also use 'tab20', 'tab20b', or 'tab20c' for categorical colors
 cmap = cm.get_cmap('hsv', num_colors)
 
 # Generate colors from the colormap
@@ -256,13 +424,6 @@ if SHOW_ORIGINAL_SPACING is False:
     custom_spacing = 4
 POLYNOMIAL_FIT = False
 
-
-# # best
-# fiber_immersion_choice = [3]
-# pitch_choice = [15.6]
-# el_gap_choice = [10]
-# anode_distance_choice = [10]
-# holder_thickness_choice = [10]
 
 fig, ax = plt.subplots(figsize=(10,7), dpi = 600)
 
@@ -481,7 +642,6 @@ for dist in tqdm(dists):
     fig.tight_layout()
     plt.show()
 
-
 # In[3]
 ### GRAPHS - Find optimal pitch ###  
 
@@ -528,6 +688,7 @@ anode_distance_choice = [2.5]
 holder_thickness_choice = [10]
 color = iter(['red', 'green', 'blue'])
 marker = iter(['^', '*', 's'])
+
 SHOW_ORIGINAL_SPACING = False
 if SHOW_ORIGINAL_SPACING is False:
     custom_spacing = 2

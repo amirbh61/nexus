@@ -569,8 +569,8 @@ if TO_GENERATE:
         #             'distanceAnodeHolder=2.5mm_holderThickness=10mm')
         
         geo_dir = ('/media/amir/Extreme Pro/SquareFiberDatabase/' +
-                    'ELGap=1mm_pitch=5mm_distanceFiberHolder=2mm_' +
-                    'distanceAnodeHolder=5mm_holderThickness=10mm')
+                    'ELGap=10mm_pitch=15.6mm_distanceFiberHolder=2mm_' +
+                    'distanceAnodeHolder=10mm_holderThickness=10mm')
 
         # grab geometry parameters for plot
         geo_params = geo_dir.split('/SquareFiberDatabase/')[-1]
@@ -599,7 +599,7 @@ if TO_GENERATE:
         dist_dirs = sorted(dist_dirs, key=extract_dir_number)
 
         # # option to choose a single distance and see P2V
-        dist = 9
+        dist = 16
         user_chosen_dir = find_subdirectory_by_distance(working_dir, dist)
         
         for dist_dir in dist_dirs:
