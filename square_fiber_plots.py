@@ -232,7 +232,9 @@ plt.show()
 # profile plots, select comparison test
 immersion_test = False
 anode_distance_test = False
-EL_gap_test = True
+EL_gap_test = False
+pitch_test = True
+
 
 if immersion_test:
     fiber_immersion_choice = [0,3,6]
@@ -260,6 +262,15 @@ if EL_gap_test:
     holder_thickness_choice = [10]
     color = iter(['red', 'green'])
     marker = iter(['^', '*'])
+    
+if pitch_test:
+    fiber_immersion_choice = [6]
+    pitch_choice = [5,10,15.6]
+    el_gap_choice = [1]
+    anode_distance_choice = [2.5]
+    holder_thickness_choice = [10]
+    color = iter(['red', 'green', 'blue'])
+    marker = iter(['^', '*', 's'])
 
 
 psf_profiles = []
@@ -368,6 +379,19 @@ for directory in tqdm(geometry_dirs):
                            boxstyle='round,pad=0.3'),
                  fontsize=12, weight='bold', linespacing=1.5)
         
+    if pitch_test:
+        label = f'pitch={int(pitch)} mm'
+        
+        text = (f'EL gap={el_gap_choice[-1]} mm' +
+                f'\nFiber immersion={fiber_immersion_choice[-1]} mm' +
+                f'\nAnode distance={anode_distance_choice[-1]} mm')
+        
+        ax.text(0.03, 0.97, text, ha='left', va='top',
+                 transform=plt.gca().transAxes,
+                 bbox=dict(facecolor='white', alpha=0.5,
+                           boxstyle='round,pad=0.3'),
+                 fontsize=12, weight='bold', linespacing=1.5)
+        
     ax.plot(x_vec, normalized_profile, color=next(color), ls='-', 
             alpha=0.7, label=label, linewidth=3, markersize=7)
 
@@ -383,21 +407,25 @@ plt.show()
 
 # In[1.1]
 # PSF image plots - show square PSF
+pitch = 5
+el_gap = 1
+anode_distance = 2.5
+
 geo_dir_1 = ('/media/amir/Extreme Pro/SquareFiberDatabase/' +
-            'ELGap=1mm_pitch=5mm_distanceFiberHolder=5mm_' +
-            'distanceAnodeHolder=2.5mm_holderThickness=10mm')
+            f'ELGap={el_gap}mm_pitch={pitch}mm_distanceFiberHolder=5mm_' +
+            f'distanceAnodeHolder={anode_distance}mm_holderThickness=10mm')
 
 geo_dir_2 = ('/media/amir/Extreme Pro/SquareFiberDatabase/' +
-            'ELGap=1mm_pitch=5mm_distanceFiberHolder=2mm_' +
-            'distanceAnodeHolder=2.5mm_holderThickness=10mm')
+            f'ELGap={el_gap}mm_pitch={pitch}mm_distanceFiberHolder=2mm_' +
+            f'distanceAnodeHolder={anode_distance}mm_holderThickness=10mm')
 
 geo_dir_3 = ('/media/amir/Extreme Pro/SquareFiberDatabase/' +
-            'ELGap=1mm_pitch=5mm_distanceFiberHolder=-1mm_' +
-            'distanceAnodeHolder=2.5mm_holderThickness=10mm')
+            f'ELGap={el_gap}mm_pitch={pitch}mm_distanceFiberHolder=-1mm_' +
+            f'distanceAnodeHolder={anode_distance}mm_holderThickness=10mm')
 
 geo_dirs = [geo_dir_1,geo_dir_2,geo_dir_3]
 
-fig, ax = plt.subplots(1,3, figsize=(18,6), dpi = 600)
+fig, ax = plt.subplots(1,3, figsize=(18,6), dpi = 200)
 fig.patch.set_facecolor('white')
 
 for i,geo_dir in enumerate(geo_dirs):
@@ -409,14 +437,19 @@ for i,geo_dir in enumerate(geo_dirs):
     fiber_immersion = 5 - fiber_immersion
     
     PSF = np.load(geo_dir + '/PSF.npy')
+    PSF_sum = np.sum(PSF)
     PSF = PSF[25:75,25:75]
     PSF_size = PSF.shape[0] / 2
     
     title = f'Immersion = {int(fiber_immersion)} mm'
-    im = ax[i].imshow(PSF, extent=[-PSF_size,PSF_size,-PSF_size,PSF_size])
+    im = ax[i].imshow(PSF, extent=[-PSF_size,PSF_size,-PSF_size,PSF_size]
+                      ,vmin = 5, vmax=485969.0)
     
     divider = make_axes_locatable(ax[i])
     cax = divider.append_axes("right", size="5%", pad=0.05)
+    cbar_min = np.min(PSF)
+    cbar_max = np.max(PSF)
+    print(f'cbar_min = {cbar_min}, cbar_max = {cbar_max}')
     cbar = plt.colorbar(im, cax=cax)
     
     # Format colorbar tick labels in scientific notation
@@ -428,25 +461,28 @@ for i,geo_dir in enumerate(geo_dirs):
     ax[i].set_xlabel('x [mm]', fontsize=17)
     ax[i].set_ylabel('y [mm]', fontsize=17)
     ax[i].set_title(title, fontsize=18, fontweight='bold')
+    # print(f'PSF sum for immersion={int(fiber_immersion)} mm is {int(PSF_sum)}')
+    
 
-title = ('Geometry parameters: pitch = 5 mm, EL gap = 1 mm, anode distance = 2.5 mm')
+title = (f'Geometry parameters: pitch = {pitch} mm, EL gap = {el_gap} mm,' +
+         f'anode distance = {anode_distance} mm')
 fig.suptitle(title,fontsize=22, fontweight='bold')
 fig.tight_layout()
 plt.show()
 
 
+## absorption length for Silicon
+# E =  [1.5498 ,  1.937 ,   2.479 , 
+#   3.099 ,   3.874,   4.959]   
 
-E =  [1.5498 ,  1.937 ,   2.479 , 
-  3.099 ,   3.874,   4.959]   
-
-abs_length = [11.764,   3.289,   0.9,
-  0.105,     0.0078125,     0.00543]
-plt.plot(E,abs_length)
-plt.yticks(np.arange(0,12,0.5))
-plt.axvline(2.883,color='red')
-plt.xlabel('E [ev]')
-plt.ylabel('abs length [um]')
-plt.show()
+# abs_length = [11.764,   3.289,   0.9,
+#   0.105,     0.0078125,     0.00543]
+# plt.plot(E,abs_length)
+# plt.yticks(np.arange(0,12,0.5))
+# plt.axvline(2.883,color='red')
+# plt.xlabel('E [ev]')
+# plt.ylabel('abs length [um]')
+# plt.show()
 
 
 # In[2]

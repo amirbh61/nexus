@@ -312,6 +312,8 @@ if TO_GENERATE:
                 dist = float(match.group(1))
             dist_dir = user_chosen_dir
             print(f'\nWorking on:\n{dist_dir}')
+                        
+                
             deconv_stack = np.zeros((size,size))
             cutoff_iter_list = []
             rel_diff_checkout_list = []
@@ -380,8 +382,8 @@ if TO_GENERATE:
                 
                 if TO_PLOT_EACH_STEP:
                     
-                    # size = 50
-                    # bins = size
+                    size = 50
+                    bins = size
                     
                     ## Plot stages of deconv aggregation ##
                     
@@ -395,14 +397,24 @@ if TO_GENERATE:
                     formatter.set_powerlimits((-1, 1))  # You can adjust limits as needed
                     
                     # SR combined event
+                    
                     im = ax[0,0].imshow(hist.T[100:150,100:150],interpolation='nearest',
                                         extent=[-size/2, size/2, -size/2, size/2],
                                         vmin=0, origin='lower')
+                    
+                    # option to set zero values as different color
+                    # bla = hist.T[100:150,100:150]
+                    # bla[bla==0] = np.nan
+                    # im = ax[0,0].imshow(bla,interpolation='nearest',
+                    #                     extent=[-size/2, size/2, -size/2, size/2],
+                    #                     vmin=0, origin='lower')
+                    
+                                        
                     divider = make_axes_locatable(ax[0,0])
                     cax = divider.append_axes("right", size="5%", pad=0.05)
                     cbar = plt.colorbar(im, cax=cax, label='Photon hits')
                     cbar.ax.yaxis.set_major_formatter(formatter)
-                    ax[0,0].set_title("Tracking plane's' response",fontsize=13,fontweight='bold')
+                    ax[0,0].set_title("Tracking plane response",fontsize=13,fontweight='bold')
                     ax[0,0].set_xlabel('x [mm]',fontsize=15)
                     ax[0,0].set_ylabel('y [mm]',fontsize=15)
                     
@@ -456,8 +468,8 @@ if TO_GENERATE:
                     # plt.ylabel('y [mm]')
                     # plt.show()
                     
-                    # size = 250
-                    # bins = size
+                    size = 250
+                    bins = size
                     
             # # Optional: show the averaged deconv, added after talk to Gonzalo
             # deconv_stack = deconv_stack/len(event_files)
