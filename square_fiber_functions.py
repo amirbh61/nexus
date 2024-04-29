@@ -10,6 +10,7 @@ import os
 import pandas as pd
 import numpy as np
 from matplotlib import pyplot as plt
+from matplotlib import ticker
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 plt.style.use('classic')
 pd.set_option('display.max_columns', None)
@@ -267,21 +268,29 @@ def plot_PSF(PSF,size=100):
              f'\n{os.path.basename(os.getcwd())}')
     # fig.suptitle(title, fontsize=15)
     im = ax0.imshow(PSF, extent=[-size/2, size/2, -size/2, size/2])
-    ax0.set_xlabel('x [mm]', fontsize=15);
-    ax0.set_ylabel('y [mm]', fontsize=15);
+    ax0.set_xlabel('x [mm]', fontsize=18);
+    ax0.set_ylabel('y [mm]', fontsize=18);
     ax0.set_title('PSF image', fontsize=15, fontweight='bold')
+
     divider = make_axes_locatable(ax0)
     cax = divider.append_axes("right", size="5%", pad=0.05)
-    plt.colorbar(im, cax=cax)
+    cbar = plt.colorbar(im, cax=cax)
     
-    # y = PSF[int(size/2),:]
+    # Format colorbar tick labels in scientific notation
+    formatter = ticker.ScalarFormatter(useMathText=True)
+    formatter.set_scientific(True)
+    formatter.set_powerlimits((-1, 1))  # You can adjust limits as needed
+    cbar.ax.yaxis.set_major_formatter(formatter)
+    
     y = PSF.mean(axis=0)
     peaks, _ = find_peaks(y)
     fwhm = np.max(peak_widths(y, peaks, rel_height=0.5)[0])
     ax1.plot(np.arange(-size/2,size/2,1), y, linewidth=2) #normalize
-    ax1.set_xlabel('x [mm]', fontsize=15)
-    ax1.set_ylabel('Charge', fontsize=15)
-    ax1.set_title('Charge profile', fontsize=15, fontweight='bold')
+    ax1.set_xlabel('x [mm]', fontsize=18)
+    ax1.set_ylabel('Photon hits', fontsize=18)
+    ax1.set_title('PSF profile', fontsize=15, fontweight='bold')
+    ax1.ticklabel_format(style='sci', axis='y', scilimits=(0,0))
+                    
     ax1.grid(linewidth=1)
     fwhm_text = f"FWHM = {fwhm:.3f}"  # format to have 3 decimal places
     ax1.text(0.95, 0.95, fwhm_text, transform=ax1.transAxes, 

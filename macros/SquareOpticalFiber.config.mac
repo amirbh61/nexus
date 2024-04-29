@@ -36,14 +36,20 @@
 
 ####  SETUP PARAMETERS  ####
 /nexus/random_seed 10002
-#/Geometry/SquareOpticalFiber/specific_vertex 0 0 -0.0001 mm # face of fiber TPB, "AD_HOC"
+/Geometry/SquareOpticalFiber/specific_vertex 0 0 -0.0023 mm # face of fiber TPB, "AD_HOC"
+#/Geometry/SquareOpticalFiber/specific_vertex 0 0 -0.002 mm # face of fiber TPB, "AD_HOC"
+#/Geometry/SquareOpticalFiber/specific_vertex 0 0 -0.0018 mm # face of fiber TPB, "AD_HOC"
+#/Geometry/SquareOpticalFiber/specific_vertex 0 0 -0.0014 mm # face of fiber TPB, "AD_HOC"
+#/Geometry/SquareOpticalFiber/specific_vertex 0 0 -0.0011 mm # face of fiber TPB, "AD_HOC"
+
 #/Geometry/SquareOpticalFiber/specific_vertex 0 0 -0.0023 mm # z-value not relevant here in "LINE_SOURCE_EL" mode
-/Geometry/SquareOpticalFiber/specific_vertex 0 0 -0.0023 mm # face of fiber, "FACE_RANDOM_DIST"
+
+#/Geometry/SquareOpticalFiber/specific_vertex 0 0 -0.0023 mm # face of fiber, "FACE_RANDOM_DIST"
 
 
 /Geometry/SquareOpticalFiber/ELGap 10 mm
 /Geometry/SquareOpticalFiber/pitch 15.6 mm
-/Geometry/SquareOpticalFiber/distanceFiberHolder 5 mm
+/Geometry/SquareOpticalFiber/distanceFiberHolder -1 mm
 /Geometry/SquareOpticalFiber/distanceAnodeHolder 10 mm
 /Geometry/SquareOpticalFiber/holderThickness 10 mm
 /Geometry/SquareOpticalFiber/TPBThickness 2.2 um 

@@ -52,8 +52,8 @@ delta_r = '\u0394' + 'r'
 # In[0]
 # Generate all PSFs (of geant4 TPB hits) from SquareFiberDataset
 
-TO_GENERATE = True
-TO_PLOT = True
+TO_GENERATE = False
+TO_PLOT = False
 TO_SAVE = False
 
 if TO_GENERATE:
@@ -253,9 +253,9 @@ if TO_GENERATE:
 Load twin events after shifted and centered.
 interpolate, deconv, rotate and save.
 '''
-TO_GENERATE = False
+TO_GENERATE = True
 TO_SAVE = False
-TO_PLOT_EACH_STEP = False
+TO_PLOT_EACH_STEP = True
 TO_PLOT_DECONVE_STACK = True
 TO_SMOOTH_PSF = False
 
@@ -299,7 +299,7 @@ if TO_GENERATE:
             PSF = smooth_PSF(PSF)
 
         # # option to choose a single distance
-        dist = 2
+        dist = 9
         user_chosen_dir = find_subdirectory_by_distance(working_dir, dist)
         
         for dist_dir in tqdm(dist_dirs):
@@ -395,16 +395,16 @@ if TO_GENERATE:
                     formatter.set_powerlimits((-1, 1))  # You can adjust limits as needed
                     
                     # SR combined event
-                    im = ax[0,0].imshow(hist.T[100:150,100:150],
+                    im = ax[0,0].imshow(hist.T[100:150,100:150],interpolation='nearest',
                                         extent=[-size/2, size/2, -size/2, size/2],
                                         vmin=0, origin='lower')
                     divider = make_axes_locatable(ax[0,0])
                     cax = divider.append_axes("right", size="5%", pad=0.05)
                     cbar = plt.colorbar(im, cax=cax, label='Photon hits')
                     cbar.ax.yaxis.set_major_formatter(formatter)
-                    ax[0,0].set_title('SR',fontsize=13,fontweight='bold')
-                    ax[0,0].set_xlabel('x [mm]')
-                    ax[0,0].set_ylabel('y [mm]')
+                    ax[0,0].set_title("Tracking plane's' response",fontsize=13,fontweight='bold')
+                    ax[0,0].set_xlabel('x [mm]',fontsize=15)
+                    ax[0,0].set_ylabel('y [mm]',fontsize=15)
                     
                     # Interpolated combined event
                     im = ax[0,1].imshow(interp_img[100:150,100:150],
@@ -414,10 +414,10 @@ if TO_GENERATE:
                     cax = divider.append_axes("right", size="5%", pad=0.05)
                     cbar = plt.colorbar(im, cax=cax, label='Photon hits')
                     cbar.ax.yaxis.set_major_formatter(formatter)
-                    ax[0,1].set_title('Cubic Interpolation of SR',
+                    ax[0,1].set_title('Cubic Interpolation of response',
                                       fontsize=13,fontweight='bold')
-                    ax[0,1].set_xlabel('x [mm]')
-                    ax[0,1].set_ylabel('y [mm]')
+                    ax[0,1].set_xlabel('x [mm]',fontsize=15)
+                    ax[0,1].set_ylabel('y [mm]',fontsize=15)
                     
                     # RL deconvolution
                     im = ax[1,0].imshow(deconv[100:150,100:150],
@@ -428,8 +428,8 @@ if TO_GENERATE:
                     cbar = plt.colorbar(im, cax=cax, label='Photon hits')
                     cbar.ax.yaxis.set_major_formatter(formatter)
                     ax[1,0].set_title('RL deconvolution',fontsize=13,fontweight='bold')
-                    ax[1,0].set_xlabel('x [mm]')
-                    ax[1,0].set_ylabel('y [mm]')
+                    ax[1,0].set_xlabel('x [mm]',fontsize=15)
+                    ax[1,0].set_ylabel('y [mm]',fontsize=15)
 
                     # ROTATED RL deconvolution
                     im = ax[1,1].imshow(rotated_deconv[100:150,100:150],
@@ -441,8 +441,8 @@ if TO_GENERATE:
                     cbar.ax.yaxis.set_major_formatter(formatter)
                     ax[1,1].set_title('Rotated RL deconvolution',
                                       fontsize=13,fontweight='bold')
-                    ax[1,1].set_xlabel('x [mm]')
-                    ax[1,1].set_ylabel('y [mm]')
+                    ax[1,1].set_xlabel('x [mm]',fontsize=15)
+                    ax[1,1].set_ylabel('y [mm]',fontsize=15)
                     fig.tight_layout()
                     plt.show()
                     
@@ -569,8 +569,8 @@ if TO_GENERATE:
         #             'distanceAnodeHolder=2.5mm_holderThickness=10mm')
         
         geo_dir = ('/media/amir/Extreme Pro/SquareFiberDatabase/' +
-                    'ELGap=10mm_pitch=15.6mm_distanceFiberHolder=2mm_' +
-                    'distanceAnodeHolder=10mm_holderThickness=10mm')
+                    'ELGap=1mm_pitch=5mm_distanceFiberHolder=2mm_' +
+                    'distanceAnodeHolder=5mm_holderThickness=10mm')
 
         # grab geometry parameters for plot
         geo_params = geo_dir.split('/SquareFiberDatabase/')[-1]
@@ -599,7 +599,7 @@ if TO_GENERATE:
         dist_dirs = sorted(dist_dirs, key=extract_dir_number)
 
         # # option to choose a single distance and see P2V
-        dist = 16
+        dist = 9
         user_chosen_dir = find_subdirectory_by_distance(working_dir, dist)
         
         for dist_dir in dist_dirs:
@@ -709,8 +709,8 @@ if TO_GENERATE:
             formatter.set_powerlimits((-1, 1))  # You can adjust limits as needed
             cbar.ax.yaxis.set_major_formatter(formatter)
             
-            ax0.set_xlabel('x [mm]', fontsize=15)
-            ax0.set_ylabel('y [mm]', fontsize=15)
+            ax0.set_xlabel('x [mm]', fontsize=18)
+            ax0.set_ylabel('y [mm]', fontsize=18)
             ax0.set_title('Stacked RL deconvolution')
             # deconv profile
             # ax1.plot(np.arange(-size/2,size/2), deconv_stack_1d,
@@ -724,8 +724,8 @@ if TO_GENERATE:
                           label='fitted signal',linewidth=3, color='black')
                 
             # ax1.plot([], [], ' ', label=legend)  # ' ' creates an invisible line
-            ax1.set_xlabel('x [mm]', fontsize=15)
-            ax1.set_ylabel('photon hits', fontsize=15)
+            ax1.set_xlabel('x [mm]', fontsize=18)
+            ax1.set_ylabel('photon hits', fontsize=18)
             ax1.set_title('Stacked RL deconvolution profile')
             ax1.grid()
             

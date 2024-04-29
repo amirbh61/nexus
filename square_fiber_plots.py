@@ -135,7 +135,7 @@ ax.plot(vikuiti_ref, SiPM_hits_NO_TPB, '-*g',linewidth=3,markersize=12,label="Fi
 ax.plot(vikuiti_ref, SiPM_hits_TPB, '-*r', linewidth=3,
          markersize=12, label="fiber+TPB")
 
-text = ("100K photons facing forward per reflectivity\n" + \
+text = ("100K photons facing forward vs. reflectivity\n" + \
        "Random XY generation on external face")
 
 ax.text(95.1, 0.63, text, bbox=dict(facecolor='blue', alpha=0.5),
@@ -195,7 +195,7 @@ ax1.set_ylabel("Fraction of photons absorbed in SiPM",fontsize=15,fontweight='bo
 ax1.tick_params(axis='y', labelcolor='black')
 
 # Adding the text box
-text = ("100K photons facing forward per length" +
+text = ("100K photons facing forward vs. length" +
         "\nRandom XY generation on external face" +
         "\nFiber coating reflectivity set to 98%")
 ax1.text(12, 0.615, text, bbox=dict(facecolor='magenta', alpha=0.5), fontsize=14)
@@ -262,9 +262,41 @@ if EL_gap_test:
     marker = iter(['^', '*'])
 
 
+psf_profiles = []
+
+# Loop through each directory to compute and store the PSF profiles
+for directory in tqdm(geometry_dirs):
+    geo_params = directory.split('/SquareFiberDatabase/')[-1]
+    
+    
+    el_gap = float(re.search(r"ELGap=(-?\d+\.?\d*)mm",
+                             geo_params).group(1))
+    pitch = float(re.search(r"pitch=(-?\d+\.?\d*)mm",
+                            geo_params).group(1))
+    anode_distance = float(re.search(r"distanceAnodeHolder=(-?\d+\.?\d*)mm",
+                                     geo_params).group(1))
+    holder_thickness = float(re.search(r"holderThickness=(-?\d+\.?\d*)mm",
+                                       geo_params).group(1))
+    fiber_immersion = float(re.search(r"distanceFiberHolder=(-?\d+\.?\d*)mm",
+                                      geo_params).group(1))
+    fiber_immersion = 5 - fiber_immersion
+
+    if (el_gap not in el_gap_choice or
+        pitch not in pitch_choice or
+        anode_distance not in anode_distance_choice or
+        fiber_immersion not in fiber_immersion_choice or
+        holder_thickness not in holder_thickness_choice):
+        continue
+    
+    PSF = np.load(directory + '/PSF.npy')
+    psf_profile = PSF.mean(axis=0)
+    psf_profiles.append((psf_profile))
+
+max_psf_profile = max([np.max(profile) for profile in psf_profiles])
+
+
 fig, ax = plt.subplots(figsize=(9,7), dpi = 600)
 fig.patch.set_facecolor('white')
-
 for directory in tqdm(geometry_dirs):
     
     geo_params = directory.split('/SquareFiberDatabase/')[-1]
@@ -287,12 +319,16 @@ for directory in tqdm(geometry_dirs):
         anode_distance not in anode_distance_choice or
         fiber_immersion not in fiber_immersion_choice or
         holder_thickness not in holder_thickness_choice):
-        # print(i)
         continue
     
+    # normalize other PSFs to max PSF
+
     PSF = np.load(directory + '/PSF.npy')
     psf_profile = PSF.mean(axis=0)
+   
+    normalized_profile = psf_profile * (max_psf_profile/np.max(psf_profile))
     x_vec = np.arange(-PSF.shape[0]/2, PSF.shape[0]/2)+0.5 # shift to bin center
+    
     if immersion_test:
         label = f'Fiber immersion={int(fiber_immersion)} mm'
         
@@ -332,12 +368,12 @@ for directory in tqdm(geometry_dirs):
                            boxstyle='round,pad=0.3'),
                  fontsize=12, weight='bold', linespacing=1.5)
         
-    ax.plot(x_vec, psf_profile, color=next(color), ls='-', 
+    ax.plot(x_vec, normalized_profile, color=next(color), ls='-', 
             alpha=0.7, label=label, linewidth=3, markersize=7)
 
 
-plt.xlabel('x [mm]', fontweight='bold')
-plt.ylabel('Intensity', fontweight='bold')
+plt.xlabel('x [mm]', fontsize=14)
+plt.ylabel('Photon hits', fontsize=14)
 # plt.xlim([0,30])
 plt.grid()
 ax.ticklabel_format(axis='y', style='scientific', scilimits=(0,0))
@@ -361,7 +397,7 @@ geo_dir_3 = ('/media/amir/Extreme Pro/SquareFiberDatabase/' +
 
 geo_dirs = [geo_dir_1,geo_dir_2,geo_dir_3]
 
-fig, ax = plt.subplots(1,3, figsize=(23,8), dpi = 600)
+fig, ax = plt.subplots(1,3, figsize=(18,6), dpi = 600)
 fig.patch.set_facecolor('white')
 
 for i,geo_dir in enumerate(geo_dirs):
@@ -389,14 +425,29 @@ for i,geo_dir in enumerate(geo_dirs):
     formatter.set_powerlimits((-1, 1))
     cbar.ax.yaxis.set_major_formatter(formatter)
     
-    ax[i].set_xlabel('x [mm]', fontsize=18)
-    ax[i].set_ylabel('y [mm]', fontsize=18)
-    ax[i].set_title(title, fontsize=20, fontweight='bold')
+    ax[i].set_xlabel('x [mm]', fontsize=17)
+    ax[i].set_ylabel('y [mm]', fontsize=17)
+    ax[i].set_title(title, fontsize=18, fontweight='bold')
 
 title = ('Geometry parameters: pitch = 5 mm, EL gap = 1 mm, anode distance = 2.5 mm')
-fig.suptitle(title,fontsize=25, fontweight='bold')
+fig.suptitle(title,fontsize=22, fontweight='bold')
 fig.tight_layout()
 plt.show()
+
+
+
+E =  [1.5498 ,  1.937 ,   2.479 , 
+  3.099 ,   3.874,   4.959]   
+
+abs_length = [11.764,   3.289,   0.9,
+  0.105,     0.0078125,     0.00543]
+plt.plot(E,abs_length)
+plt.yticks(np.arange(0,12,0.5))
+plt.axvline(2.883,color='red')
+plt.xlabel('E [ev]')
+plt.ylabel('abs length [um]')
+plt.show()
+
 
 # In[2]
 ### GRAPHS - compare P2Vs of different geometries ###

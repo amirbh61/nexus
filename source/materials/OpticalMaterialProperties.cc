@@ -1066,19 +1066,6 @@ namespace opticalprops {
     ultraviolet regime", page 13, Fig. 16
     */
     mpt->AddConstProperty("WLSMEANNUMBERPHOTONS", 0.53);
-
-    // G4double meanNumberPhotons = mpt->GetConstProperty("WLSMEANNUMBERPHOTONS");
-    // G4cout << G4endl;
-    // G4cout << G4endl;
-    // G4cout << G4endl;
-    // G4cout << G4endl;
-    // G4cout << G4endl;
-    // G4cout << "WLSMEANNUMBERPHOTONS: " << meanNumberPhotons << G4endl;
-    // G4cout << G4endl;
-    // G4cout << G4endl;
-    // G4cout << G4endl;
-    // G4cout << G4endl;
-    // G4cout << G4endl;
     
     return mpt;
   }

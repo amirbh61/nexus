@@ -124,7 +124,7 @@ void SquareOpticalFiber::Construct(){
     G4double BarrelThickness = 5*cm;
     G4double barrelOuterRadius = 50.*cm;
     G4double barrelInnerRadius = barrelOuterRadius - BarrelThickness;
-    G4double cylLength = 7*cm + delta; // This is also the fiber length !!
+    G4double cylLength = 0.001*cm + delta; // This is also the fiber length !!
 
     G4Tubs *barrel = new G4Tubs("Barrel", //name
                               barrelInnerRadius, //inner radius

@@ -9,6 +9,7 @@ Created on Wed Feb 22 21:22:36 2023
 import os
 import pandas as pd
 import numpy as np
+import matplotlib.ticker as ticker
 from matplotlib import pyplot as plt
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 plt.style.use('classic')
@@ -17,15 +18,11 @@ pd.set_option('display.max_columns', None)
 pd.set_option('display.max_rows', 500)
 import glob
 import re
-from mpl_toolkits.axes_grid1 import make_axes_locatable
 from scipy import ndimage
-import time
 from scipy.signal           import fftconvolve
 from scipy.signal           import convolve
 # from invisible_cities.reco.deconv_functions     import richardson_lucy
-from scipy.interpolate import interp2d
 from scipy.interpolate import griddata
-from scipy.interpolate import RectBivariateSpline
 from scipy.signal import find_peaks, peak_widths
 from scipy.signal import butter, filtfilt, welch
 from scipy.ndimage import rotate
@@ -41,12 +38,15 @@ size = 250
 bins = size
 
 
-# path_to_dataset = '/media/amir/Extreme Pro/SquareFiberDatabase'
-path_to_dataset = '/media/amir/Extreme Pro/SquareFiberDatabaseExpansion'
+path_to_dataset = '/media/amir/Extreme Pro/SquareFiberDatabase'
+# path_to_dataset = '/media/amir/Extreme Pro/SquareFiberDatabaseExpansion'
 
 # List full paths of the Geant4_PSF_events folders inside SquareFiberDatabase
 geometry_dirs = [os.path.join(path_to_dataset, d) for d in os.listdir(path_to_dataset)
                  if os.path.isdir(os.path.join(path_to_dataset, d))]
+delta_r = '\u0394' + 'r'
+
+
 
 
 # In[1]
@@ -78,6 +78,40 @@ def smooth_PSF(PSF):
     return smooth_PSF
 
 
+# #original
+# def assign_hit_to_SiPM_original(hit, pitch, n):
+#     """
+#     Assign a hit to a SiPM based on its coordinates.
+    
+#     Args:
+#     - hit (tuple): The (x, y) coordinates of the hit.
+#     - pitch (float): The spacing between SiPMs.
+#     - n (int): The number of SiPMs on one side of the square grid.
+    
+#     Returns:
+#     - (int, int): The assigned SiPM coordinates.
+#     """
+    
+#     half_grid_length = (n-1) * pitch / 2
+
+#     x, y = hit
+
+#     # First, check the central SiPM
+#     for i in [0, -pitch, pitch]:
+#         for j in [0, -pitch, pitch]:
+#             if -pitch/2 <= x - i < pitch/2 and -pitch/2 <= y - j < pitch/2:
+#                 return (i, j)
+
+#     # If not found in the central SiPM, search the rest of the grid
+#     for i in np.linspace(-half_grid_length, half_grid_length, n):
+#         for j in np.linspace(-half_grid_length, half_grid_length, n):
+#             if abs(i) > pitch or abs(j) > pitch:  # Skip the previously checked SiPMs
+#                 if i - pitch/2 <= x < i + pitch/2 and j - pitch/2 <= y < j + pitch/2:
+#                     return (i, j)
+    
+#     # Return None if hit doesn't belong to any SiPM
+#     return None
+
 
 def assign_hit_to_SiPM(hit, pitch, n):
     half_grid_length = (n-1) * pitch / 2
@@ -88,10 +122,12 @@ def assign_hit_to_SiPM(hit, pitch, n):
     nearest_y = round((y + half_grid_length) / pitch) * pitch - half_grid_length
 
     # Check if the hit is within the bounds of the SiPM
-    if -half_grid_length <= nearest_x <= half_grid_length and -half_grid_length <= nearest_y <= half_grid_length:
+    if (-half_grid_length <= nearest_x <= half_grid_length and
+        -half_grid_length <= nearest_y <= half_grid_length):
         return (np.around(nearest_x,1), np.around(nearest_y,1))
     else:
         return None
+
 
 
 
@@ -164,17 +200,11 @@ def psf_creator(directory, create_from, to_plot=False,to_smooth=False):
         x_event = float(x_match[0])
         y_match = re.findall(y_pattern, filename)
         y_event = float(y_match[0])
+        # print(f'x,y=({x_event},{y_event})')
         
         if plot_event:
-            single_event, x_hist, y_hist = np.histogram2d(hitmap[:,0], hitmap[:,1],
-                                                  range=[[-size/2,size/2],[-size/2,size/2]],
-                                                  bins=bins)
-            plt.imshow(single_event,extent=[-size/2, size/2, -size/2, size/2])
-            plt.title("Single Geant4 event")
-            plt.xlabel('x [mm]');
-            plt.ylabel('y [mm]');
-            plt.colorbar()
-            plt.show()
+            plot_sensor_response(hitmap, bins, size,
+                                 title='Single Geant4 Kr event')
         
         # Assign each hit to a SiPM before shifting the hitmap
         new_hitmap = []
@@ -187,7 +217,8 @@ def psf_creator(directory, create_from, to_plot=False,to_smooth=False):
         
         
         if plot_sipm_assigned_event:
-            plot_sensor_response(new_hitmap, bins, size)
+            plot_sensor_response(new_hitmap, bins, size,
+                                 title='SR of single event')
         
         
         
@@ -196,30 +227,16 @@ def psf_creator(directory, create_from, to_plot=False,to_smooth=False):
     
         
         if plot_shifted_event:
-            shifted_event, x_hist, y_hist = np.histogram2d(shifted_hitmap[:,0], shifted_hitmap[:,1],
-                                                  range=[[-size/2,size/2],[-size/2,size/2]],
-                                                  bins=bins)     
-            plt.imshow(shifted_event,extent=[-size/2, size/2, -size/2, size/2])
-            plt.title("Shifted Geant4 event, after assigned to SiPMs")
-            plt.xlabel('x [mm]');
-            plt.ylabel('y [mm]');
-            plt.colorbar()
-            plt.show()
+            plot_sensor_response(shifted_hitmap, bins, size,
+                                 title='SR of shifted event')
         
         
         PSF_list.append(shifted_hitmap)
         
         if plot_accomulated_events:
             PSF = np.vstack(PSF_list)
-            PSF, x_hist, y_hist = np.histogram2d(PSF[:,0], PSF[:,1],
-                                                  range=[[-size/2,size/2],[-size/2,size/2]],
-                                                  bins=bins)
-            plt.imshow(PSF,extent=[-size/2, size/2, -size/2, size/2])
-            plt.title("Accumulated Geant4 events, after assigned to SiPMs and shifted")
-            plt.xlabel('x [mm]');
-            plt.ylabel('y [mm]');
-            plt.colorbar()
-            plt.show()
+            plot_sensor_response(PSF, bins, size,
+                                 title='Accumulated events SR')
         
         
 
@@ -240,24 +257,27 @@ def psf_creator(directory, create_from, to_plot=False,to_smooth=False):
     return PSF
 
 
-
-
-def plot_sensor_response(event, bins, size, noise=False):
-    sipm_assigned_event, x_hist, y_hist = np.histogram2d(event[:,0], event[:,1],
+def plot_sensor_response(event, bins, size, title='', noise=False):
+    hist, x_hist, y_hist = np.histogram2d(event[:,0], event[:,1],
                                                          range=[[-size/2, size/2], [-size/2, size/2]],
-                                                         bins=bins)  
+                                                         bins=[bins,bins])  
     if noise:
-        sipm_assigned_event = np.random.poisson(sipm_assigned_event)
+        hist = np.random.poisson(hist)
 
     # # Transpose the array to correctly align the axes
-    sipm_assigned_event = sipm_assigned_event.T
-
-    plt.imshow(sipm_assigned_event,
-                extent=[-size/2, size/2, -size/2, size/2], vmin=0, origin='lower')
-    plt.title("Sensor Response")
-    plt.xlabel('x [mm]')
-    plt.ylabel('y [mm]')
-    plt.colorbar(label='Photon hits')
+    hist = hist.T
+    
+    fig, ax = plt.subplots(1, figsize=(7,7), dpi=600)
+    fig.set_facecolor('white')
+    im = ax.imshow(hist,extent=[x_hist[0], x_hist[-1], y_hist[0], y_hist[-1]], vmin=0,
+                origin='lower',interpolation=None,aspect='equal')
+    divider = make_axes_locatable(ax)
+    cax = divider.append_axes("right", size="5%", pad=0.05)
+    plt.colorbar(im, cax=cax, label='Photon hits')
+    if title!="":
+        ax.set_title(title,fontsize=13,fontweight='bold')
+    ax.set_xlabel('x [mm]')
+    ax.set_ylabel('y [mm]')
     plt.show()
 
 
@@ -265,7 +285,9 @@ def plot_PSF(PSF,size=100):
     total_TPB_photon_hits = int(np.sum(PSF))
     
     fig, (ax0, ax1) = plt.subplots(1, 2, figsize=(16.5,8), dpi=600)
-    title = f'{total_TPB_photon_hits}/100M TPB hits PSF, current geometry:' + f'\n{os.path.basename(os.getcwd())}'
+    fig.patch.set_facecolor('white')
+    title = (f'{total_TPB_photon_hits}/100M TPB hits PSF, current geometry:' +
+             f'\n{os.path.basename(os.getcwd())}')
     fig.suptitle(title, fontsize=15)
     im = ax0.imshow(PSF, extent=[-size/2, size/2, -size/2, size/2])
     ax0.set_xlabel('x [mm]');
@@ -422,13 +444,14 @@ def P2V(vector):
 def find_subdirectory_by_distance(directory, user_distance):
     """
     Finds the subdirectory that corresponds to the 
-    user-specified distance within a given directory.
+    user-specified distance within a given directory, supporting both
+    integer and floating-point distances.
     
     Parameters
     ----------
     directory : str
         The directory to search in.
-    user_distance : int
+    user_distance : float
         The user-specified distance.
     
     Returns
@@ -437,10 +460,14 @@ def find_subdirectory_by_distance(directory, user_distance):
         The subdirectory corresponding to the user-specified distance,
         or None if not found.
     """
+    # Convert user_distance to a float for comparison
+    user_distance = float(user_distance)
+    
     for entry in os.scandir(directory):
         if entry.is_dir():
-            match = re.search(r'(\d+)_mm', entry.name)
-            if match and int(match.group(1)) == user_distance:
+            # Updated regex to capture both integer and floating-point numbers
+            match = re.search(r'(\d+(?:\.\d+)?)_mm', entry.name)
+            if match and abs(float(match.group(1)) - user_distance) < 1e-6:
                 return entry.path
     return None
 
@@ -479,436 +506,26 @@ def extract_dir_number(dist_dir):
     return 0  # Default to 0 if no number found
 
 
+# # tests for function assign_hit_to_SiPM
+# test_cases = [
+#     ((x, y), pitch, n)
+#     for x in np.linspace(-10, 10, 20)
+#     for y in np.linspace(-10, 10, 20)
+#     for pitch in [5,10,15.6]
+#     for n in [n_sipms]
+# ]
 
+# # Compare the outputs of the two functions
+# for hit, pitch, n in test_cases:
+#     result_original = assign_hit_to_SiPM_original(hit, pitch, n)
+#     result_optimized = assign_hit_to_SiPM(hit, pitch, n)
 
+#     if result_original != result_optimized:
+#         print(f"Discrepancy found for hit {hit}, pitch {pitch}, n {n}:")
+#         print(f"  Original: {result_original}, Optimized: {result_optimized}")
 
-
-# In[6]
-'''
-Generate and save twin events dataset, after shifting, centering and rotation
-'''
-
-def find_highest_number(directory,file_format='.npy'):
-    '''
-    Finds the highest data sample number in a directory where files are
-    named in the format:
-    "intnumber_rotation_angle_rad=value.npy"
-    The idea is that if we are adding new data to existing data, then the 
-    numbering of oyr newly generated data should continue the existing numbering.
-
-    Parameters
-    ----------
-    directory : str
-        The directory of data to search in.
-
-    Returns
-    -------
-    highest_number : int
-        The number of the last data sample created.
-        If not found, returns -1.
-    '''
-    highest_number = -1
-
-    for entry in os.scandir(directory):
-        if entry.is_dir():
-            for file in os.scandir(entry.path):
-                if file.is_file() and file.name.endswith(file_format):
-                    try:
-                        # Extracting the number before the first underscore
-                        number = int(file.name.split('_')[0])
-                        highest_number = max(highest_number, number)
-                    except ValueError:
-                        # Handle cases where the conversion to int might fail
-                        continue
-
-    return highest_number
-    
-    
-
-
-def count_npy_files(directory):
-    '''
-    Counts all .npy files in the specified directory and its subdirectories.
-
-    Parameters
-    ----------
-    directory : str
-        The directory to search in.
-
-    Returns
-    -------
-    int
-        The number of .npy files found.
-    '''
-    npy_file_count = 0
-
-    # Walk through all directories and files in the specified directory
-    for root, dirs, files in os.walk(directory):
-        for file in files:
-            if file.endswith('.npy'):
-                npy_file_count += 1
-
-    return npy_file_count
-    
-
-
-print('Generating twin events')
-TO_GENERATE = True
-TO_SAVE = True
-random_shift = True
-if random_shift is True:
-    m_min = 0
-    m_max = 2 # exclusive - up to, not including
-    n_min = 0
-    n_max = 2 # exclusive - up to, not including
-if random_shift is False:
-    m,n = 1,1
-    
-samples_per_geometry = 10000
-
-if TO_GENERATE:
-    x_match_str = r"_x=(-?\d+(?:\.\d+)?(?:e-?\d+)?)mm"
-    y_match_str = r"_y=(-?\d+(?:\.\d+)?(?:e-?\d+)?)mm"
-
-    for geo_dir in tqdm(geometry_dirs):
-
-                
-        # find min distance that will be of interest
-        match = re.search(r"_pitch=(\d+(?:\.\d+)?)mm", geo_dir)
-        pitch = float(match.group(1))
-        dist_min_threshold = int(0.5*pitch) # mm
-        dist_max_threshold = int(2*pitch) # mm
-
-        # assign input and output directories
-        print(geo_dir,end='\n')
-        working_dir = geo_dir + r'/Geant4_Kr_events'
-        save_dir = geo_dir + r'/combined_event_SR' 
-        if not os.path.isdir(save_dir):
-            os.mkdir(save_dir)
-
-        os.chdir(working_dir)
-
-        event_pattern = "SiPM_hits"
-        event_list = [entry.name for entry in os.scandir() if entry.is_file() 
-                      and entry.name.startswith(event_pattern)]
-        
-#        # in case we add more samples, find highest existing sample number
-#        highest_existing_data_number = find_highest_number(save_dir)
-#        if highest_existing_data_number == -1:
-#            highest_existing_data_number = 0
-
-
-        j = 0
-        dists = []
-        while j < samples_per_geometry:
-            # print(j)
-            event_pair = random.sample(event_list, k=2)
-    
-            # grab event 0 x,y original generation coordinates
-            x0_match = re.search(x_match_str, event_pair[0])
-            x0 = float(x0_match.group(1))
-            y0_match = re.search(y_match_str, event_pair[0])
-            y0 = float(y0_match.group(1))
-    
-            # grab event 1 x,y original generation coordinates
-            x1_match = re.search(x_match_str, event_pair[1])
-            x1 = float(x1_match.group(1))
-            y1_match = re.search(y_match_str, event_pair[1])
-            y1 = float(y1_match.group(1))
-    
-                    
-            event_to_stay, event_to_shift = np.genfromtxt(event_pair[0]), np.genfromtxt(event_pair[1])
-    
-            # Assign each hit to a SiPM
-            event_to_stay_SR = []
-            for hit in event_to_stay:
-                sipm = assign_hit_to_SiPM(hit=hit, pitch=pitch, n=n_sipms)
-                if sipm:  # if the hit belongs to a SiPM
-                    event_to_stay_SR.append(sipm)
-               
-            event_to_stay_SR = np.array(event_to_stay_SR)
-    
-    
-            # Assign each hit to a SiPM
-            event_to_shift_SR = []
-            for hit in event_to_shift:
-                sipm = assign_hit_to_SiPM(hit=hit, pitch=pitch, n=n_sipms)
-                if sipm:  # if the hit belongs to a SiPM
-                    event_to_shift_SR.append(sipm)
-               
-            event_to_shift_SR = np.array(event_to_shift_SR)
-    
-            # shift "event_shift_SR"
-            if random_shift:
-                m, n = np.random.randint(m_min,m_max), np.random.randint(n_min,n_max)
-            shifted_event_SR = event_to_shift_SR + [m*pitch, n*pitch]
-    
-            # Combine the two events
-            combined_event_SR = np.concatenate((event_to_stay_SR, shifted_event_SR))
-            shifted_event_coord = np.array([x1, y1]) + [m*pitch, n*pitch]
-    
-            # get distance between stay and shifted
-            dist = (np.sqrt((x0-shifted_event_coord[0])**2+(y0-shifted_event_coord[1])**2))
-
-            # take specific distances in ROI
-            if dist < dist_min_threshold or dist > dist_max_threshold:
-                continue
-            
-            dists.append(dist)
-            # get midpoint of stay and shifted
-            midpoint = [(x0+shifted_event_coord[0])/2,(y0+shifted_event_coord[1])/2]
-            
-            theta = np.arctan2(y0-shifted_event_coord[1],x0-shifted_event_coord[0])
-            rot_matrix = np.array([[np.cos(theta),-np.sin(theta)],
-                                    [np.sin(theta),np.cos(theta)]])
-    
-            # center combined event using midpoint
-            centered_combined_event_SR = combined_event_SR - midpoint
-    
-            # # Save combined centered event to suitlable folder according to sources distance
-            if TO_SAVE:
-                # save to dirs with spacing 0.5 mm
-                spacing = 0.5
-                if int(dist) <= dist < int(dist) + spacing:
-                    save_path = save_dir + f'/{int(dist)}_mm'
-                if int(dist) + spacing <= dist < np.ceil(dist):
-                    save_path = save_dir + f'/{int(dist) + spacing}_mm'
-                                       
-                if not os.path.isdir(save_path):
-                    os.mkdir(save_path)
-                save_path = (save_path + f'/{j}_' +
-                f'rotation_angle_rad={np.around(theta,5)}.npy')
-                np.save(save_path,centered_combined_event_SR)
-                
-                #also, useful to save dists vector
-                np.save(geo_dir+r'/dists.npy', dists)
-                
-    
-            j += 1
-        
-        print(f'Created {count_npy_files(save_dir)} events')
-            
-            
-            
-            
-# In[7]
-'''
-Load twin events after shifted and centered.
-interpolate, deconv, rotate and save.
-'''
-print('Generating deconvs')
-TO_GENERATE = True
-TO_SAVE = True
-TO_PLOT_EACH_STEP = False
-TO_PLOT_DECONVE_STACK = False
-
-TO_SMOOTH_PSF = False
-
-if TO_GENERATE:
-    for geo_dir in tqdm(geometry_dirs):
-
-        # grab geometry parameters for plot
-        geo_params = geo_dir.split('/SquareFiberDatabase/')[-1]
-        el_gap = float(re.search(r"ELGap=(-?\d+\.?\d*)mm",
-                                 geo_params).group(1))
-        pitch = float(re.search(r"pitch=(-?\d+\.?\d*)mm",
-                                geo_params).group(1))
-        
-        fiber_immersion = float(re.search(r"distanceFiberHolder=(-?\d+\.?\d*)mm",
-                                          geo_params).group(1))
-        anode_distance = float(re.search(r"distanceAnodeHolder=(-?\d+\.?\d*)mm",
-                                         geo_params).group(1))
-        holder_thickness = float(re.search(r"holderThickness=(-?\d+\.?\d*)mm",
-                                           geo_params).group(1))
-        
-        fiber_immersion = 5 - fiber_immersion # convert from a Geant4 parameter to a simpler one
-    
-        # assign directories
-        # print(geo_dir)
-        working_dir = geo_dir + r'/combined_event_SR'
-        save_dir = geo_dir + r'/deconv'
-        if not os.path.isdir(save_dir):
-            os.mkdir(save_dir)
-
-        
-        dist_dirs = glob.glob(working_dir + '/*')
-        dist_dirs = sorted(dist_dirs, key=extract_dir_number)
-        
-        PSF = np.load(geo_dir + '/PSF.npy')
-        if TO_SMOOTH_PSF:
-            PSF = smooth_PSF(PSF)
-
-        # # option to choose a single distance
-        # dist = 30
-        # user_chosen_dir = find_subdirectory_by_distance(working_dir, dist)
-        
-        for dist_dir in dist_dirs:
-            # print(dist_dir)
-            
-            # print(f'Working on:\n{dist_dir}')
-            # match = re.search(r'/(\d+)_mm', dist_dir)
-            match = re.search(r'/(\d+(?:\.\d+)?)_mm$', dist_dir)
-            if match:
-                dist = float(match.group(1))
-            # dist_dir = user_chosen_dir
-            # print(f'Working on:\n{dist_dir}')
-            deconv_stack = np.zeros((size,size))
-            cutoff_iter_list = []
-            rel_diff_checkout_list = []
-            event_files = glob.glob(dist_dir + '/*.npy')
-            
-            
-            for event_file in event_files:
-                event = np.load(event_file)
-                
-                ##### interpolation #####
-
-                # Create a 2D histogram
-                hist, x_edges, y_edges = np.histogram2d(event[:,0], event[:,1],
-                                                        range=[[-size/2, size/2],
-                                                                [-size/2, size/2]],
-                                                        bins=bins)
-
-
-                # Compute the centers of the bins
-                x_centers = (x_edges[:-1] + x_edges[1:]) / 2
-                y_centers = (y_edges[:-1] + y_edges[1:]) / 2
-
-                hist_hits_x_idx, hist_hits_y_idx = np.where(hist>0)
-                hist_hits_x = x_centers[hist_hits_x_idx]
-                hist_hits_y = y_centers[hist_hits_y_idx]
-                hist_hits_vals = hist[hist>0]
-
-
-                # Define the interpolation grid
-                x_range = np.linspace(-size/2, size/2, num=bins)
-                y_range = np.linspace(-size/2, size/2, num=bins)
-                x_grid, y_grid = np.meshgrid(x_range, y_range)
-
-                # Perform the interpolation
-                interp_img = griddata((hist_hits_x, hist_hits_y), hist_hits_vals,
-                                      (x_grid, y_grid), method='cubic', fill_value=0)
-
-
-                # optional, cut interp image values below 0
-                interp_img[interp_img<0] = 0
-
-
-                ##### RL deconvolution #####
-                rel_diff_checkout, cutoff_iter, deconv = richardson_lucy(interp_img, PSF,
-                                                                  iterations=75, iter_thr=0.01)
-                
-                
-                cutoff_iter_list.append(cutoff_iter)
-                rel_diff_checkout_list.append(rel_diff_checkout)
-                
-
-                ##### ROTATE #####
-                theta = extract_theta_from_path(event_file)
-                rot_matrix = np.array([[np.cos(theta),-np.sin(theta)],
-                                        [np.sin(theta),np.cos(theta)]])
-
-                # rotate combined event AFTER deconv
-                rotated_deconv = rotate(deconv, np.degrees(theta), reshape=False, mode='nearest')
-                deconv_stack += rotated_deconv
-                
-
-
-                
-                if TO_PLOT_EACH_STEP:
-                    
-                    # plot SR combined event
-                    plt.imshow(hist, extent=[-size/2, size/2, -size/2, size/2],
-                                vmin=0, origin='lower')
-                    plt.colorbar(label='Photon hits')
-                    plt.title('SR Combined event')
-                    plt.xlabel('x [mm]')
-                    plt.ylabel('y [mm]')
-                    plt.show()
-                    
-                    # plot interpolated combined event
-                    plt.imshow(interp_img, extent=[-size/2, size/2, -size/2, size/2],
-                                vmin=0, origin='lower')
-                    plt.colorbar(label='Photon hits')
-                    plt.title('Cubic Interpolation of Combined event')
-                    plt.xlabel('x [mm]')
-                    plt.ylabel('y [mm]')
-                    plt.show()
-                    
-                    # plot RL deconvolution
-                    plt.imshow(deconv, extent=[-size/2, size/2, -size/2, size/2],
-                                vmin=0, origin='lower')
-                    plt.colorbar(label='Photon hits')
-                    plt.title('RL deconvolution')
-                    plt.xlabel('x [mm]')
-                    plt.ylabel('y [mm]')
-                    plt.show()
-                    
-                    # plot ROTATED RL deconvolution
-                    plt.imshow(rotated_deconv, extent=[-size/2, size/2, -size/2, size/2],
-                                vmin=0, origin='lower')
-                    plt.colorbar(label='Photon hits')
-                    plt.title('Rotated RL deconvolution')
-                    plt.xlabel('x [mm]')
-                    plt.ylabel('y [mm]')
-                    plt.show()
-                    
-                    # plot deconvolution stacking
-                    plt.imshow(deconv_stack, extent=[-size/2, size/2, -size/2, size/2],
-                                vmin=0, origin='lower')
-                    plt.colorbar(label='Photon hits')
-                    plt.title('Accomulated RL deconvolution')
-                    plt.xlabel('x [mm]')
-                    plt.ylabel('y [mm]')
-                    plt.show()
-                
-            
-            avg_cutoff_iter = np.mean(cutoff_iter_list)
-            avg_rel_diff_checkout = np.mean(rel_diff_checkout_list)
-            
-            ## save deconv_stack+avg_cutoff_iter+avg_rel_diff_checkout ###
-            if TO_SAVE:
-                ## plot deconv##
-                fig = plt.figure(figsize=(8,7.5),dpi=600)
-                # deconv
-                plt.imshow(deconv_stack, extent=[-size/2, size/2, -size/2, size/2])
-                plt.colorbar()
-                plt.xlabel('x [mm]')
-                plt.ylabel('y [mm]')
-                plt.title('Stacked RL deconvolution')
-                plt.grid()
-                    
-                title = (f'EL gap={el_gap}mm, pitch={pitch}mm,' + 
-                          f' fiber immersion={fiber_immersion}mm,\nanode distance={anode_distance}mm,' + 
-                          f' holder thickness={holder_thickness}mm\n\nEvent spacing={dist}mm,' + 
-                        f' Avg RL iterations={int(avg_cutoff_iter)},'  +
-                        f' Avg RL relative diff={np.around(avg_rel_diff_checkout,4)}')
-            
-                fig.suptitle(title,fontsize=15)
-                fig.tight_layout()
-                
-                # save files and deconv image plot in correct folder #
-                spacing = 0.5
-                if int(dist) <= dist < int(dist) + spacing:
-                    save_path = save_dir + f'/{int(dist)}_mm'
-                if int(dist) + spacing <= dist < np.ceil(dist):
-                    save_path = save_dir + f'/{int(dist) + spacing}_mm'
-                
-                if not os.path.isdir(save_path):
-                    os.mkdir(save_path)
-                np.save(save_path+'/deconv.npy',deconv_stack)
-                np.savetxt(save_path+'/avg_cutoff_iter.txt',
-                           np.array([avg_cutoff_iter]))
-                np.savetxt(save_path+'/avg_rel_diff_checkout.txt',
-                           np.array([avg_rel_diff_checkout]))
-                fig.savefig(save_path+'/deconv_plot', format='svg')
-            if TO_PLOT_DECONVE_STACK: 
-                plt.show()
-                continue
-            plt.close(fig)
-
-
-
+# # If no output, then the two functions are consistent for the test cases
+# print("Test completed.")
 
 
 
@@ -935,26 +552,33 @@ def frequency_analyzer(signal, spatial_sampling_rate):
     return dynamic_spatial_cutoff_frequency
 
 
-
 # Define the model function for two Gaussians
 def double_gaussian(x, A1, A2, mu1, mu2, sigma):
     f = A1 * np.exp(-((x - mu1)**2) / (2 * sigma**2)) + \
     A2 * np.exp(-((x - mu2)**2) / (2 * sigma**2))
     return f
 
-print('Generating P2V')
+
 TO_GENERATE = True
 TO_SAVE = True
 TO_PLOT_P2V = False
 TO_SMOOTH_SIGNAL = False
 if TO_SMOOTH_SIGNAL: # If True, only one option must be True - the other, False.
     DOUBLE_GAUSSIAN_FIT = True # currently, the most promising approach !
-    PSD_AND_BUTTERWORTH = False 
+    PSD_AND_BUTTERWORTH = not DOUBLE_GAUSSIAN_FIT
 
 
 
 if TO_GENERATE:
-    for geo_dir in tqdm(geometry_dirs):
+    for geo_dir in tqdm(geometry_dirs[49:]):
+        
+        # geo_dir = ('/media/amir/Extreme Pro/SquareFiberDatabase/' +
+        #             'ELGap=1mm_pitch=15.6mm_distanceFiberHolder=-1mm_' +
+        #             'distanceAnodeHolder=2.5mm_holderThickness=10mm')
+        
+        # geo_dir = ('/media/amir/Extreme Pro/SquareFiberDatabase/' +
+        #             'ELGap=1mm_pitch=5mm_distanceFiberHolder=2mm_' +
+        #             'distanceAnodeHolder=5mm_holderThickness=10mm')
 
         # grab geometry parameters for plot
         geo_params = geo_dir.split('/SquareFiberDatabase/')[-1]
@@ -983,7 +607,7 @@ if TO_GENERATE:
         dist_dirs = sorted(dist_dirs, key=extract_dir_number)
 
         # # option to choose a single distance and see P2V
-        # dist = 30
+        # dist = 20
         # user_chosen_dir = find_subdirectory_by_distance(working_dir, dist)
         
         for dist_dir in dist_dirs:
@@ -995,6 +619,9 @@ if TO_GENERATE:
                 dist = float(match.group(1))
                 
             # dist_dir = user_chosen_dir
+            # match = re.search(r'/(\d+(?:\.\d+)?)_mm$', dist_dir)
+            # if match:
+            #     dist = float(match.group(1))
             # print(f'Working on:\n{dist_dir}')
             
             
@@ -1006,7 +633,8 @@ if TO_GENERATE:
             # P2V deconv
             x_cm, y_cm = ndimage.measurements.center_of_mass(deconv_stack)
             x_cm, y_cm = int(x_cm), int(y_cm)
-            deconv_stack_1d = deconv_stack[y_cm,:]
+            # deconv_stack_1d = deconv_stack[y_cm,:]
+            deconv_stack_1d = deconv_stack.mean(axis=0)
         
             
             if TO_SMOOTH_SIGNAL:
@@ -1076,36 +704,63 @@ if TO_GENERATE:
             
             ## plot deconv + deconv profile (with rotation) ##
             fig, (ax0, ax1) = plt.subplots(1,2,figsize=(15,7),dpi=600)
+            fig.patch.set_facecolor('white')
             # deconv
+            deconv_stack = np.flip(deconv_stack)
+            deconv_stack_1d = np.flip(deconv_stack_1d)
             im = ax0.imshow(deconv_stack, extent=[-size/2, size/2, -size/2, size/2])
+            # im = ax0.imshow(deconv_stack[100:150,100:150],
+            #                 extent=[-25, 25, -25, 25])
             divider = make_axes_locatable(ax0)
             cax = divider.append_axes("right", size="5%", pad=0.05)
-            plt.colorbar(im, cax=cax)
+            cbar = plt.colorbar(im, cax=cax)
+            
+            # Format colorbar tick labels in scientific notation
+            formatter = ticker.ScalarFormatter(useMathText=True)
+            formatter.set_scientific(True)
+            formatter.set_powerlimits((-1, 1))  # You can adjust limits as needed
+            cbar.ax.yaxis.set_major_formatter(formatter)
+            
             ax0.set_xlabel('x [mm]')
             ax0.set_ylabel('y [mm]')
             ax0.set_title('Stacked RL deconvolution')
             # deconv profile
-            legend = f'P2V = {np.around(P2V_deconv_stack_1d,3)}'
             ax1.plot(np.arange(-size/2,size/2), deconv_stack_1d,
-                      label='original signal',color='red')
+                      linewidth=3,color='blue')
+            # ax1.plot(np.arange(-25,25), deconv_stack_1d[100:150],
+            #          linewidth=3,color='blue')
+            ax1.ticklabel_format(style='sci', axis='y',scilimits=(0,0))
+            
             if TO_SMOOTH_SIGNAL:
                 ax1.plot(np.arange(-size/2,size/2), fitted_signal,
-                          label='fitted signal', color='blue')
-            ax1.plot([], [], ' ', label=legend)  # ' ' creates an invisible line
+                          label='fitted signal',linewidth=3, color='black')
+                
+            # ax1.plot([], [], ' ', label=legend)  # ' ' creates an invisible line
             ax1.set_xlabel('x [mm]')
             ax1.set_ylabel('photon hits')
             ax1.set_title('Stacked RL deconvolution profile')
             ax1.grid()
-            ax1.legend(fontsize=10)
+            
+            text = (f'P2V={np.around(P2V_deconv_stack_1d,2)}'+
+                    f'\nPitch={pitch} mm' +
+                    f'\nEL gap={el_gap} mm' +
+                    f'\nImmersion={fiber_immersion} mm' +
+                    f'\nanode dist={anode_distance} mm')
+            ax1.text(0.04, 0.95, text, ha='left', va='top',
+                     transform=ax1.transAxes,
+                     bbox=dict(facecolor='white', alpha=0.5, boxstyle='round,pad=0.3'),  # Set edgecolor to 'none'
+                     fontsize=13, color='blue', fontweight='bold', linespacing=1.5)
+
+
                   
-            title = (f'EL gap={el_gap}mm, pitch={pitch}mm,' + 
-                      f' fiber immersion={fiber_immersion}mm, anode distance={anode_distance}mm,' + 
-                      f' holder thickness={holder_thickness}mm\n\nEvent spacing={dist}mm,' + 
-                    f' Avg RL iterations={int(avg_cutoff_iter)},'  +
-                    f' Avg RL relative diff={np.around(avg_rel_diff_checkout,4)}')
+            title = (f' Event spacing={dist} mm,' + 
+                     f' Avg RL iterations={int(avg_cutoff_iter)},'  +
+                     f' Avg RL relative diff={np.around(avg_rel_diff_checkout,4)}')
             
 
-            fig.suptitle(title,fontsize=15)
+
+
+            fig.suptitle(title,fontsize=16,fontweight='bold')
             fig.tight_layout()
             if TO_SAVE:
                 # save files and deconv image plot in correct folder #
