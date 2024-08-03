@@ -45,10 +45,10 @@ SquareOpticalFiber::~SquareOpticalFiber(){
 
 
 void SquareOpticalFiber::Construct(){
-    G4int n = 1;
+    G4int n = 25;
     bool claddingExists = true;
     bool wallsExists = false;
-    bool holderExists = false;
+    bool holderExists = true;
     bool fiberTPBExist = true;
     bool holderTPBExist = false;
 
@@ -124,7 +124,7 @@ void SquareOpticalFiber::Construct(){
     G4double BarrelThickness = 5*cm;
     G4double barrelOuterRadius = 50.*cm;
     G4double barrelInnerRadius = barrelOuterRadius - BarrelThickness;
-    G4double cylLength = 0.001*cm + delta; // This is also the fiber length !!
+    G4double cylLength = 7*cm + delta; // This is also the fiber length !!
 
     G4Tubs *barrel = new G4Tubs("Barrel", //name
                               barrelInnerRadius, //inner radius
@@ -138,6 +138,7 @@ void SquareOpticalFiber::Construct(){
                                                                 Teflon, //material of cylinder
                                                                 "Barrel"); //name
 
+    // Add encircling teflon half barrel
     // new G4PVPlacement(
     //                 0,                // no rotation
     //                 G4ThreeVector(0.,0.,0.),// at (0,0,0)
@@ -381,18 +382,18 @@ void SquareOpticalFiber::Construct(){
 
 
 
-            if (wallsExists){
-                name = "wall_(x,y)=(" + x_str + "," + y_str + ")";
-                new G4PVPlacement(
-                                0,                // no rotation
-                                G4ThreeVector(x,y,zTeflonWall),  // at (0,0,0)
-                                teflonWallLogicalVolume, // its logical volume
-                                name,               //its name
-                                worldLogicalVolume,   //its mother volume
-                                false,            // no boolean operation
-                                0,                // copy number
-                                false);          // checking overlaps)
-            }
+            // if (wallsExists){
+            //     name = "wall_(x,y)=(" + x_str + "," + y_str + ")";
+            //     new G4PVPlacement(
+            //                     0,                // no rotation
+            //                     G4ThreeVector(x,y,zTeflonWall),  // at (0,0,0)
+            //                     teflonWallLogicalVolume, // its logical volume
+            //                     name,               //its name
+            //                     worldLogicalVolume,   //its mother volume
+            //                     false,            // no boolean operation
+            //                     0,                // copy number
+            //                     false);          // checking overlaps)
+            // }
 
 
 
@@ -715,8 +716,6 @@ G4ThreeVector SquareOpticalFiber::GenerateVertex(const G4String& region) const {
         G4double xGen = x_dist_(gen_);
         G4double yGen = y_dist_(gen_);
         G4double zGen = specific_vertex_.z();
-        // z_dist_ = std::uniform_real_distribution<double>(-0.0022*mm, 0*mm);
-        // G4double zGen = z_dist_(gen_);
         G4ThreeVector random_vertex = G4ThreeVector(xGen, yGen, zGen);
         return random_vertex;
     }

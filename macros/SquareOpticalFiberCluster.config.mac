@@ -35,5 +35,4 @@
 /Geometry/SquareOpticalFiber/TPBThickness ${TPBThickness} um 
 
 /SquareOpticalFiber/SquareFiberSD/Output/sipmPath ${sipmOutputFile_}
-#/SquareOpticalFiber/SquareFiberSD/Output/tpbPath /dev/null
 /SquareOpticalFiber/SquareFiberSD/Output/tpbPath ${tpbOutputFile_}

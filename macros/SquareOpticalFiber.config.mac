@@ -21,10 +21,10 @@
 
 
 ## Choose region
-#/Generator/SingleParticle/region LINE_SOURCE_EL
+/Generator/SingleParticle/region LINE_SOURCE_EL
 #/Generator/SingleParticle/region AD_HOC
 #/Generator/SingleParticle/region SingleParticle
-/Generator/SingleParticle/region FACE_RANDOM_DIST
+#/Generator/SingleParticle/region FACE_RANDOM_DIST
 
 
 #/Generator/SingleParticle/region ACTIVE
@@ -36,13 +36,9 @@
 
 ####  SETUP PARAMETERS  ####
 /nexus/random_seed 10002
-/Geometry/SquareOpticalFiber/specific_vertex 0 0 -0.0023 mm # face of fiber TPB, "AD_HOC"
-#/Geometry/SquareOpticalFiber/specific_vertex 0 0 -0.002 mm # face of fiber TPB, "AD_HOC"
-#/Geometry/SquareOpticalFiber/specific_vertex 0 0 -0.0018 mm # face of fiber TPB, "AD_HOC"
-#/Geometry/SquareOpticalFiber/specific_vertex 0 0 -0.0014 mm # face of fiber TPB, "AD_HOC"
-#/Geometry/SquareOpticalFiber/specific_vertex 0 0 -0.0011 mm # face of fiber TPB, "AD_HOC"
+#/Geometry/SquareOpticalFiber/specific_vertex 0 0 -0.0023 mm # face of fiber TPB, "AD_HOC"
 
-#/Geometry/SquareOpticalFiber/specific_vertex 0 0 -0.0023 mm # z-value not relevant here in "LINE_SOURCE_EL" mode
+/Geometry/SquareOpticalFiber/specific_vertex 0 0 -0.0023 mm # z-value not relevant here in "LINE_SOURCE_EL" mode
 
 #/Geometry/SquareOpticalFiber/specific_vertex 0 0 -0.0023 mm # face of fiber, "FACE_RANDOM_DIST"
 
@@ -60,7 +56,7 @@
 #/SquareOpticalFiber/SquareFiberSD/Output/sipmPath /dev/null
 #/SquareOpticalFiber/SquareFiberSD/Output/tpbPath /dev/null
 
-## CLUSTER ONLY, Write output hitpoint text and hdf5 files ##
+# CLUSTER ONLY, Write output hitpoint text and hdf5 files ##
 #/SquareOpticalFiber/SquareFiberSD/Output/sipmPath /gpfs0/arazi/users/amirbenh/Resolving_Power/nexus/test_outputs/SiPM_hits.txt
 #/SquareOpticalFiber/SquareFiberSD/Output/tpbPath /gpfs0/arazi/users/amirbenh/Resolving_Power/nexus/test_outputs/TPB_hits.txt
 #/nexus/persistency/outputFile /gpfs0/arazi/users/amirbenh/Resolving_Power/nexus/test_outputs/SquareFiber.next
