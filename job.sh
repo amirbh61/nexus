@@ -1,8 +1,11 @@
 #!/bin/bash
-
 # This code runs a single job and is used inside runner.sh
+
+# manually enter path to geant source 
 source /gpfs0/arazi/projects/geant4.11.0.2-build/geant4make.sh
+# manually cd to main working directory
 cd /gpfs0/arazi/users/amirbenh/Resolving_Power/nexus
+
 
 geometry_folder=$1
 sub_dir=$2

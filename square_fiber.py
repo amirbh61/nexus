@@ -35,7 +35,7 @@ from square_fiber_functions import *
 
 # Global settings #
 
-n_sipms = 25 # DO NOT CHANGE THIS VALUE
+n_sipms = 25 # DO NOT CHANGE THIS VALUE - corresponds to geant4 sim sipm number
 n_sipms_per_side = (n_sipms-1)/2
 size = 250
 bins = size
@@ -47,7 +47,8 @@ path_to_dataset = '/media/amir/Extreme Pro/SquareFiberDatabase'
 # List full paths of the Geant4_PSF_events folders inside SquareFiberDatabase
 geometry_dirs = [os.path.join(path_to_dataset, d) for d in os.listdir(path_to_dataset)
                  if os.path.isdir(os.path.join(path_to_dataset, d))]
-delta_r = '\u0394' + 'r'
+
+delta_r = '\u0394' + 'r' # math sign for delta
 
 # In[0]
 # Generate all PSFs (of geant4 TPB hits) from SquareFiberDataset

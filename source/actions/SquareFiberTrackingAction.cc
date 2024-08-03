@@ -16,7 +16,6 @@ SquareFiberTrackingAction::~SquareFiberTrackingAction()
 }
 
 
-// original
 void SquareFiberTrackingAction::PreUserTrackingAction(const G4Track* track) {
     if (track->GetParentID() == 0) {
         track->SetUserInformation(new MyTrackInfo());
@@ -30,28 +29,6 @@ void SquareFiberTrackingAction::PreUserTrackingAction(const G4Track* track) {
         }
     }
 }
-
-// //second one
-// void SquareFiberTrackingAction::PreUserTrackingAction(const G4Track* track) {
-//     if (track->GetParentID() != 0) {  // Check only for secondary particles
-//         const G4VProcess* creator = track->GetCreatorProcess();
-//         if (creator && creator->GetProcessName() == "OpWLS") {
-//             MyTrackInfo* info = dynamic_cast<MyTrackInfo*>(track->GetUserInformation());
-//             G4cout << "info = " << info << G4endl;
-//             if (!info) {
-//                 info = new MyTrackInfo();
-//                 track->SetUserInformation(info);
-//             }
-//             info->SetParentHasOpWLS(true);
-//             G4cout << "OpWLS process detected for track ID: " << track->GetTrackID() << G4endl;
-//         }
-//     }
-// }
-
-
-
-
-
 
 
 

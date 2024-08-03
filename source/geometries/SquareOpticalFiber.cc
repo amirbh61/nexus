@@ -258,7 +258,7 @@ void SquareOpticalFiber::Construct(){
 
 
 
-    // ///// TEFLON WALL SURROUNDING FIBER CORE /////
+    // ///// TEFLON WALL SURROUNDING FIBER CORE - CURRENTLY UNUSED /////
     // G4double WallThickness = 0.5*mm;
     // G4double outerTeflonWallSide = 0.5*pitch_;
     // G4double innerTeflonWallSide = outerTeflonWallSide - WallThickness;
@@ -381,18 +381,18 @@ void SquareOpticalFiber::Construct(){
 
 
 
-            // if (wallsExists){
-            //     name = "wall_(x,y)=(" + x_str + "," + y_str + ")";
-            //     new G4PVPlacement(
-            //                     0,                // no rotation
-            //                     G4ThreeVector(x,y,zTeflonWall),  // at (0,0,0)
-            //                     teflonWallLogicalVolume, // its logical volume
-            //                     name,               //its name
-            //                     worldLogicalVolume,   //its mother volume
-            //                     false,            // no boolean operation
-            //                     0,                // copy number
-            //                     false);          // checking overlaps)
-            // }
+            if (wallsExists){
+                name = "wall_(x,y)=(" + x_str + "," + y_str + ")";
+                new G4PVPlacement(
+                                0,                // no rotation
+                                G4ThreeVector(x,y,zTeflonWall),  // at (0,0,0)
+                                teflonWallLogicalVolume, // its logical volume
+                                name,               //its name
+                                worldLogicalVolume,   //its mother volume
+                                false,            // no boolean operation
+                                0,                // copy number
+                                false);          // checking overlaps)
+            }
 
 
 
@@ -565,7 +565,7 @@ void SquareOpticalFiber::Construct(){
  ///////////////////   THINGS TO KEEP FOR NOW    ///////////////////
 
 
-    // ///// Create world center /////
+    // ///// Create world center - /////
 
     // G4Box *worldCenter = new G4Box("World_Center", edge/1000, edge/1000, edge/1000);
     // G4LogicalVolume *worldCenterLogical = new G4LogicalVolume(worldCenter,Xe, "World_Center");

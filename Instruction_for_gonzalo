@@ -1,0 +1,28 @@
+Instructions:
+
+1. make sure you have the template .init and .config files.
+
+2. in square_fiber_generate_macros_Cluster.py:
+choose your geometry parameters.
+choose generation method (remember to run this script twice for both methods to create both event files to be sampled for resolving power and events to crete PSF).
+choose paths for templates and output folder.
+
+run the script (twice).
+
+3. in job.sh:
+make sure source and cd paths are correct for your
+choose how many single photons to be generated for both "Geant4_Kr_events" and "Geant4_PSF_events".
+
+4. in runner.sh:
+choose path of mother folder - should be the same as the output folder in section 2.
+choose your username.
+specify path for log outputs and log errors (for both conditions).
+specify correct queue.
+
+5. after run is over:
+open custom_text_files_transfer.txt
+use the examples to download the data excluding the .mac files, to your local machine.
+
+
+
+

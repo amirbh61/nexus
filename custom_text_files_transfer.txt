@@ -7,7 +7,7 @@ EXAMPLE:
 rsync -avz --include='*/' --include='*.txt' --exclude='*' ./SquareFiberMacrosAndOutputsCloseEL10KSources1mmEL amir@132.72.12.172:/media/amir/9C33-6BBD/NEXT_work/Geant4/nexus/small_cluster_hitpoints_dataset
 
 
-Example with selective taking of only needed data for study:
+HIGHLY RECOMMENDED: Example with selective taking of only needed data for study:
 
 rsync -avz \
     --include='*/' \

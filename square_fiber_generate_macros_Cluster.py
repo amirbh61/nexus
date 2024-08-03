@@ -18,38 +18,24 @@ import re
 import itertools
 
 
-# In[0]
-# generate new geant4 macros for all geometries and all possible runs
+'''
+This script generates new .mac files for Geant4 for all geometries and in all runs.
+'''
 
+
+# Choose geometry parameters - script will create .mac file combinations of these parameters
 # Geometry parameters
-# geometry_params = {
-#      'ELGap': ['1', '10'],
-#      'pitch': ['5', '10', '15.6'],
-#      'distanceFiberHolder': ['-1', '2', '5'],
-#      'distanceAnodeHolder': ['2.5', '5', '10'],
-#      'holderThickness': ['10'],
-#      'TPBThickness': ['2.2'] # microns
-# }
-
- # Geometry parameters - Exansion to NEXT database for studying optimal anode distance at varying fiber depths
 geometry_params = {
-     'ELGap': ['10'],
-     'pitch': ['15.6'],
-     'distanceFiberHolder': ['-1','2'],
-     'distanceAnodeHolder': ['7.5'],
+     'ELGap': ['1', '10'],
+     'pitch': ['5', '10', '15.6'],
+     'distanceFiberHolder': ['-1', '2', '5'],
+     'distanceAnodeHolder': ['2.5', '5', '10'],
      'holderThickness': ['10'],
-     'TPBThickness': ['2.2']  # microns
+     'TPBThickness': ['2.2'] # microns, FULL thickness (in contrast to half size generally used in geant4 examples)
 }
 
-# # Run parameters
-# run_params = {
-#     'x': ['0'],
-#     'y': ['0'],
-#     'z': ['0'],
-# }
 
-
-# Run parameters
+# line source x,y,z
 run_params = {
     'x': ['0'],
     'y': ['0'],
@@ -57,37 +43,57 @@ run_params = {
 }
 
 ### IMPORTANT : BOTH MODES ARE NEEDED FOR EACH GEOMETRY !! ###
-# Chose mode of source generation
 
-# The Kr events
-fixed_intervals = False # edges are included !
-if fixed_intervals:
-    unit_cell_source_spacing = 0.2 # mm, spacing between sources in different runs
+'''
+Choose mode of source generation.
+Explanation:
+
+to run our simulation we need both line source events and PSF events for resolving power study.
+The line source events are currently set to be taken at a fixed intervals of the central unit cell "unit_cell_source_spacing".
+
+for PSF generation, we use a different approach, in which we generate .mac files for line source events at random x,y positions. the number of positions it the "num_samples" under the below PSF section. the number of photons per individual run is set in the job.sh file.
+NOTE: I have noticed it is generally more efficient to generate more macros with less photons per macro than to generate less macros with more photons per macro.
+so for example, 10K macros with 10K photons per macro gives a better PSF performance than 1K macros with 100K photons each. Ideally, one would generate a 1M macros with a single photon each at random x,y , however the huge amount of macros and the inefficincy of loading the entire geometry for a single photon for each core worker will be sub optimal and wasteful. Also, in the current BGU HPC there is a 3M files limit for each user.
+Therefore, we need to compromise somewhere in between.
+
+For both, the parameter "sub_dir" specifies the folder name for these files.
+
+At the current state of the code, you need to choose the method to generate .mac files using the below 'x_y_dist_method' parameter.
+We use 'fixed_intervals' for creating the line sources, later to be joind to create the twin events. 
+We use 'random_events_xy' for creating files for the PSF.
+
+'''
+
+
+# x,y distribution method
+x_y_dist_method = 'fixed_intervals' # or 'random_events_xy'
+
+if x_y_dist_method == 'fixed_intervals':
+    unit_cell_source_spacing = 0.2 # in mm, spacing between consecutive sources
     sub_dir = r'Geant4_Kr_events'
-
-# The PSF events
-random_events_xy = True
-if random_events_xy:
-    num_samples = 10000
+    
+if x_y_dist_method == 'random_events_xy':
+    num_samples = 10000 # how many random x,y positions to take for PSF generation
     sub_dir = 'Geant4_PSF_events'
 
 
+seed = 10000 # initaial seed. Each .mac will have seed=seed+1 with "seed" being a tunning counter.
 
-seed = 10000
+template_config_macro_path = r'/gpfs0/arazi/users/amirbenh/Resolving_Power/nexus/macros/SquareOpticalFiberCluster.config.mac'
+template_init_macro_path = r'/gpfs0/arazi/users/amirbenh/Resolving_Power/nexus/macros/SquareOpticalFiberCluster.init.mac'
+output_macro_Mfolder = r'/gpfs0/arazi/users/amirbenh/Resolving_Power/nexus/SquareFiberDatabaseExpansion2/' # main dataset folder path
 
-original_config_macro_path = r'/gpfs0/arazi/users/amirbenh/Resolving_Power/nexus/macros/SquareOpticalFiberCluster.config.mac'
-original_init_macro_path = r'/gpfs0/arazi/users/amirbenh/Resolving_Power/nexus/macros/SquareOpticalFiberCluster.init.mac'
-output_macro_Mfolder = r'/gpfs0/arazi/users/amirbenh/Resolving_Power/nexus/SquareFiberDatabaseExpansion2/'
+
 
 if not os.path.isdir(output_macro_Mfolder):
     os.mkdir(output_macro_Mfolder)
 
 # Open config macro file and read in the data
-with open(original_config_macro_path, "r") as f:
+with open(template_config_macro_path, "r") as f:
     config_template = f.read()
     
 # Open init macro file and read in the data
-with open(original_init_macro_path, "r") as f:
+with open(template_init_macro_path, "r") as f:
     init_template = f.read()
     
 
@@ -116,14 +122,14 @@ for i, combination in enumerate(geometry_combinations):
         if key == 'pitch':
             pitch_value = float(value)
             
-            if fixed_intervals:
+            if x_y_dist_method == 'fixed_intervals':
                 # scan unit cell at fixed intervals
                 x = np.arange(-pitch_value / 2, pitch_value / 2 + unit_cell_source_spacing,
                               unit_cell_source_spacing)
                 y = np.arange(-pitch_value / 2, pitch_value / 2 + unit_cell_source_spacing,
                               unit_cell_source_spacing)
             
-            if random_events_xy:
+            if x_y_dist_method == 'random_events_xy':
                 # randomize events in the unit cell at random places           
                 x = list(np.random.uniform(-(pitch_value / 2) + 0.00001,
                                            pitch_value / 2, num_samples))
@@ -142,7 +148,7 @@ for i, combination in enumerate(geometry_combinations):
             break
 
 
-    if fixed_intervals:
+    if x_y_dist_method == 'fixed_intervals':
         # Iterate through each combination of x and y
         for x_val in run_params['x']:
             for y_val in run_params['y']:
@@ -185,7 +191,7 @@ for i, combination in enumerate(geometry_combinations):
                     f.write(init_macro)
                 
                 
-    if random_events_xy:
+    if x_y_dist_method == 'random_events_xy':
         for i in range(len(x)):
             # fresh copy of the macro config template
             config_macro = config_template

@@ -823,12 +823,6 @@ namespace opticalprops {
     std::vector<G4double> rIndex = {1.41, 1.41};
     mpt->AddProperty("RINDEX", ENERGIES_2, rIndex);
 
-    // std::vector<G4double> TEFLONabsLength = {
-    //   0.1*mm,  0.1*mm,  0.1*mm,  0.1*mm,
-    //   0.1*mm,  0.1*mm,  0.1*mm
-    // };
-    // mpt->AddProperty("ABSLENGTH", ENERGIES, TEFLONabsLength);
-
     return mpt;
   }
 
@@ -1058,6 +1052,7 @@ namespace opticalprops {
     // According to the paper, the QE of TPB depends on the incident wavelength.
     // As Geant4 doesn't allow this possibility, it is set to the value corresponding
     // to Xe scintillation spectrum peak.
+
 
     /*
     WLSMEANNUMBERPHOTONS=0.53 According to paper:
